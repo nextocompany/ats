@@ -44,6 +44,17 @@ func (f fakePos) FindByPSCode(_ context.Context, code string) (*positions.Positi
 }
 func (fakePos) ListPublic(context.Context) ([]positions.PublicPosition, error) { return nil, nil }
 
+type fakeReengage struct {
+	called  int
+	lastPos uuid.UUID
+}
+
+func (f *fakeReengage) OnVacancyOpened(_ context.Context, positionID uuid.UUID) error {
+	f.called++
+	f.lastPos = positionID
+	return nil
+}
+
 func testApp(h *Handler) *fiber.App {
 	app := fiber.New(fiber.Config{ErrorHandler: httpx.ErrorHandler})
 	RegisterRoutes(app, h)
@@ -63,7 +74,7 @@ func post(t *testing.T, app *fiber.App, path, body string) int {
 
 func TestVacancyOpened_MappedCode(t *testing.T) {
 	vac := &fakeVac{}
-	h := NewHandler(vac, fakePos{knownCode: "CASHIER"}, nil, "mock")
+	h := NewHandler(vac, fakePos{knownCode: "CASHIER"}, nil, "mock", nil)
 	app := testApp(h)
 
 	code := post(t, app, "/api/v1/ps/vacancy-opened",
@@ -76,9 +87,33 @@ func TestVacancyOpened_MappedCode(t *testing.T) {
 	}
 }
 
+func TestVacancyOpened_FiresReengageWhenMapped(t *testing.T) {
+	re := &fakeReengage{}
+	h := NewHandler(&fakeVac{}, fakePos{knownCode: "CASHIER"}, nil, "mock", re)
+	if code := post(t, testApp(h), "/api/v1/ps/vacancy-opened",
+		`{"ps_vacancy_id":"V-9","position_code":"CASHIER","headcount":1}`); code != fiber.StatusOK {
+		t.Fatalf("expected 200, got %d", code)
+	}
+	if re.called != 1 {
+		t.Fatalf("expected re-engagement fired once for mapped vacancy, got %d", re.called)
+	}
+}
+
+func TestVacancyOpened_SkipsReengageWhenUnmapped(t *testing.T) {
+	re := &fakeReengage{}
+	h := NewHandler(&fakeVac{}, fakePos{knownCode: "CASHIER"}, nil, "mock", re)
+	if code := post(t, testApp(h), "/api/v1/ps/vacancy-opened",
+		`{"ps_vacancy_id":"V-10","position_code":"UNKNOWN","headcount":1}`); code != fiber.StatusOK {
+		t.Fatalf("expected 200, got %d", code)
+	}
+	if re.called != 0 {
+		t.Fatalf("expected no re-engagement for unmapped vacancy, got %d", re.called)
+	}
+}
+
 func TestVacancyOpened_UnknownCodeStillStored(t *testing.T) {
 	vac := &fakeVac{}
-	h := NewHandler(vac, fakePos{knownCode: "CASHIER"}, nil, "mock")
+	h := NewHandler(vac, fakePos{knownCode: "CASHIER"}, nil, "mock", nil)
 	app := testApp(h)
 
 	code := post(t, app, "/api/v1/ps/vacancy-opened",
@@ -95,7 +130,7 @@ func TestVacancyOpened_UnknownCodeStillStored(t *testing.T) {
 }
 
 func TestVacancyOpened_BadPayload(t *testing.T) {
-	h := NewHandler(&fakeVac{}, fakePos{}, nil, "mock")
+	h := NewHandler(&fakeVac{}, fakePos{}, nil, "mock", nil)
 	if code := post(t, testApp(h), "/api/v1/ps/vacancy-opened", `{"headcount":1}`); code != fiber.StatusBadRequest {
 		t.Fatalf("expected 400 for missing ps_vacancy_id, got %d", code)
 	}
@@ -103,7 +138,7 @@ func TestVacancyOpened_BadPayload(t *testing.T) {
 
 func TestVacancyClosed(t *testing.T) {
 	vac := &fakeVac{}
-	h := NewHandler(vac, fakePos{}, nil, "mock")
+	h := NewHandler(vac, fakePos{}, nil, "mock", nil)
 	if code := post(t, testApp(h), "/api/v1/ps/vacancy-closed", `{"ps_vacancy_id":"V-1","status":"cancelled"}`); code != fiber.StatusOK {
 		t.Fatalf("expected 200, got %d", code)
 	}

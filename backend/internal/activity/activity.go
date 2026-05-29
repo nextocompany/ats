@@ -18,6 +18,7 @@ const (
 	ActionBulkAction   = "bulk_action"
 	ActionViewResume   = "view_resume"
 	ActionConsent      = "consent"
+	ActionReengage     = "reengage"
 )
 
 // Entry is a single audit record.

@@ -11,6 +11,10 @@ import (
 // TypeProcessApplication is the asynq task type for the OCR + parse pipeline.
 const TypeProcessApplication = "application:process"
 
+// TypeReengageVacancy is the asynq task type for re-engaging talent-pool / prior
+// candidates when a vacancy opens (Sprint 5a).
+const TypeReengageVacancy = "vacancy:reengage"
+
 const (
 	taskMaxRetry  = 3
 	taskTimeout   = 90 * time.Second
@@ -44,6 +48,35 @@ func NewProcessApplicationTask(p ProcessApplicationPayload) (*asynq.Task, error)
 // ParseProcessApplicationPayload decodes a task body.
 func ParseProcessApplicationPayload(body []byte) (ProcessApplicationPayload, error) {
 	var p ProcessApplicationPayload
+	if err := json.Unmarshal(body, &p); err != nil {
+		return p, fmt.Errorf("queue: unmarshal payload: %w", err)
+	}
+	return p, nil
+}
+
+// ReengageVacancyPayload is the job body enqueued when a vacancy opens.
+type ReengageVacancyPayload struct {
+	PositionID string `json:"position_id"`
+}
+
+// NewReengageVacancyTask builds the re-engagement task with retry/timeout policy.
+func NewReengageVacancyTask(p ReengageVacancyPayload) (*asynq.Task, error) {
+	body, err := json.Marshal(p)
+	if err != nil {
+		return nil, fmt.Errorf("queue: marshal payload: %w", err)
+	}
+	return asynq.NewTask(
+		TypeReengageVacancy,
+		body,
+		asynq.MaxRetry(taskMaxRetry),
+		asynq.Timeout(taskTimeout),
+		asynq.Retention(taskRetention),
+	), nil
+}
+
+// ParseReengageVacancyPayload decodes a re-engagement task body.
+func ParseReengageVacancyPayload(body []byte) (ReengageVacancyPayload, error) {
+	var p ReengageVacancyPayload
 	if err := json.Unmarshal(body, &p); err != nil {
 		return p, fmt.Errorf("queue: unmarshal payload: %w", err)
 	}

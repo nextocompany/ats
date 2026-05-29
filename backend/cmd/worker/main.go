@@ -12,14 +12,17 @@ import (
 	goredis "github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
 
+	"github.com/nexto/hr-ats/internal/activity"
 	"github.com/nexto/hr-ats/internal/ai"
 	"github.com/nexto/hr-ats/internal/applications"
 	"github.com/nexto/hr-ats/internal/branch"
 	"github.com/nexto/hr-ats/internal/candidates"
 	"github.com/nexto/hr-ats/internal/dedup"
 	"github.com/nexto/hr-ats/internal/health"
+	"github.com/nexto/hr-ats/internal/notify"
 	"github.com/nexto/hr-ats/internal/pipeline"
 	"github.com/nexto/hr-ats/internal/positions"
+	"github.com/nexto/hr-ats/internal/reengage"
 	"github.com/nexto/hr-ats/internal/scoring"
 	"github.com/nexto/hr-ats/internal/vacancies"
 	"github.com/nexto/hr-ats/pkg/blob"
@@ -116,11 +119,20 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("queue redis opt failed")
 	}
+	// Re-engagement (Sprint 5a): notify talent-pool / prior candidates on vacancy open.
+	reengageSvc := reengage.NewService(
+		reengage.NewRepository(pool),
+		notify.NewNotifier(cfg),
+		activity.New(pool),
+		cfg.PortalBaseURL,
+	)
+
 	srv := asynq.NewServer(redisOpt, asynq.Config{Concurrency: workerConcurrency})
 	mux := asynq.NewServeMux()
 	mux.HandleFunc(queue.TypeProcessApplication, processor.HandleProcessApplication)
+	mux.HandleFunc(queue.TypeReengageVacancy, reengageSvc.HandleReengageVacancy)
 
-	log.Info().Str("provider", cfg.AIProvider).Msg("worker started; consuming process_application")
+	log.Info().Str("provider", cfg.AIProvider).Msg("worker started; consuming process_application + vacancy:reengage")
 	if err := srv.Run(mux); err != nil {
 		log.Fatal().Err(err).Msg("asynq server error")
 	}

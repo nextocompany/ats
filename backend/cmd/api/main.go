@@ -27,6 +27,7 @@ import (
 	"github.com/nexto/hr-ats/internal/positions"
 	"github.com/nexto/hr-ats/internal/profiles"
 	"github.com/nexto/hr-ats/internal/public"
+	"github.com/nexto/hr-ats/internal/reengage"
 	"github.com/nexto/hr-ats/internal/reports"
 	"github.com/nexto/hr-ats/internal/users"
 	"github.com/nexto/hr-ats/internal/vacancies"
@@ -140,13 +141,18 @@ func main() {
 	psClient := peoplesoft.NewClient(cfg)
 	psService := peoplesoft.NewService(psClient, appRepo, candidateRepo, blobClient, cfg.PSCSVFallbackContainer)
 	lineVerifier := auth.NewVerifier(cfg)
+	reengageTrigger := reengage.NewTrigger(queueClient)
 
 	// Intake + status routes (status PATCH triggers PS sync on hired).
 	intakeSvc := applications.NewService(candidateRepo, appRepo, blobClient, queueClient)
 	applications.RegisterRoutes(app, applications.NewHandler(intakeSvc, appRepo, inspector, psService))
 
-	// PeopleSoft integration (Direction A webhooks + Direction B sync).
-	peoplesoft.RegisterRoutes(app, peoplesoft.NewHandler(vacancyRepo, positionRepo, psService, cfg.PSProvider))
+	// PeopleSoft integration (Direction A webhooks + Direction B sync). Vacancy
+	// open fires candidate re-engagement (Sprint 5a).
+	peoplesoft.RegisterRoutes(app, peoplesoft.NewHandler(vacancyRepo, positionRepo, psService, cfg.PSProvider, reengageTrigger))
+
+	// Re-engagement manual trigger (Sprint 5a).
+	reengage.RegisterRoutes(app, reengage.NewHandler(reengageTrigger))
 
 	// Public Career API (consumed by the Next.js portal in Sprint 4).
 	pdpaRepo := pdpa.New(pool)
