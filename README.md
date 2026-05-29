@@ -2,12 +2,14 @@
 
 End-to-end AI recruitment platform — intake → AI screening/scoring → HR approval → PeopleSoft HCM sync.
 
-> **Status:** Sprint 2 (Scoring + Branch Assignment + Dedup). The pipeline now runs intake → OCR → parse →
-> **dedup → score → must-have gate → branch assignment**. Resumes are submitted, queued (asynq), OCR'd,
-> parsed, deduplicated, scored 0–100 against the Master JD, and routed to the nearest store with an open
-> vacancy (or the talent pool). AI is pluggable — a **mock** runs by default (zero Azure keys); set
-> `AI_PROVIDER=azure` for real Document Intelligence + GPT-4o. Scoring is **hybrid**: deterministic rules
-> for the gate/location/education/experience, LLM only for skills match + Thai strengths + red flags.
+> **Status:** Sprint 3 (PeopleSoft + Public Career API + Reference Import). Vacancies now flow in from
+> **PeopleSoft** webhooks (replacing seeded demos) and hired candidates are pushed back (CSV fallback on
+> failure). A public **Career API** (`/api/v1/public/*`) lets candidates browse open positions, apply
+> (mock LINE auth, reusing the full intake→score→assign pipeline), and check status by opaque token. A CSV
+> **importer** loads real Storelist/Master JD data. The pipeline (S1+S2) runs intake → OCR → parse →
+> dedup → score → must-have gate → branch assignment. External integrations (AI, PeopleSoft, LINE) are all
+> pluggable — **mock by default** (zero external creds); set `AI_PROVIDER=azure` / `PS_PROVIDER=real` /
+> `LINE_PROVIDER=real` for the real services. The Next.js Career Portal + HR Dashboard UIs are Sprint 4.
 
 ## Prerequisites
 
@@ -68,7 +70,31 @@ curl -s localhost:8080/api/v1/applications/<app_id>   # → status "scored" | "r
 ```
 
 Resubmitting the same person (matching id_card, or phone/email + fuzzy name) auto-merges to the canonical
-candidate. Notifications (LINE) and PeopleSoft vacancy sync are Sprint 3+; Sprint 2 uses seeded demo vacancies.
+candidate.
+
+## PeopleSoft + Public Career API (Sprint 3)
+
+```bash
+# Reference data: synthetic SQL seed (make seed) OR real-format CSV import:
+make import DIR=scripts        # → cmd/importref loads stores + Master JD positions (idempotent)
+
+# Direction A — PeopleSoft opens a vacancy (replaces seeded demos):
+curl -X POST localhost:8080/api/v1/ps/vacancy-opened -H 'Content-Type: application/json' \
+  -d '{"ps_vacancy_id":"V-2026-001","store_id":1,"position_code":"CASHIER","headcount":1,"opened_date":"2026-06-01"}'
+
+# Public Career API (mock LINE auth via X-LINE-IdToken):
+curl localhost:8080/api/v1/public/positions
+curl -F resume=@cv.pdf;type=application/pdf -F position_id=<id> -F full_name=... -F province=เชียงใหม่ \
+  -H 'X-LINE-IdToken: dev-stub' localhost:8080/api/v1/public/apply   # → {status_token}
+curl localhost:8080/api/v1/public/status/<status_token>             # minimal projection
+
+# Direction B — mark hired → push to PeopleSoft (CSV-to-Blob fallback on failure):
+curl -X PATCH localhost:8080/api/v1/applications/<id>/status -H 'Content-Type: application/json' -d '{"status":"hired"}'
+curl localhost:8080/api/v1/ps/health
+```
+
+A PeopleSoft outage never blocks a hire — the candidate is written as a CSV export to Blob and
+`ps_synced_at` is left unset for later retry. Notifications (LINE push) are Sprint 5.
 
 ## Make Targets
 

@@ -15,6 +15,7 @@ const (
 	StatusFailed   = "failed"   // pipeline error
 	StatusScored   = "scored"   // S2: passed gate, scored + assigned
 	StatusRejected = "rejected" // S2: failed must-have gate
+	StatusHired    = "hired"    // S3: HR hired → pushed to PeopleSoft
 )
 
 // Application maps the applications table (columns used in Sprint 1).

@@ -1,6 +1,7 @@
 package applications
 
 import (
+	"context"
 	"io"
 
 	"github.com/gofiber/fiber/v2"
@@ -20,16 +21,23 @@ type JobInspector interface {
 	GetTaskInfo(queue, id string) (*asynq.TaskInfo, error)
 }
 
+// HiredSyncer pushes a hired application to PeopleSoft. Injected as an interface
+// so this package does not import peoplesoft (which imports this package).
+type HiredSyncer interface {
+	SyncHired(ctx context.Context, applicationID uuid.UUID) error
+}
+
 // Handler serves the intake and status endpoints.
 type Handler struct {
 	svc       *Service
 	apps      Repository
 	inspector JobInspector
+	hired     HiredSyncer
 }
 
 // NewHandler builds the applications handler.
-func NewHandler(svc *Service, apps Repository, inspector JobInspector) *Handler {
-	return &Handler{svc: svc, apps: apps, inspector: inspector}
+func NewHandler(svc *Service, apps Repository, inspector JobInspector, hired HiredSyncer) *Handler {
+	return &Handler{svc: svc, apps: apps, inspector: inspector, hired: hired}
 }
 
 // contentTypeToFileType maps an allowlisted content type to our file_type tag.
@@ -121,4 +129,48 @@ func (h *Handler) JobStatus(c *fiber.Ctx) error {
 		"queue":   info.Queue,
 		"retried": info.Retried,
 	})
+}
+
+// allowedStatuses bounds manual status transitions (HR Dashboard uses this in S4).
+var allowedStatuses = map[string]bool{
+	StatusScored: true, StatusRejected: true, StatusHired: true,
+	"shortlisted": true, "interview": true,
+}
+
+type updateStatusReq struct {
+	Status string `json:"status"`
+}
+
+// UpdateStatus handles PATCH /api/v1/applications/:id/status. Setting "hired"
+// records hired_at and pushes the candidate to PeopleSoft (the push never fails
+// the hire — see peoplesoft.Service).
+func (h *Handler) UpdateStatus(c *fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "invalid application id")
+	}
+	var req updateStatusReq
+	if err := c.BodyParser(&req); err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "invalid payload")
+	}
+	if !allowedStatuses[req.Status] {
+		return fiber.NewError(fiber.StatusBadRequest, "unsupported status transition")
+	}
+
+	if req.Status == StatusHired {
+		if err := h.apps.SetHired(c.UserContext(), id); err != nil {
+			return err
+		}
+		if h.hired != nil {
+			if err := h.hired.SyncHired(c.UserContext(), id); err != nil {
+				return err
+			}
+		}
+		return httpx.OK(c, fiber.Map{"id": id, "status": StatusHired})
+	}
+
+	if err := h.apps.SetStatus(c.UserContext(), id, req.Status); err != nil {
+		return err
+	}
+	return httpx.OK(c, fiber.Map{"id": id, "status": req.Status})
 }

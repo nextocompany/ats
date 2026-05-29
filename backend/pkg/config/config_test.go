@@ -71,6 +71,27 @@ func TestLoad_AzureRequiresKeys(t *testing.T) {
 	}
 }
 
+func TestLoad_PSRealRequiresCreds(t *testing.T) {
+	t.Setenv("DB_URL", "postgres://localhost/db")
+	t.Setenv("REDIS_URL", "redis://localhost:6379")
+	t.Setenv("AZURE_BLOB_CONNECTION_STRING", "conn")
+	t.Setenv("PS_PROVIDER", "real")
+	if _, err := Load(); err == nil {
+		t.Fatal("expected error when PS_PROVIDER=real without IB creds")
+	}
+}
+
+func TestLoad_LINERealRequiresChannel(t *testing.T) {
+	t.Setenv("DB_URL", "postgres://localhost/db")
+	t.Setenv("REDIS_URL", "redis://localhost:6379")
+	t.Setenv("AZURE_BLOB_CONNECTION_STRING", "conn")
+	t.Setenv("LINE_PROVIDER", "real")
+	t.Setenv("LINE_CHANNEL_ID", "")
+	if _, err := Load(); err == nil {
+		t.Fatal("expected error when LINE_PROVIDER=real without channel id")
+	}
+}
+
 func TestLoad_AzureWithKeys(t *testing.T) {
 	// Arrange
 	t.Setenv("DB_URL", "postgres://localhost/db")

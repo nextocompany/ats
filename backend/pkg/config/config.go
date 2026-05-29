@@ -29,10 +29,25 @@ type Config struct {
 	AzureOpenAIDeployment string
 	AzureDocIntelEndpoint string
 	AzureDocIntelKey      string
+
+	// PeopleSoft Integration Broker — "mock" (default) or "real".
+	PSProvider             string
+	PSIBBaseURL            string
+	PSIBTokenURL           string
+	PSIBClientID           string
+	PSIBClientSecret       string
+	PSCSVFallbackContainer string
+
+	// LINE Login — "mock" (default) or "real".
+	LINEProvider  string
+	LINEChannelID string
 }
 
-// AIProviderAzure is the value of AIProvider that selects real Azure clients.
-const AIProviderAzure = "azure"
+// Provider values selecting real (vs mock) integrations.
+const (
+	AIProviderAzure = "azure"
+	ProviderReal    = "real"
+)
 
 // Load reads configuration from the environment and returns a populated Config.
 // Required variables (DB_URL, REDIS_URL) cause a clear error when absent.
@@ -53,6 +68,16 @@ func Load() (*Config, error) {
 		AzureOpenAIDeployment: getenv("AZURE_OPENAI_DEPLOYMENT", "hr-screening-gpt4o"),
 		AzureDocIntelEndpoint: os.Getenv("AZURE_DOC_INTEL_ENDPOINT"),
 		AzureDocIntelKey:      os.Getenv("AZURE_DOC_INTEL_KEY"),
+
+		PSProvider:             getenv("PS_PROVIDER", "mock"),
+		PSIBBaseURL:            os.Getenv("PS_IB_BASE_URL"),
+		PSIBTokenURL:           os.Getenv("PS_IB_TOKEN_URL"),
+		PSIBClientID:           os.Getenv("PS_IB_CLIENT_ID"),
+		PSIBClientSecret:       os.Getenv("PS_IB_CLIENT_SECRET"),
+		PSCSVFallbackContainer: getenv("PS_CSV_FALLBACK_CONTAINER", "ps-export"),
+
+		LINEProvider:  getenv("LINE_PROVIDER", "mock"),
+		LINEChannelID: os.Getenv("LINE_CHANNEL_ID"),
 	}
 
 	if c.DatabaseURL == "" {
@@ -72,9 +97,23 @@ func Load() (*Config, error) {
 			return nil, fmt.Errorf("config: AZURE_DOC_INTEL_ENDPOINT and AZURE_DOC_INTEL_KEY are required when AI_PROVIDER=azure")
 		}
 	}
+	if c.UsesRealPeopleSoft() {
+		if c.PSIBBaseURL == "" || c.PSIBTokenURL == "" || c.PSIBClientID == "" || c.PSIBClientSecret == "" {
+			return nil, fmt.Errorf("config: PS_IB_BASE_URL, PS_IB_TOKEN_URL, PS_IB_CLIENT_ID, PS_IB_CLIENT_SECRET are required when PS_PROVIDER=real")
+		}
+	}
+	if c.UsesRealLINE() && c.LINEChannelID == "" {
+		return nil, fmt.Errorf("config: LINE_CHANNEL_ID is required when LINE_PROVIDER=real")
+	}
 
 	return c, nil
 }
+
+// UsesRealPeopleSoft reports whether the real PS Integration Broker client should be used.
+func (c *Config) UsesRealPeopleSoft() bool { return c.PSProvider == ProviderReal }
+
+// UsesRealLINE reports whether real LINE id-token verification should be used.
+func (c *Config) UsesRealLINE() bool { return c.LINEProvider == ProviderReal }
 
 // UsesAzureAI reports whether real Azure AI clients should be constructed.
 func (c *Config) UsesAzureAI() bool {
