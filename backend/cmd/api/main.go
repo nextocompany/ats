@@ -15,14 +15,19 @@ import (
 	goredis "github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
 
+	"github.com/nexto/hr-ats/internal/activity"
 	"github.com/nexto/hr-ats/internal/applications"
 	"github.com/nexto/hr-ats/internal/auth"
 	"github.com/nexto/hr-ats/internal/candidates"
 	"github.com/nexto/hr-ats/internal/health"
 	"github.com/nexto/hr-ats/internal/middleware"
+	"github.com/nexto/hr-ats/internal/pdpa"
 	"github.com/nexto/hr-ats/internal/peoplesoft"
 	"github.com/nexto/hr-ats/internal/positions"
+	"github.com/nexto/hr-ats/internal/profiles"
 	"github.com/nexto/hr-ats/internal/public"
+	"github.com/nexto/hr-ats/internal/reports"
+	"github.com/nexto/hr-ats/internal/users"
 	"github.com/nexto/hr-ats/internal/vacancies"
 	"github.com/nexto/hr-ats/pkg/blob"
 	"github.com/nexto/hr-ats/pkg/bootstrap"
@@ -138,6 +143,15 @@ func main() {
 
 	// Public Career API (consumed by the Next.js portal in Sprint 4).
 	public.RegisterRoutes(app, public.NewHandler(intakeSvc, appRepo, positionRepo, lineVerifier))
+
+	// HR Dashboard API (Sprint 4a): ranked inbox, bulk, resume signed-URLs,
+	// candidate detail/timeline, analytics, PDPA, users/me.
+	activityLog := activity.New(pool)
+	applications.RegisterDashboardRoutes(app, applications.NewDashboardHandler(appRepo, blobClient, activityLog))
+	profiles.RegisterRoutes(app, profiles.NewHandler(candidateRepo, appRepo))
+	reports.RegisterRoutes(app, reports.NewHandler(reports.New(pool)))
+	pdpa.RegisterRoutes(app, pdpa.NewHandler(pdpa.New(pool)))
+	users.RegisterRoutes(app, users.NewHandler())
 
 	go func() {
 		addr := "0.0.0.0:" + cfg.HTTPPort

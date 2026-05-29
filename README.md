@@ -96,6 +96,26 @@ curl localhost:8080/api/v1/ps/health
 A PeopleSoft outage never blocks a hire — the candidate is written as a CSV export to Blob and
 `ps_synced_at` is left unset for later retry. Notifications (LINE push) are Sprint 5.
 
+## HR Dashboard API (Sprint 4a)
+
+The Go API the dashboard UI (Sprint 4b) renders — role-scoped via the authenticated user.
+
+```bash
+curl 'localhost:8080/api/v1/applications?status=scored&min_score=50&page=1&limit=20'  # ranked inbox → data[] + meta
+curl localhost:8080/api/v1/applications/<id>/resume          # short-lived signed (SAS) URL
+curl -X POST localhost:8080/api/v1/applications/bulk -d '{"ids":["<id>"],"action":"status","value":"shortlisted"}'
+curl localhost:8080/api/v1/candidates                        # list (scoped, paginated)
+curl localhost:8080/api/v1/candidates/<id>                   # candidate + applications
+curl localhost:8080/api/v1/candidates/<id>/timeline          # audit history (F16)
+curl localhost:8080/api/v1/reports/funnel                    # also /kpi, /sources
+curl -X POST localhost:8080/api/v1/pdpa/consent -d '{"candidate_id":"<id>","consent_given":true,"consent_version":"1.0","source_channel":"career_portal"}'
+curl localhost:8080/api/v1/users/me
+```
+
+**Role scoping** is derived centrally (`internal/rbac`): super_admin/regional/auditor → all; operation_director →
+subregion; sgm/hr_manager/hr_staff → store. The dev mock user is `super_admin`; scoping is unit-tested across roles.
+The Next.js HR Dashboard + Career Portal UIs (Sprint 4b) build on this API in a **light operations console** direction.
+
 ## Make Targets
 
 Run `make help` for the full list — `up`, `down`, `migrate-up`, `migrate-down`,

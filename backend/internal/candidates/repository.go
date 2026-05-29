@@ -6,6 +6,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/nexto/hr-ats/internal/activity"
+	"github.com/nexto/hr-ats/internal/rbac"
 )
 
 // Repository is the candidate data-access contract. The concrete implementation
@@ -13,6 +16,8 @@ import (
 type Repository interface {
 	Create(ctx context.Context, c Candidate) (Candidate, error)
 	FindByID(ctx context.Context, id uuid.UUID) (*Candidate, error)
+	List(ctx context.Context, f Filter, scope rbac.Scope) ([]Candidate, int, error)
+	Timeline(ctx context.Context, id uuid.UUID) ([]activity.Entry, error)
 	UpdateProfileFields(ctx context.Context, id uuid.UUID, f ProfileFields) error
 	// FindDuplicates returns non-duplicate candidates (excluding excludeID) that
 	// share an exact id_card, phone, or email with the given values.

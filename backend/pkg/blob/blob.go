@@ -7,10 +7,12 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/bloberror"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/sas"
 )
 
 // Client wraps the azblob client together with the working container name.
@@ -63,6 +65,27 @@ func (c *Client) Upload(ctx context.Context, name string, data []byte, contentTy
 		return "", fmt.Errorf("blob: upload %q: %w", name, err)
 	}
 	return strings.TrimRight(c.client.ServiceClient().URL(), "/") + "/" + c.container + "/" + name, nil
+}
+
+// SignedURL returns a short-lived, read-only SAS URL for the named blob.
+func (c *Client) SignedURL(name string, ttl time.Duration) (string, error) {
+	bc := c.client.ServiceClient().NewContainerClient(c.container).NewBlobClient(name)
+	url, err := bc.GetSASURL(sas.BlobPermissions{Read: true}, time.Now().Add(ttl), nil)
+	if err != nil {
+		return "", fmt.Errorf("blob: signed url for %q: %w", name, err)
+	}
+	return url, nil
+}
+
+// SignedURLForStored derives the blob key from a previously stored full URL and
+// returns a signed URL for it.
+func (c *Client) SignedURLForStored(storedURL string, ttl time.Duration) (string, error) {
+	marker := "/" + c.container + "/"
+	i := strings.Index(storedURL, marker)
+	if i < 0 {
+		return "", fmt.Errorf("blob: cannot derive key from %q", storedURL)
+	}
+	return c.SignedURL(storedURL[i+len(marker):], ttl)
 }
 
 // Download reads the named blob into memory.
