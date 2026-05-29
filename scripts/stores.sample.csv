@@ -1,0 +1,8 @@
+store_no,store_name,format_type,subregion,province,latitude,longitude
+1,CM Central,A,Upper North,เชียงใหม่,18.7960,98.9790
+2,Chiang Rai,B,Upper North,เชียงราย,19.9100,99.8400
+10,Bangkok Rama IX,A,BKK East,กรุงเทพมหานคร,13.7563,100.5018
+30,Udon Thani,A,Upper Northeast,อุดรธานี,17.4138,102.7870
+40,Chonburi,A,East,ชลบุรี,13.3611,100.9847
+50,Surat Thani,B,Upper South,สุราษฎร์ธานี,9.1382,99.3215
+60,Khon Kaen,A,Lower West Northeast,ขอนแก่น,,

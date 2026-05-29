@@ -16,9 +16,14 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/nexto/hr-ats/internal/applications"
+	"github.com/nexto/hr-ats/internal/auth"
 	"github.com/nexto/hr-ats/internal/candidates"
 	"github.com/nexto/hr-ats/internal/health"
 	"github.com/nexto/hr-ats/internal/middleware"
+	"github.com/nexto/hr-ats/internal/peoplesoft"
+	"github.com/nexto/hr-ats/internal/positions"
+	"github.com/nexto/hr-ats/internal/public"
+	"github.com/nexto/hr-ats/internal/vacancies"
 	"github.com/nexto/hr-ats/pkg/blob"
 	"github.com/nexto/hr-ats/pkg/bootstrap"
 	"github.com/nexto/hr-ats/pkg/config"
@@ -113,11 +118,26 @@ func main() {
 	}
 	app.Get("/health", health.Handler(checkers...))
 
-	// Intake + status routes.
+	// Repositories.
 	candidateRepo := candidates.NewRepository(pool)
 	appRepo := applications.NewRepository(pool)
+	positionRepo := positions.NewRepository(pool)
+	vacancyRepo := vacancies.NewRepository(pool)
+
+	// External integrations (mock by default; real behind config).
+	psClient := peoplesoft.NewClient(cfg)
+	psService := peoplesoft.NewService(psClient, appRepo, candidateRepo, blobClient, cfg.PSCSVFallbackContainer)
+	lineVerifier := auth.NewVerifier(cfg)
+
+	// Intake + status routes (status PATCH triggers PS sync on hired).
 	intakeSvc := applications.NewService(candidateRepo, appRepo, blobClient, queueClient)
-	applications.RegisterRoutes(app, applications.NewHandler(intakeSvc, appRepo, inspector))
+	applications.RegisterRoutes(app, applications.NewHandler(intakeSvc, appRepo, inspector, psService))
+
+	// PeopleSoft integration (Direction A webhooks + Direction B sync).
+	peoplesoft.RegisterRoutes(app, peoplesoft.NewHandler(vacancyRepo, positionRepo, psService, cfg.PSProvider))
+
+	// Public Career API (consumed by the Next.js portal in Sprint 4).
+	public.RegisterRoutes(app, public.NewHandler(intakeSvc, appRepo, positionRepo, lineVerifier))
 
 	go func() {
 		addr := "0.0.0.0:" + cfg.HTTPPort

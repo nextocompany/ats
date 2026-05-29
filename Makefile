@@ -9,7 +9,7 @@ POSTGRES_USER ?= hruser
 POSTGRES_DB ?= hr_db
 PSQL := docker compose exec -T postgres psql -U $(POSTGRES_USER) -d $(POSTGRES_DB)
 
-.PHONY: help up down logs ps migrate-up migrate-down migrate-create seed build run-api run-worker test test-integration lint vet tidy
+.PHONY: help up down logs ps migrate-up migrate-down migrate-create seed import build run-api run-worker test test-integration lint vet tidy
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS=":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -35,10 +35,13 @@ migrate-down: ## Roll back the last migration
 migrate-create: ## Create a new migration: make migrate-create name=add_foo
 	migrate create -ext sql -dir $(MIGRATIONS_DIR) -seq $(name)
 
-seed: ## Load representative reference data (stores, positions, vacancies)
+seed: ## Load representative reference data via SQL (quick demo)
 	$(PSQL) < scripts/seed_stores.sql
 	$(PSQL) < scripts/seed_positions.sql
 	$(PSQL) < scripts/seed_vacancies.sql
+
+import: ## Import reference data from CSVs: make import DIR=scripts
+	cd backend && go run ./cmd/importref ../$(DIR)/stores.sample.csv ../$(DIR)/positions.sample.csv
 
 build: ## Build both binaries
 	cd backend && go build ./...

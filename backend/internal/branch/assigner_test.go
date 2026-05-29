@@ -22,6 +22,8 @@ func (f fakeVac) FindOpen(_ context.Context, subregion string, _ uuid.UUID) ([]v
 func (f fakeVac) CountOpenForPosition(_ context.Context, _ uuid.UUID) (int, error) {
 	return f.total, nil
 }
+func (fakeVac) Upsert(context.Context, vacancies.Vacancy) error       { return nil }
+func (fakeVac) SetStatusByPSID(context.Context, string, string) error { return nil }
 
 func ptrF(v float64) *float64 { return &v }
 

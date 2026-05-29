@@ -21,6 +21,11 @@ type Repository interface {
 	SetDedupState(ctx context.Context, id uuid.UUID, state string, confidence float64) error
 	SetScore(ctx context.Context, id uuid.UUID, s Score) error
 	SetAssignment(ctx context.Context, id uuid.UUID, storeNo *int, talentPool bool) error
+	// Sprint 3:
+	SetHired(ctx context.Context, id uuid.UUID) error
+	SetPSSynced(ctx context.Context, id uuid.UUID) error
+	SetPublicToken(ctx context.Context, id uuid.UUID, token string) error
+	FindByPublicToken(ctx context.Context, token string) (*Application, error)
 }
 
 type pgRepository struct {
@@ -152,4 +157,51 @@ func (r *pgRepository) SetAssignment(ctx context.Context, id uuid.UUID, storeNo 
 		return fmt.Errorf("applications: set assignment: %w", err)
 	}
 	return nil
+}
+
+func (r *pgRepository) SetHired(ctx context.Context, id uuid.UUID) error {
+	const q = `UPDATE applications SET status = $2, hired_at = NOW(), updated_at = NOW() WHERE id = $1`
+	if _, err := r.pool.Exec(ctx, q, id, StatusHired); err != nil {
+		return fmt.Errorf("applications: set hired: %w", err)
+	}
+	return nil
+}
+
+func (r *pgRepository) SetPSSynced(ctx context.Context, id uuid.UUID) error {
+	const q = `UPDATE applications SET ps_synced_at = NOW(), updated_at = NOW() WHERE id = $1`
+	if _, err := r.pool.Exec(ctx, q, id); err != nil {
+		return fmt.Errorf("applications: set ps synced: %w", err)
+	}
+	return nil
+}
+
+func (r *pgRepository) SetPublicToken(ctx context.Context, id uuid.UUID, token string) error {
+	const q = `UPDATE applications SET public_token = $2, updated_at = NOW() WHERE id = $1`
+	if _, err := r.pool.Exec(ctx, q, id, token); err != nil {
+		return fmt.Errorf("applications: set public token: %w", err)
+	}
+	return nil
+}
+
+func (r *pgRepository) FindByPublicToken(ctx context.Context, token string) (*Application, error) {
+	const q = `
+		SELECT id, candidate_id, position_id, status,
+		       COALESCE(raw_file_blob_url,''), COALESCE(raw_file_type,''),
+		       COALESCE(ocr_text_blob_url,''), COALESCE(parsed_profile_blob_url,''),
+		       ocr_confidence, COALESCE(needs_manual_review,false),
+		       COALESCE(queue_task_id,''), parsed_at,
+		       ai_score, must_have_passed, assigned_store_id,
+		       COALESCE(talent_pool,false), COALESCE(dedup_state,''), created_at
+		FROM applications WHERE public_token = $1`
+	var a Application
+	err := r.pool.QueryRow(ctx, q, token).Scan(
+		&a.ID, &a.CandidateID, &a.PositionID, &a.Status,
+		&a.RawFileBlobURL, &a.RawFileType, &a.OCRTextBlobURL, &a.ParsedProfileBlobURL,
+		&a.OCRConfidence, &a.NeedsManualReview, &a.QueueTaskID, &a.ParsedAt,
+		&a.AIScore, &a.MustHavePassed, &a.AssignedStoreID, &a.TalentPool, &a.DedupState, &a.CreatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("applications: find by public token: %w", err)
+	}
+	return &a, nil
 }

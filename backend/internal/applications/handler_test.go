@@ -45,7 +45,7 @@ func newTestApp(h *Handler) *fiber.App {
 // handler with nil collaborators is sufficient.
 
 func TestIntake_MissingFile(t *testing.T) {
-	app := newTestApp(NewHandler(nil, nil, nil))
+	app := newTestApp(NewHandler(nil, nil, nil, nil))
 	body, ct := multipartBody(t, map[string]string{"full_name": "A", "position_id": uuid.NewString()}, "", "", "", nil)
 	req := httptest.NewRequest(fiber.MethodPost, "/api/v1/applications", body)
 	req.Header.Set("Content-Type", ct)
@@ -60,7 +60,7 @@ func TestIntake_MissingFile(t *testing.T) {
 }
 
 func TestIntake_UnsupportedType(t *testing.T) {
-	app := newTestApp(NewHandler(nil, nil, nil))
+	app := newTestApp(NewHandler(nil, nil, nil, nil))
 	body, ct := multipartBody(t,
 		map[string]string{"full_name": "A", "position_id": uuid.NewString()},
 		"resume", "x.exe", "application/x-msdownload", []byte("MZ"))
@@ -77,7 +77,7 @@ func TestIntake_UnsupportedType(t *testing.T) {
 }
 
 func TestIntake_BadPositionID(t *testing.T) {
-	app := newTestApp(NewHandler(nil, nil, nil))
+	app := newTestApp(NewHandler(nil, nil, nil, nil))
 	body, ct := multipartBody(t,
 		map[string]string{"full_name": "A", "position_id": "not-a-uuid"},
 		"resume", "cv.pdf", "application/pdf", []byte("%PDF-1.4"))
