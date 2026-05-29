@@ -17,10 +17,10 @@ type Personal struct {
 
 // Experience is a single work-history entry.
 type Experience struct {
-	Company         string `json:"company"`
-	Position        string `json:"position"`
-	DurationMonths  int    `json:"duration_months"`
-	Description     string `json:"description"`
+	Company        string `json:"company"`
+	Position       string `json:"position"`
+	DurationMonths int    `json:"duration_months"`
+	Description    string `json:"description"`
 }
 
 // Education is a single education entry.
@@ -41,7 +41,7 @@ type Language struct {
 type Profile struct {
 	Personal        Personal     `json:"personal"`
 	Experience      []Experience `json:"experience"`
-	Education        []Education  `json:"education"`
+	Education       []Education  `json:"education"`
 	Skills          []string     `json:"skills"`
 	Languages       []Language   `json:"languages"`
 	DesiredPosition string       `json:"desired_position"`

@@ -16,6 +16,11 @@ type Repository interface {
 	SetQueueTaskID(ctx context.Context, id uuid.UUID, taskID string) error
 	SetStatus(ctx context.Context, id uuid.UUID, status string) error
 	SetParseResults(ctx context.Context, id uuid.UUID, r ParseResult) error
+	// Sprint 2:
+	SetCanonicalCandidate(ctx context.Context, id, candidateID uuid.UUID) error
+	SetDedupState(ctx context.Context, id uuid.UUID, state string, confidence float64) error
+	SetScore(ctx context.Context, id uuid.UUID, s Score) error
+	SetAssignment(ctx context.Context, id uuid.UUID, storeNo *int, talentPool bool) error
 }
 
 type pgRepository struct {
@@ -46,13 +51,16 @@ func (r *pgRepository) FindByID(ctx context.Context, id uuid.UUID) (*Application
 		       COALESCE(raw_file_blob_url,''), COALESCE(raw_file_type,''),
 		       COALESCE(ocr_text_blob_url,''), COALESCE(parsed_profile_blob_url,''),
 		       ocr_confidence, COALESCE(needs_manual_review,false),
-		       COALESCE(queue_task_id,''), parsed_at, created_at
+		       COALESCE(queue_task_id,''), parsed_at,
+		       ai_score, must_have_passed, assigned_store_id,
+		       COALESCE(talent_pool,false), COALESCE(dedup_state,''), created_at
 		FROM applications WHERE id = $1`
 	var a Application
 	err := r.pool.QueryRow(ctx, q, id).Scan(
 		&a.ID, &a.CandidateID, &a.PositionID, &a.Status,
 		&a.RawFileBlobURL, &a.RawFileType, &a.OCRTextBlobURL, &a.ParsedProfileBlobURL,
-		&a.OCRConfidence, &a.NeedsManualReview, &a.QueueTaskID, &a.ParsedAt, &a.CreatedAt,
+		&a.OCRConfidence, &a.NeedsManualReview, &a.QueueTaskID, &a.ParsedAt,
+		&a.AIScore, &a.MustHavePassed, &a.AssignedStoreID, &a.TalentPool, &a.DedupState, &a.CreatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("applications: find by id: %w", err)
@@ -99,6 +107,49 @@ func (r *pgRepository) SetParseResults(ctx context.Context, id uuid.UUID, res Pa
 		res.OCRTextBlobURL, res.ParsedProfileBlobURL, res.OCRConfidence, res.NeedsManualReview)
 	if err != nil {
 		return fmt.Errorf("applications: set parse results: %w", err)
+	}
+	return nil
+}
+
+func (r *pgRepository) SetCanonicalCandidate(ctx context.Context, id, candidateID uuid.UUID) error {
+	const q = `UPDATE applications SET candidate_id = $2, updated_at = NOW() WHERE id = $1`
+	if _, err := r.pool.Exec(ctx, q, id, candidateID); err != nil {
+		return fmt.Errorf("applications: set canonical candidate: %w", err)
+	}
+	return nil
+}
+
+func (r *pgRepository) SetDedupState(ctx context.Context, id uuid.UUID, state string, confidence float64) error {
+	const q = `UPDATE applications SET dedup_state = $2, dedup_confidence = $3, updated_at = NOW() WHERE id = $1`
+	if _, err := r.pool.Exec(ctx, q, id, state, confidence); err != nil {
+		return fmt.Errorf("applications: set dedup state: %w", err)
+	}
+	return nil
+}
+
+func (r *pgRepository) SetScore(ctx context.Context, id uuid.UUID, s Score) error {
+	const q = `
+		UPDATE applications SET
+			status                 = $2,
+			must_have_passed       = $3,
+			ai_score               = $4,
+			ai_score_breakdown     = $5,
+			ai_summary             = $6,
+			ai_red_flags           = $7,
+			ai_suggested_positions = $8,
+			updated_at             = NOW()
+		WHERE id = $1`
+	if _, err := r.pool.Exec(ctx, q, id, s.Status, s.MustHavePassed, s.Total,
+		s.BreakdownJSON, s.Summary, s.RedFlags, s.SuggestedJSON); err != nil {
+		return fmt.Errorf("applications: set score: %w", err)
+	}
+	return nil
+}
+
+func (r *pgRepository) SetAssignment(ctx context.Context, id uuid.UUID, storeNo *int, talentPool bool) error {
+	const q = `UPDATE applications SET assigned_store_id = $2, talent_pool = $3, updated_at = NOW() WHERE id = $1`
+	if _, err := r.pool.Exec(ctx, q, id, storeNo, talentPool); err != nil {
+		return fmt.Errorf("applications: set assignment: %w", err)
 	}
 	return nil
 }

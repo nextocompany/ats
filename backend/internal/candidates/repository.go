@@ -14,6 +14,11 @@ type Repository interface {
 	Create(ctx context.Context, c Candidate) (Candidate, error)
 	FindByID(ctx context.Context, id uuid.UUID) (*Candidate, error)
 	UpdateProfileFields(ctx context.Context, id uuid.UUID, f ProfileFields) error
+	// FindDuplicates returns non-duplicate candidates (excluding excludeID) that
+	// share an exact id_card, phone, or email with the given values.
+	FindDuplicates(ctx context.Context, excludeID uuid.UUID, idCard, phone, email string) ([]Candidate, error)
+	// MarkDuplicateOf records dupID as a duplicate of canonicalID.
+	MarkDuplicateOf(ctx context.Context, dupID, canonicalID uuid.UUID) error
 }
 
 type pgRepository struct {
@@ -83,6 +88,44 @@ func (r *pgRepository) UpdateProfileFields(ctx context.Context, id uuid.UUID, f 
 		WHERE id = $1`
 	if _, err := r.pool.Exec(ctx, q, id, f.FullName, f.Phone, f.Email, f.Address, f.Province, f.DateOfBirth); err != nil {
 		return fmt.Errorf("candidates: update profile fields: %w", err)
+	}
+	return nil
+}
+
+func (r *pgRepository) FindDuplicates(ctx context.Context, excludeID uuid.UUID, idCard, phone, email string) ([]Candidate, error) {
+	// Only match on non-empty contact fields; ignore self and existing duplicates.
+	const q = `
+		SELECT id, full_name, COALESCE(phone,''), COALESCE(email,''), COALESCE(id_card,''),
+		       COALESCE(province,''), status, created_at
+		FROM candidates
+		WHERE id <> $1 AND is_duplicate_of IS NULL
+		AND ( (NULLIF($2,'') IS NOT NULL AND id_card = $2)
+		   OR (NULLIF($3,'') IS NOT NULL AND phone   = $3)
+		   OR (NULLIF($4,'') IS NOT NULL AND email   = $4) )`
+	rows, err := r.pool.Query(ctx, q, excludeID, idCard, phone, email)
+	if err != nil {
+		return nil, fmt.Errorf("candidates: find duplicates: %w", err)
+	}
+	defer rows.Close()
+
+	var out []Candidate
+	for rows.Next() {
+		var c Candidate
+		if err := rows.Scan(&c.ID, &c.FullName, &c.Phone, &c.Email, &c.IDCard, &c.Province, &c.Status, &c.CreatedAt); err != nil {
+			return nil, fmt.Errorf("candidates: scan duplicate: %w", err)
+		}
+		out = append(out, c)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("candidates: duplicate rows: %w", err)
+	}
+	return out, nil
+}
+
+func (r *pgRepository) MarkDuplicateOf(ctx context.Context, dupID, canonicalID uuid.UUID) error {
+	const q = `UPDATE candidates SET is_duplicate_of = $2, updated_at = NOW() WHERE id = $1`
+	if _, err := r.pool.Exec(ctx, q, dupID, canonicalID); err != nil {
+		return fmt.Errorf("candidates: mark duplicate: %w", err)
 	}
 	return nil
 }

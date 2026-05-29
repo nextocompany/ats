@@ -116,9 +116,9 @@ func (h *Handler) JobStatus(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusNotFound, "job not found")
 	}
 	return httpx.OK(c, fiber.Map{
-		"job_id": info.ID,
-		"state":  info.State.String(),
-		"queue":  info.Queue,
+		"job_id":  info.ID,
+		"state":   info.State.String(),
+		"queue":   info.Queue,
 		"retried": info.Retried,
 	})
 }
