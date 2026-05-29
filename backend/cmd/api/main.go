@@ -12,6 +12,8 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/helmet"
+	"github.com/gofiber/fiber/v2/middleware/limiter"
 	"github.com/jackc/pgx/v5/pgxpool"
 	goredis "github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
@@ -46,6 +48,7 @@ import (
 const (
 	shutdownTimeout = 10 * time.Second
 	maxBodyBytes    = 12 * 1024 * 1024 // headroom over the 10MB resume limit
+	publicRateMax   = 30               // requests per IP per minute on /api/v1/public/*
 )
 
 func main() {
@@ -119,8 +122,22 @@ func main() {
 		AllowHeaders:     "Origin,Content-Type,Accept,Authorization,X-Request-ID,X-LINE-IdToken",
 		AllowCredentials: true,
 	}))
+	// Security headers (Sprint 6a): helmet sets X-Frame-Options/nosniff/Referrer/
+	// HSTS/Permissions-Policy + a baseline CSP for API responses.
+	app.Use(helmet.New(helmet.Config{
+		XFrameOptions:         "DENY",
+		ContentSecurityPolicy: "default-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'",
+		ReferrerPolicy:        "strict-origin-when-cross-origin",
+		HSTSMaxAge:            31536000,
+		HSTSExcludeSubdomains: false,
+		PermissionPolicy:      "camera=(), microphone=(), geolocation=()",
+	}))
 	app.Use(middleware.RequestLogger())
-	app.Use(middleware.MockJWT(cfg.IsDevelopment()))
+	authMW, err := middleware.Auth(ctx, cfg)
+	if err != nil {
+		log.Fatal().Err(err).Msg("auth middleware init failed")
+	}
+	app.Use(authMW)
 
 	checkers := []health.Checker{
 		health.NewChecker("postgres", func(ctx context.Context) error { return pool.Ping(ctx) }),
@@ -156,7 +173,16 @@ func main() {
 	// Re-engagement manual trigger (Sprint 5a).
 	reengage.RegisterRoutes(app, reengage.NewHandler(reengageTrigger))
 
-	// Public Career API (consumed by the Next.js portal in Sprint 4).
+	// Public Career API (consumed by the Next.js portal in Sprint 4). Rate-limited
+	// per IP (Sprint 6a) — apply/status are the public abuse surface.
+	app.Use("/api/v1/public", limiter.New(limiter.Config{
+		Max:          publicRateMax,
+		Expiration:   time.Minute,
+		KeyGenerator: func(c *fiber.Ctx) string { return c.IP() },
+		LimitReached: func(c *fiber.Ctx) error {
+			return fiber.NewError(fiber.StatusTooManyRequests, "rate limit exceeded")
+		},
+	}))
 	pdpaRepo := pdpa.New(pool)
 	public.RegisterRoutes(app, public.NewHandler(intakeSvc, appRepo, positionRepo, lineVerifier, pdpaRepo))
 

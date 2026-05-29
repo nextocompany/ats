@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/rs/zerolog/log"
 )
 
 // Config holds every runtime setting. It is constructed once via Load and then
@@ -45,6 +47,12 @@ type Config struct {
 	PSIBClientID           string
 	PSIBClientSecret       string
 	PSCSVFallbackContainer string
+
+	// HR auth (Sprint 6a) — "mock" (dev super_admin, default) or "real" (Azure AD /
+	// Entra ID JWT validation). The middleware preserves the DevUser locals contract.
+	AuthProvider    string
+	AzureADTenantID string
+	AzureADClientID string // expected token audience
 
 	// LINE Login — "mock" (default) or "real".
 	LINEProvider  string
@@ -93,6 +101,10 @@ func Load() (*Config, error) {
 		AzureOpenAIDeployment: getenv("AZURE_OPENAI_DEPLOYMENT", "hr-screening-gpt4o"),
 		AzureDocIntelEndpoint: os.Getenv("AZURE_DOC_INTEL_ENDPOINT"),
 		AzureDocIntelKey:      os.Getenv("AZURE_DOC_INTEL_KEY"),
+
+		AuthProvider:    getenv("AUTH_PROVIDER", "mock"),
+		AzureADTenantID: os.Getenv("AZURE_AD_TENANT_ID"),
+		AzureADClientID: os.Getenv("AZURE_AD_CLIENT_ID"),
 
 		AISearchProvider:    getenv("AI_SEARCH_PROVIDER", "mock"),
 		AzureSearchEndpoint: os.Getenv("AZURE_SEARCH_ENDPOINT"),
@@ -152,6 +164,12 @@ func Load() (*Config, error) {
 	if c.UsesAzureSearch() && (c.AzureSearchEndpoint == "" || c.AzureSearchKey == "") {
 		return nil, fmt.Errorf("config: AZURE_SEARCH_ENDPOINT and AZURE_SEARCH_KEY are required when AI_SEARCH_PROVIDER=azure")
 	}
+	if c.UsesRealAuth() && (c.AzureADTenantID == "" || c.AzureADClientID == "") {
+		return nil, fmt.Errorf("config: AZURE_AD_TENANT_ID and AZURE_AD_CLIENT_ID are required when AUTH_PROVIDER=real")
+	}
+	if !c.IsDevelopment() && c.JWTSecret == "" {
+		log.Warn().Msg("config: JWT_SECRET is empty outside development")
+	}
 
 	return c, nil
 }
@@ -161,6 +179,10 @@ func (c *Config) UsesRealPeopleSoft() bool { return c.PSProvider == ProviderReal
 
 // UsesRealLINE reports whether real LINE id-token verification should be used.
 func (c *Config) UsesRealLINE() bool { return c.LINEProvider == ProviderReal }
+
+// UsesRealAuth reports whether real Azure AD (Entra) JWT validation should be
+// used for the HR API. Mock (dev super_admin) is the default.
+func (c *Config) UsesRealAuth() bool { return c.AuthProvider == ProviderReal }
 
 // UsesRealNotify reports whether the real notifier (LINE push / email) should be
 // constructed. Mock (log-only) is the default so local/CI need no credentials.
