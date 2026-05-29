@@ -6,12 +6,16 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/nexto/hr-ats/internal/rbac"
 )
 
 // Repository is the application data-access contract.
 type Repository interface {
 	Create(ctx context.Context, a Application) (Application, error)
 	FindByID(ctx context.Context, id uuid.UUID) (*Application, error)
+	List(ctx context.Context, f ListFilter, scope rbac.Scope) ([]Application, int, error)
+	ListByCandidate(ctx context.Context, candidateID uuid.UUID) ([]Application, error)
 	SetRawFile(ctx context.Context, id uuid.UUID, blobURL string) error
 	SetQueueTaskID(ctx context.Context, id uuid.UUID, taskID string) error
 	SetStatus(ctx context.Context, id uuid.UUID, status string) error

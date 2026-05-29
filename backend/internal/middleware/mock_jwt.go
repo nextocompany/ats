@@ -8,19 +8,21 @@ const UserContextKey = "user"
 // DevUser is the fixed identity injected during local development in place of
 // real Azure AD SSO. It must NEVER be active outside ENV=development.
 type DevUser struct {
-	ID    string `json:"id"`
-	Email string `json:"email"`
-	Role  string `json:"role"`
+	ID        string `json:"id"`
+	Email     string `json:"email"`
+	Role      string `json:"role"`
+	StoreID   *int   `json:"store_id"`
+	Subregion string `json:"subregion"`
 }
 
-// MockJWT injects a fixed super_admin user so Sprint 1 handlers can read auth
-// context locally without Azure AD. When enabled is false it is a no-op, which
+// MockJWT injects a fixed super_admin user so handlers can read auth context
+// locally without Azure AD. When enabled is false it is a no-op, which
 // guarantees it cannot leak into production.
 func MockJWT(enabled bool) fiber.Handler {
 	dev := DevUser{
 		ID:    "00000000-0000-0000-0000-000000000001",
 		Email: "dev.superadmin@local.test",
-		Role:  "super_admin",
+		Role:  "super_admin", // sees all; role scoping is unit-tested across roles
 	}
 	return func(c *fiber.Ctx) error {
 		if enabled {
