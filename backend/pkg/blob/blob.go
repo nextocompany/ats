@@ -3,10 +3,13 @@
 package blob
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/bloberror"
 )
 
@@ -47,4 +50,32 @@ func (c *Client) HealthCheck(ctx context.Context) error {
 		return fmt.Errorf("blob: health: %w", err)
 	}
 	return nil
+}
+
+// Upload writes data to the named blob (overwriting if present) and returns the
+// blob URL. Uploads are idempotent by name, which the pipeline relies on for
+// safe task retries.
+func (c *Client) Upload(ctx context.Context, name string, data []byte, contentType string) (string, error) {
+	_, err := c.client.UploadBuffer(ctx, c.container, name, data, &azblob.UploadBufferOptions{
+		HTTPHeaders: &blob.HTTPHeaders{BlobContentType: &contentType},
+	})
+	if err != nil {
+		return "", fmt.Errorf("blob: upload %q: %w", name, err)
+	}
+	return strings.TrimRight(c.client.ServiceClient().URL(), "/") + "/" + c.container + "/" + name, nil
+}
+
+// Download reads the named blob into memory.
+func (c *Client) Download(ctx context.Context, name string) ([]byte, error) {
+	resp, err := c.client.DownloadStream(ctx, c.container, name, nil)
+	if err != nil {
+		return nil, fmt.Errorf("blob: download %q: %w", name, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	var buf bytes.Buffer
+	if _, err := buf.ReadFrom(resp.Body); err != nil {
+		return nil, fmt.Errorf("blob: read %q: %w", name, err)
+	}
+	return buf.Bytes(), nil
 }

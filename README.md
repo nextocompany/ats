@@ -2,7 +2,9 @@
 
 End-to-end AI recruitment platform — intake → AI screening/scoring → HR approval → PeopleSoft HCM sync.
 
-> **Status:** Sprint 0 (Foundation). Docker stack, database schema, and health checks are in place. Feature work begins in Sprint 1.
+> **Status:** Sprint 1 (Intake + CV Parser + OCR). On top of the Sprint 0 foundation, resumes can be
+> submitted, queued (asynq), OCR'd, and parsed into a structured profile. AI providers are pluggable —
+> a **mock** runs by default (zero Azure keys); set `AI_PROVIDER=azure` for real Document Intelligence + GPT-4o.
 
 ## Prerequisites
 
@@ -32,6 +34,25 @@ A healthy response looks like:
 ```
 
 If any dependency is down, `/health` returns HTTP `503` and names the failing check.
+
+## Submit a Resume (Sprint 1)
+
+```bash
+# A position must exist; grab one (or seed your own):
+POS=$(docker compose exec -T postgres psql -U hruser -d hr_db -tA \
+  -c "INSERT INTO positions (title_th, level) VALUES ('แคชเชียร์','Staff') RETURNING id;" | head -1)
+
+curl -F "resume=@cv.pdf;type=application/pdf" \
+     -F "position_id=$POS" -F "full_name=สมชาย ใจดี" -F "source_channel=walk_in" \
+     localhost:8080/api/v1/applications
+#   → 201 {"application_id":"…","candidate_id":"…","job_id":"…"}
+
+curl -s localhost:8080/api/v1/ai/jobs/<job_id>        # → {"state":"completed"}
+curl -s localhost:8080/api/v1/applications/<app_id>   # → status "parsed", parsed_profile_blob_url, ocr_confidence
+```
+
+Allowed uploads: `pdf`, `docx`, `jpeg`, `png` (≤10MB). Low OCR confidence (<0.7) sets `needs_manual_review=true`
+without aborting. The pipeline ends at `parsed` — dedup, scoring, branch assignment, and notifications are Sprint 2+.
 
 ## Make Targets
 

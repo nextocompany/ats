@@ -15,6 +15,8 @@ import (
 	goredis "github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
 
+	"github.com/nexto/hr-ats/internal/applications"
+	"github.com/nexto/hr-ats/internal/candidates"
 	"github.com/nexto/hr-ats/internal/health"
 	"github.com/nexto/hr-ats/internal/middleware"
 	"github.com/nexto/hr-ats/pkg/blob"
@@ -23,10 +25,14 @@ import (
 	"github.com/nexto/hr-ats/pkg/database"
 	"github.com/nexto/hr-ats/pkg/httpx"
 	"github.com/nexto/hr-ats/pkg/logging"
+	"github.com/nexto/hr-ats/pkg/queue"
 	appredis "github.com/nexto/hr-ats/pkg/redis"
 )
 
-const shutdownTimeout = 10 * time.Second
+const (
+	shutdownTimeout = 10 * time.Second
+	maxBodyBytes    = 12 * 1024 * 1024 // headroom over the 10MB resume limit
+)
 
 func main() {
 	cfg, err := config.Load()
@@ -75,9 +81,23 @@ func main() {
 		log.Fatal().Err(err).Msg("blob connect failed")
 	}
 
+	// Queue client + inspector (asynq over the same Redis).
+	queueClient, err := queue.NewClient(cfg.RedisURL)
+	if err != nil {
+		log.Fatal().Err(err).Msg("queue client init failed")
+	}
+	defer func() { _ = queueClient.Close() }()
+
+	inspector, err := queue.NewInspector(cfg.RedisURL)
+	if err != nil {
+		log.Fatal().Err(err).Msg("queue inspector init failed")
+	}
+	defer func() { _ = inspector.Close() }()
+
 	app := fiber.New(fiber.Config{
 		ErrorHandler:          httpx.ErrorHandler,
 		DisableStartupMessage: true,
+		BodyLimit:             maxBodyBytes,
 	})
 	app.Use(middleware.RequestLogger())
 	app.Use(middleware.MockJWT(cfg.IsDevelopment()))
@@ -86,8 +106,18 @@ func main() {
 		health.NewChecker("postgres", func(ctx context.Context) error { return pool.Ping(ctx) }),
 		health.NewChecker("redis", func(ctx context.Context) error { return rdb.Ping(ctx).Err() }),
 		health.NewChecker("blob", blobClient.HealthCheck),
+		health.NewChecker("queue", func(ctx context.Context) error {
+			_, perr := inspector.Queues()
+			return perr
+		}),
 	}
 	app.Get("/health", health.Handler(checkers...))
+
+	// Intake + status routes.
+	candidateRepo := candidates.NewRepository(pool)
+	appRepo := applications.NewRepository(pool)
+	intakeSvc := applications.NewService(candidateRepo, appRepo, blobClient, queueClient)
+	applications.RegisterRoutes(app, applications.NewHandler(intakeSvc, appRepo, inspector))
 
 	go func() {
 		addr := "0.0.0.0:" + cfg.HTTPPort
