@@ -11,6 +11,8 @@ import type {
   KPI,
   Me,
   ReportExport,
+  SearchFilter,
+  SearchHit,
   Source,
   TimelineEntry,
 } from "./types";
@@ -87,6 +89,18 @@ export function useKpi() {
 }
 export function useSources() {
   return useQuery({ queryKey: ["sources"], queryFn: () => api.get<Source[]>("/api/v1/reports/sources").then((r) => r.data) });
+}
+
+export function useCandidateSearch(filter: SearchFilter) {
+  return useQuery({
+    queryKey: ["candidate-search", filter],
+    queryFn: () =>
+      api.get<SearchHit[]>(
+        "/api/v1/candidates/search" +
+          buildQuery({ q: filter.q, status: filter.status, page: filter.page, limit: filter.limit }),
+      ),
+    enabled: filter.q.trim().length > 0,
+  });
 }
 
 export function useReportExports() {

@@ -30,6 +30,7 @@ import (
 	"github.com/nexto/hr-ats/internal/public"
 	"github.com/nexto/hr-ats/internal/reengage"
 	"github.com/nexto/hr-ats/internal/reports"
+	"github.com/nexto/hr-ats/internal/search"
 	"github.com/nexto/hr-ats/internal/users"
 	"github.com/nexto/hr-ats/internal/vacancies"
 	"github.com/nexto/hr-ats/pkg/blob"
@@ -163,6 +164,10 @@ func main() {
 	// candidate detail/timeline, analytics, PDPA, users/me.
 	activityLog := activity.New(pool)
 	applications.RegisterDashboardRoutes(app, applications.NewDashboardHandler(appRepo, blobClient, activityLog))
+	// Candidate search (Sprint 5c) — registered BEFORE profiles so the static
+	// /candidates/search path takes precedence over /candidates/:id. Mock Postgres
+	// trigram by default; Azure AI Search behind config.
+	search.RegisterRoutes(app, search.NewHandler(search.NewSearcher(cfg, pool)))
 	profiles.RegisterRoutes(app, profiles.NewHandler(candidateRepo, appRepo))
 	// Analytics + report exports (Sprint 5b): on-demand export rides the same
 	// export service the scheduler/worker use; delivery via the notify seam.
