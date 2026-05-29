@@ -14,9 +14,14 @@ import (
 
 	"github.com/nexto/hr-ats/internal/ai"
 	"github.com/nexto/hr-ats/internal/applications"
+	"github.com/nexto/hr-ats/internal/branch"
 	"github.com/nexto/hr-ats/internal/candidates"
+	"github.com/nexto/hr-ats/internal/dedup"
 	"github.com/nexto/hr-ats/internal/health"
 	"github.com/nexto/hr-ats/internal/pipeline"
+	"github.com/nexto/hr-ats/internal/positions"
+	"github.com/nexto/hr-ats/internal/scoring"
+	"github.com/nexto/hr-ats/internal/vacancies"
 	"github.com/nexto/hr-ats/pkg/blob"
 	"github.com/nexto/hr-ats/pkg/bootstrap"
 	"github.com/nexto/hr-ats/pkg/config"
@@ -94,10 +99,17 @@ func main() {
 
 	// AI providers (mock by default; azure when configured).
 	ocr, parser := ai.New(cfg)
+	candidateRepo := candidates.NewRepository(pool)
+	appRepo := applications.NewRepository(pool)
+	vacancyRepo := vacancies.NewRepository(pool)
 	processor := pipeline.NewProcessor(
 		ocr, parser, blobClient,
-		candidates.NewRepository(pool),
-		applications.NewRepository(pool),
+		candidateRepo,
+		appRepo,
+		dedup.NewService(candidateRepo),
+		scoring.NewScorer(cfg),
+		branch.NewAssigner(vacancyRepo),
+		positions.NewRepository(pool),
 	)
 
 	redisOpt, err := queue.RedisOpt(cfg.RedisURL)

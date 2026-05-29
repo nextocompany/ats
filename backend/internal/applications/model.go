@@ -8,11 +8,13 @@ import (
 	"github.com/google/uuid"
 )
 
-// Status values used in Sprint 1.
+// Status values.
 const (
-	StatusPending = "pending"
-	StatusParsed  = "parsed"
-	StatusFailed  = "failed"
+	StatusPending  = "pending"  // S1: created, awaiting pipeline
+	StatusParsed   = "parsed"   // S1: OCR + parse done
+	StatusFailed   = "failed"   // pipeline error
+	StatusScored   = "scored"   // S2: passed gate, scored + assigned
+	StatusRejected = "rejected" // S2: failed must-have gate
 )
 
 // Application maps the applications table (columns used in Sprint 1).
@@ -29,7 +31,25 @@ type Application struct {
 	NeedsManualReview    bool       `json:"needs_manual_review"`
 	QueueTaskID          string     `json:"queue_task_id"`
 	ParsedAt             *time.Time `json:"parsed_at"`
-	CreatedAt            time.Time  `json:"created_at"`
+	// Sprint 2: scoring + assignment + dedup.
+	AIScore         *float64  `json:"ai_score"`
+	MustHavePassed  *bool     `json:"must_have_passed"`
+	AssignedStoreID *int      `json:"assigned_store_id"`
+	TalentPool      bool      `json:"talent_pool"`
+	DedupState      string    `json:"dedup_state"`
+	CreatedAt       time.Time `json:"created_at"`
+}
+
+// Score carries scoring results in a repository-friendly (pre-serialized) form,
+// so this package does not depend on the scoring package.
+type Score struct {
+	Status         string
+	MustHavePassed bool
+	Total          float64
+	BreakdownJSON  []byte
+	Summary        string
+	RedFlags       string
+	SuggestedJSON  []byte
 }
 
 // ParseResult is what the pipeline writes back after OCR + parse.

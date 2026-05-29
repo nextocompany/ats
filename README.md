@@ -2,9 +2,12 @@
 
 End-to-end AI recruitment platform — intake → AI screening/scoring → HR approval → PeopleSoft HCM sync.
 
-> **Status:** Sprint 1 (Intake + CV Parser + OCR). On top of the Sprint 0 foundation, resumes can be
-> submitted, queued (asynq), OCR'd, and parsed into a structured profile. AI providers are pluggable —
-> a **mock** runs by default (zero Azure keys); set `AI_PROVIDER=azure` for real Document Intelligence + GPT-4o.
+> **Status:** Sprint 2 (Scoring + Branch Assignment + Dedup). The pipeline now runs intake → OCR → parse →
+> **dedup → score → must-have gate → branch assignment**. Resumes are submitted, queued (asynq), OCR'd,
+> parsed, deduplicated, scored 0–100 against the Master JD, and routed to the nearest store with an open
+> vacancy (or the talent pool). AI is pluggable — a **mock** runs by default (zero Azure keys); set
+> `AI_PROVIDER=azure` for real Document Intelligence + GPT-4o. Scoring is **hybrid**: deterministic rules
+> for the gate/location/education/experience, LLM only for skills match + Thai strengths + red flags.
 
 ## Prerequisites
 
@@ -21,9 +24,10 @@ End-to-end AI recruitment platform — intake → AI screening/scoring → HR ap
 ```bash
 cp .env.example .env          # 1. local config (host-side values)
 make up                       # 2. start postgres, redis, azurite, api, worker
-make migrate-up               # 3. apply the schema (000001 + 000002)
-curl -s localhost:8080/health # 4. api health  → {"success":true,"data":{"checks":{...}}}
-curl -s localhost:8081/health # 5. worker health
+make migrate-up               # 3. apply all migrations
+make seed                     # 4. load representative stores/positions/vacancies (Sprint 2)
+curl -s localhost:8080/health # 5. api health  → {"success":true,"data":{"checks":{...}}}
+curl -s localhost:8081/health # 6. worker health
 make down                     # stop the stack
 ```
 
@@ -52,7 +56,19 @@ curl -s localhost:8080/api/v1/applications/<app_id>   # → status "parsed", par
 ```
 
 Allowed uploads: `pdf`, `docx`, `jpeg`, `png` (≤10MB). Low OCR confidence (<0.7) sets `needs_manual_review=true`
-without aborting. The pipeline ends at `parsed` — dedup, scoring, branch assignment, and notifications are Sprint 2+.
+without aborting.
+
+After parse the pipeline (Sprint 2) **dedups** the candidate, **scores** 0–100 against the position's
+Master JD, applies the **must-have gate**, and **assigns a branch**:
+
+```bash
+curl -s localhost:8080/api/v1/applications/<app_id>   # → status "scored" | "rejected"
+#   ai_score, ai_score_breakdown {experience,skills,education,language,location},
+#   ai_summary (3 Thai strengths), must_have_passed, assigned_store_id (or talent_pool), dedup_state
+```
+
+Resubmitting the same person (matching id_card, or phone/email + fuzzy name) auto-merges to the canonical
+candidate. Notifications (LINE) and PeopleSoft vacancy sync are Sprint 3+; Sprint 2 uses seeded demo vacancies.
 
 ## Make Targets
 

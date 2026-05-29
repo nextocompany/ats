@@ -5,8 +5,11 @@
 DB_URL ?= postgres://hruser:hrpass@localhost:5432/hr_db?sslmode=disable
 MIGRATIONS_DIR := backend/migrations
 MIGRATE := migrate -path $(MIGRATIONS_DIR) -database "$(DB_URL)"
+POSTGRES_USER ?= hruser
+POSTGRES_DB ?= hr_db
+PSQL := docker compose exec -T postgres psql -U $(POSTGRES_USER) -d $(POSTGRES_DB)
 
-.PHONY: help up down logs ps migrate-up migrate-down migrate-create build run-api run-worker test lint vet tidy
+.PHONY: help up down logs ps migrate-up migrate-down migrate-create seed build run-api run-worker test test-integration lint vet tidy
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS=":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -32,6 +35,11 @@ migrate-down: ## Roll back the last migration
 migrate-create: ## Create a new migration: make migrate-create name=add_foo
 	migrate create -ext sql -dir $(MIGRATIONS_DIR) -seq $(name)
 
+seed: ## Load representative reference data (stores, positions, vacancies)
+	$(PSQL) < scripts/seed_stores.sql
+	$(PSQL) < scripts/seed_positions.sql
+	$(PSQL) < scripts/seed_vacancies.sql
+
 build: ## Build both binaries
 	cd backend && go build ./...
 
@@ -42,7 +50,10 @@ run-worker: ## Run the worker locally (needs deps up + .env exported)
 	cd backend && go run ./cmd/worker
 
 test: ## Run unit tests
-	cd backend && go test ./... -cover
+	cd backend && go test -race ./... -cover
+
+test-integration: ## Run integration tests (needs: make up && make migrate-up && make seed)
+	cd backend && go test -tags integration ./... -count=1
 
 lint: ## Run golangci-lint
 	cd backend && golangci-lint run
