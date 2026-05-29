@@ -1,0 +1,10 @@
+DROP INDEX IF EXISTS idx_activity_logs_entity;
+DROP INDEX IF EXISTS idx_vacancies_lookup;
+DROP INDEX IF EXISTS idx_candidates_email;
+DROP INDEX IF EXISTS idx_candidates_phone;
+DROP INDEX IF EXISTS idx_candidates_status;
+DROP INDEX IF EXISTS idx_candidates_subregion;
+DROP INDEX IF EXISTS idx_applications_assigned_store_id;
+DROP INDEX IF EXISTS idx_applications_candidate_id;
+DROP INDEX IF EXISTS idx_applications_ai_score;
+DROP INDEX IF EXISTS idx_applications_status;

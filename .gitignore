@@ -1,0 +1,19 @@
+# Secrets / local env
+.env
+*.local
+
+# Build artifacts
+backend/bin/
+/out/
+*.exe
+
+# Go
+backend/vendor/
+
+# Data volumes
+pgdata/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

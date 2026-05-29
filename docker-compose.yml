@@ -1,0 +1,90 @@
+# Local development full stack.
+# `docker compose up` brings up postgres, redis, azurite, api, and worker.
+# api/worker use INTERNAL service hostnames (postgres/redis/azurite) — these are
+# set here directly and intentionally differ from the host-side values in .env
+# (which target localhost for `make migrate-up` and host-run binaries).
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-hr_db}
+      POSTGRES_USER: ${POSTGRES_USER:-hruser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hrpass}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hruser} -d ${POSTGRES_DB:-hr_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite
+    command: "azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --skipApiVersionCheck"
+    ports:
+      - "10000:10000"
+      - "10001:10001"
+      - "10002:10002"
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        SVC: api
+    environment:
+      ENV: development
+      HTTP_PORT: "8080"
+      DB_URL: postgres://${POSTGRES_USER:-hruser}:${POSTGRES_PASSWORD:-hrpass}@postgres:5432/${POSTGRES_DB:-hr_db}?sslmode=disable
+      REDIS_URL: redis://redis:6379
+      AZURE_BLOB_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;"
+      AZURE_BLOB_CONTAINER: resumes
+      JWT_SECRET: ${JWT_SECRET:-dev-only-change-me}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      azurite:
+        condition: service_started
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        SVC: worker
+    environment:
+      ENV: development
+      WORKER_PORT: "8081"
+      DB_URL: postgres://${POSTGRES_USER:-hruser}:${POSTGRES_PASSWORD:-hrpass}@postgres:5432/${POSTGRES_DB:-hr_db}?sslmode=disable
+      REDIS_URL: redis://redis:6379
+      AZURE_BLOB_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;"
+      AZURE_BLOB_CONTAINER: resumes
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      azurite:
+        condition: service_started
+
+volumes:
+  pgdata:
