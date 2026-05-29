@@ -3,18 +3,26 @@
 package public
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"io"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 
 	"github.com/nexto/hr-ats/internal/applications"
 	"github.com/nexto/hr-ats/internal/auth"
+	"github.com/nexto/hr-ats/internal/pdpa"
 	"github.com/nexto/hr-ats/internal/positions"
 	"github.com/nexto/hr-ats/pkg/httpx"
 )
+
+// ConsentRecorder records a candidate's PDPA consent. pdpa.Repo satisfies it.
+type ConsentRecorder interface {
+	Record(ctx context.Context, c pdpa.Consent, ip string) error
+}
 
 const maxResumeBytes = 10 * 1024 * 1024
 
@@ -31,11 +39,12 @@ type Handler struct {
 	apps     applications.Repository
 	pos      positions.Repository
 	verifier auth.Verifier
+	consent  ConsentRecorder
 }
 
 // NewHandler builds the public handler.
-func NewHandler(intake *applications.Service, apps applications.Repository, pos positions.Repository, v auth.Verifier) *Handler {
-	return &Handler{intake: intake, apps: apps, pos: pos, verifier: v}
+func NewHandler(intake *applications.Service, apps applications.Repository, pos positions.Repository, v auth.Verifier, consent ConsentRecorder) *Handler {
+	return &Handler{intake: intake, apps: apps, pos: pos, verifier: v, consent: consent}
 }
 
 // ListPositions handles GET /api/v1/public/positions (only positions with open vacancies).
@@ -92,6 +101,14 @@ func (h *Handler) Apply(c *fiber.Ctx) error {
 	if name == "" {
 		return fiber.NewError(fiber.StatusBadRequest, "full_name is required")
 	}
+	// PDPA consent is mandatory before any candidate data is stored (F13).
+	if c.FormValue("consent_given") != "true" {
+		return fiber.NewError(fiber.StatusBadRequest, "PDPA consent is required")
+	}
+	consentVersion := c.FormValue("consent_version")
+	if consentVersion == "" {
+		consentVersion = "1.0"
+	}
 
 	f, err := fileHeader.Open()
 	if err != nil {
@@ -127,6 +144,18 @@ func (h *Handler) Apply(c *fiber.Ctx) error {
 	if err := h.apps.SetPublicToken(c.UserContext(), result.ApplicationID, token); err != nil {
 		return err
 	}
+
+	// Record PDPA consent against the (canonical) candidate. A failure here must
+	// not lose the application — log and continue (consent is retryable).
+	if err := h.consent.Record(c.UserContext(), pdpa.Consent{
+		CandidateID:   result.CandidateID,
+		ConsentGiven:  true,
+		Version:       consentVersion,
+		SourceChannel: "career_portal",
+	}, c.IP()); err != nil {
+		log.Warn().Err(err).Str("candidate_id", result.CandidateID.String()).Msg("failed to record PDPA consent")
+	}
+
 	return httpx.Created(c, fiber.Map{"status_token": token})
 }
 

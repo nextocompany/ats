@@ -149,7 +149,8 @@ func main() {
 	peoplesoft.RegisterRoutes(app, peoplesoft.NewHandler(vacancyRepo, positionRepo, psService, cfg.PSProvider))
 
 	// Public Career API (consumed by the Next.js portal in Sprint 4).
-	public.RegisterRoutes(app, public.NewHandler(intakeSvc, appRepo, positionRepo, lineVerifier))
+	pdpaRepo := pdpa.New(pool)
+	public.RegisterRoutes(app, public.NewHandler(intakeSvc, appRepo, positionRepo, lineVerifier, pdpaRepo))
 
 	// HR Dashboard API (Sprint 4a): ranked inbox, bulk, resume signed-URLs,
 	// candidate detail/timeline, analytics, PDPA, users/me.
@@ -157,7 +158,7 @@ func main() {
 	applications.RegisterDashboardRoutes(app, applications.NewDashboardHandler(appRepo, blobClient, activityLog))
 	profiles.RegisterRoutes(app, profiles.NewHandler(candidateRepo, appRepo))
 	reports.RegisterRoutes(app, reports.NewHandler(reports.New(pool)))
-	pdpa.RegisterRoutes(app, pdpa.NewHandler(pdpa.New(pool)))
+	pdpa.RegisterRoutes(app, pdpa.NewHandler(pdpaRepo))
 	users.RegisterRoutes(app, users.NewHandler())
 
 	go func() {
