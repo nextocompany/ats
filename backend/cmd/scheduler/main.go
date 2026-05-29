@@ -1,0 +1,48 @@
+// Command scheduler is the single periodic dispatcher. It runs one asynq
+// Scheduler that enqueues report-export tasks on REPORT_SCHEDULE_CRON. It must
+// run as exactly ONE replica — multiple instances would double-enqueue. The
+// worker consumes the tasks it produces.
+package main
+
+import (
+	"github.com/hibiken/asynq"
+	"github.com/rs/zerolog/log"
+
+	"github.com/nexto/hr-ats/pkg/config"
+	"github.com/nexto/hr-ats/pkg/logging"
+	"github.com/nexto/hr-ats/pkg/queue"
+)
+
+func main() {
+	// config.Load requires DB/blob vars even though the scheduler only enqueues to
+	// Redis; they are validated but unused here (the worker holds those concerns).
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatal().Err(err).Msg("config load failed")
+	}
+	logging.Configure(cfg.IsDevelopment())
+
+	redisOpt, err := queue.RedisOpt(cfg.RedisURL)
+	if err != nil {
+		log.Fatal().Err(err).Msg("queue redis opt failed")
+	}
+
+	scheduler := asynq.NewScheduler(redisOpt, &asynq.SchedulerOpts{})
+
+	// Period is intentionally left empty: asynq.Scheduler enqueues a fixed task
+	// copy each tick, so the worker derives the period (ISO week) at run time
+	// rather than freezing it to scheduler-startup time.
+	task, err := queue.NewExportReportTask(queue.ExportReportPayload{Kind: "weekly"})
+	if err != nil {
+		log.Fatal().Err(err).Msg("build export task failed")
+	}
+	entryID, err := scheduler.Register(cfg.ReportScheduleCron, task)
+	if err != nil {
+		log.Fatal().Err(err).Str("cron", cfg.ReportScheduleCron).Msg("register schedule failed")
+	}
+
+	log.Info().Str("cron", cfg.ReportScheduleCron).Str("entry_id", entryID).Msg("scheduler started; report:export registered")
+	if err := scheduler.Run(); err != nil {
+		log.Fatal().Err(err).Msg("scheduler error")
+	}
+}

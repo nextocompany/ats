@@ -6,6 +6,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 )
 
 // Config holds every runtime setting. It is constructed once via Load and then
@@ -50,6 +51,11 @@ type Config struct {
 	// PortalBaseURL is the public Career Portal origin used to build apply links
 	// in outbound notifications.
 	PortalBaseURL string
+
+	// Report scheduler (Sprint 5b): cron spec for the recurring export, and the
+	// comma-separated recipient list notified with the export link.
+	ReportScheduleCron string
+	ReportRecipients   string
 
 	// CORSAllowOrigins is the comma-separated allowlist for browser clients.
 	CORSAllowOrigins string
@@ -97,6 +103,9 @@ func Load() (*Config, error) {
 
 		PortalBaseURL: getenv("PORTAL_BASE_URL", "http://localhost:3001"),
 
+		ReportScheduleCron: getenv("REPORT_SCHEDULE_CRON", "0 7 * * 1"), // Mon 07:00
+		ReportRecipients:   os.Getenv("REPORT_RECIPIENTS"),
+
 		CORSAllowOrigins: getenv("CORS_ALLOW_ORIGINS", "http://localhost:3000,http://localhost:3001"),
 	}
 
@@ -141,6 +150,18 @@ func (c *Config) UsesRealLINE() bool { return c.LINEProvider == ProviderReal }
 // UsesRealNotify reports whether the real notifier (LINE push / email) should be
 // constructed. Mock (log-only) is the default so local/CI need no credentials.
 func (c *Config) UsesRealNotify() bool { return c.NotifyProvider == ProviderReal }
+
+// ReportRecipientList splits the comma-separated REPORT_RECIPIENTS into trimmed,
+// non-empty entries.
+func (c *Config) ReportRecipientList() []string {
+	var out []string
+	for _, r := range strings.Split(c.ReportRecipients, ",") {
+		if t := strings.TrimSpace(r); t != "" {
+			out = append(out, t)
+		}
+	}
+	return out
+}
 
 // UsesAzureAI reports whether real Azure AI clients should be constructed.
 func (c *Config) UsesAzureAI() bool {

@@ -23,6 +23,7 @@ import (
 	"github.com/nexto/hr-ats/internal/pipeline"
 	"github.com/nexto/hr-ats/internal/positions"
 	"github.com/nexto/hr-ats/internal/reengage"
+	"github.com/nexto/hr-ats/internal/reports"
 	"github.com/nexto/hr-ats/internal/scoring"
 	"github.com/nexto/hr-ats/internal/vacancies"
 	"github.com/nexto/hr-ats/pkg/blob"
@@ -119,20 +120,28 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("queue redis opt failed")
 	}
+	notifier := notify.NewNotifier(cfg)
+
 	// Re-engagement (Sprint 5a): notify talent-pool / prior candidates on vacancy open.
 	reengageSvc := reengage.NewService(
 		reengage.NewRepository(pool),
-		notify.NewNotifier(cfg),
+		notifier,
 		activity.New(pool),
 		cfg.PortalBaseURL,
+	)
+
+	// Report export (Sprint 5b): snapshot → blob → record → deliver.
+	exportSvc := reports.NewExportService(
+		reports.New(pool), blobClient, notifier, cfg.ReportRecipientList(),
 	)
 
 	srv := asynq.NewServer(redisOpt, asynq.Config{Concurrency: workerConcurrency})
 	mux := asynq.NewServeMux()
 	mux.HandleFunc(queue.TypeProcessApplication, processor.HandleProcessApplication)
 	mux.HandleFunc(queue.TypeReengageVacancy, reengageSvc.HandleReengageVacancy)
+	mux.HandleFunc(queue.TypeExportReport, exportSvc.HandleExportReport)
 
-	log.Info().Str("provider", cfg.AIProvider).Msg("worker started; consuming process_application + vacancy:reengage")
+	log.Info().Str("provider", cfg.AIProvider).Msg("worker started; consuming process_application + vacancy:reengage + report:export")
 	if err := srv.Run(mux); err != nil {
 		log.Fatal().Err(err).Msg("asynq server error")
 	}

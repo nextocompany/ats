@@ -53,6 +53,7 @@ services:
       AZURE_BLOB_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;"
       AZURE_BLOB_CONTAINER: resumes
       JWT_SECRET: ${JWT_SECRET:-dev-only-change-me}
+      REPORT_RECIPIENTS: ${REPORT_RECIPIENTS:-}
     ports:
       - "8080:8080"
     depends_on:
@@ -76,6 +77,8 @@ services:
       REDIS_URL: redis://redis:6379
       AZURE_BLOB_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;"
       AZURE_BLOB_CONTAINER: resumes
+      # The worker delivers scheduled report exports, so it needs the recipients.
+      REPORT_RECIPIENTS: ${REPORT_RECIPIENTS:-}
     ports:
       - "8081:8081"
     depends_on:
@@ -85,6 +88,30 @@ services:
         condition: service_healthy
       azurite:
         condition: service_started
+
+  # Single periodic dispatcher (Sprint 5b). MUST stay at one replica — multiple
+  # instances would double-enqueue the recurring report export. config.Load
+  # requires DB/blob vars even though the scheduler only enqueues to redis.
+  scheduler:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        SVC: scheduler
+    environment:
+      ENV: development
+      DB_URL: postgres://${POSTGRES_USER:-hruser}:${POSTGRES_PASSWORD:-hrpass}@postgres:5432/${POSTGRES_DB:-hr_db}?sslmode=disable
+      REDIS_URL: redis://redis:6379
+      AZURE_BLOB_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;"
+      AZURE_BLOB_CONTAINER: resumes
+      REPORT_SCHEDULE_CRON: ${REPORT_SCHEDULE_CRON:-0 7 * * 1}
+    deploy:
+      replicas: 1
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
 volumes:
   pgdata:
