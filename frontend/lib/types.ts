@@ -103,3 +103,20 @@ export interface ReportExport {
   csv_url?: string;
   json_url?: string;
 }
+
+// SearchHit mirrors search.Hit (Sprint 5c): a candidate plus their best
+// application's status/score.
+export interface SearchHit {
+  candidate_id: string;
+  full_name: string;
+  province: string;
+  status: string;
+  ai_score: number | null;
+}
+
+export interface SearchFilter {
+  q: string;
+  status?: string;
+  page?: number;
+  limit?: number;
+}

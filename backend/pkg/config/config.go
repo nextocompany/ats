@@ -31,6 +31,13 @@ type Config struct {
 	AzureDocIntelEndpoint string
 	AzureDocIntelKey      string
 
+	// AISearchProvider selects candidate search: "mock" (Postgres trigram, default)
+	// or "azure" (Azure AI Search query). Required Azure fields gate on "azure".
+	AISearchProvider    string
+	AzureSearchEndpoint string
+	AzureSearchKey      string
+	AzureSearchIndex    string
+
 	// PeopleSoft Integration Broker — "mock" (default) or "real".
 	PSProvider             string
 	PSIBBaseURL            string
@@ -87,6 +94,11 @@ func Load() (*Config, error) {
 		AzureDocIntelEndpoint: os.Getenv("AZURE_DOC_INTEL_ENDPOINT"),
 		AzureDocIntelKey:      os.Getenv("AZURE_DOC_INTEL_KEY"),
 
+		AISearchProvider:    getenv("AI_SEARCH_PROVIDER", "mock"),
+		AzureSearchEndpoint: os.Getenv("AZURE_SEARCH_ENDPOINT"),
+		AzureSearchKey:      os.Getenv("AZURE_SEARCH_KEY"),
+		AzureSearchIndex:    getenv("AZURE_SEARCH_INDEX", "candidates"),
+
 		PSProvider:             getenv("PS_PROVIDER", "mock"),
 		PSIBBaseURL:            os.Getenv("PS_IB_BASE_URL"),
 		PSIBTokenURL:           os.Getenv("PS_IB_TOKEN_URL"),
@@ -137,6 +149,9 @@ func Load() (*Config, error) {
 	if c.UsesRealNotify() && c.NotifyLINEToken == "" {
 		return nil, fmt.Errorf("config: NOTIFY_LINE_TOKEN is required when NOTIFY_PROVIDER=real")
 	}
+	if c.UsesAzureSearch() && (c.AzureSearchEndpoint == "" || c.AzureSearchKey == "") {
+		return nil, fmt.Errorf("config: AZURE_SEARCH_ENDPOINT and AZURE_SEARCH_KEY are required when AI_SEARCH_PROVIDER=azure")
+	}
 
 	return c, nil
 }
@@ -166,6 +181,12 @@ func (c *Config) ReportRecipientList() []string {
 // UsesAzureAI reports whether real Azure AI clients should be constructed.
 func (c *Config) UsesAzureAI() bool {
 	return c.AIProvider == AIProviderAzure
+}
+
+// UsesAzureSearch reports whether the real Azure AI Search client should be used
+// for candidate search. Mock (Postgres trigram) is the default.
+func (c *Config) UsesAzureSearch() bool {
+	return c.AISearchProvider == AIProviderAzure
 }
 
 // IsDevelopment reports whether the process is running in local development.
