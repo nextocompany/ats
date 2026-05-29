@@ -45,4 +45,51 @@ func TestLoad_Defaults(t *testing.T) {
 	if c.BlobContainer != "resumes" {
 		t.Errorf("expected default BlobContainer resumes, got %q", c.BlobContainer)
 	}
+	if c.AIProvider != "mock" {
+		t.Errorf("expected default AIProvider mock, got %q", c.AIProvider)
+	}
+	if c.UsesAzureAI() {
+		t.Error("expected UsesAzureAI false by default")
+	}
+}
+
+func TestLoad_AzureRequiresKeys(t *testing.T) {
+	// Arrange: azure provider selected but no Azure credentials present.
+	t.Setenv("DB_URL", "postgres://localhost/db")
+	t.Setenv("REDIS_URL", "redis://localhost:6379")
+	t.Setenv("AZURE_BLOB_CONNECTION_STRING", "conn")
+	t.Setenv("AI_PROVIDER", "azure")
+	t.Setenv("AZURE_OPENAI_ENDPOINT", "")
+	t.Setenv("AZURE_OPENAI_KEY", "")
+
+	// Act
+	_, err := Load()
+
+	// Assert
+	if err == nil {
+		t.Fatal("expected error when AI_PROVIDER=azure without Azure keys")
+	}
+}
+
+func TestLoad_AzureWithKeys(t *testing.T) {
+	// Arrange
+	t.Setenv("DB_URL", "postgres://localhost/db")
+	t.Setenv("REDIS_URL", "redis://localhost:6379")
+	t.Setenv("AZURE_BLOB_CONNECTION_STRING", "conn")
+	t.Setenv("AI_PROVIDER", "azure")
+	t.Setenv("AZURE_OPENAI_ENDPOINT", "https://x.openai.azure.com")
+	t.Setenv("AZURE_OPENAI_KEY", "k")
+	t.Setenv("AZURE_DOC_INTEL_ENDPOINT", "https://x.cognitiveservices.azure.com")
+	t.Setenv("AZURE_DOC_INTEL_KEY", "k2")
+
+	// Act
+	c, err := Load()
+
+	// Assert
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !c.UsesAzureAI() {
+		t.Error("expected UsesAzureAI true when AI_PROVIDER=azure")
+	}
 }

@@ -1,35 +1,33 @@
-// Command worker is the queue worker entrypoint. In Sprint 0 it establishes the
-// same dependency connections as the api, exposes its own /health probe on
-// WORKER_PORT, and emits a periodic heartbeat. Queue consumption arrives in
-// Sprint 1.
+// Command worker consumes the AI processing queue. It connects the same backing
+// dependencies as the api, exposes a /health probe on WORKER_PORT, and runs an
+// asynq server that handles process_application tasks (OCR → parse → persist).
 package main
 
 import (
 	"context"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/hibiken/asynq"
 	"github.com/jackc/pgx/v5/pgxpool"
 	goredis "github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
 
+	"github.com/nexto/hr-ats/internal/ai"
+	"github.com/nexto/hr-ats/internal/applications"
+	"github.com/nexto/hr-ats/internal/candidates"
 	"github.com/nexto/hr-ats/internal/health"
+	"github.com/nexto/hr-ats/internal/pipeline"
 	"github.com/nexto/hr-ats/pkg/blob"
 	"github.com/nexto/hr-ats/pkg/bootstrap"
 	"github.com/nexto/hr-ats/pkg/config"
 	"github.com/nexto/hr-ats/pkg/database"
 	"github.com/nexto/hr-ats/pkg/httpx"
 	"github.com/nexto/hr-ats/pkg/logging"
+	"github.com/nexto/hr-ats/pkg/queue"
 	appredis "github.com/nexto/hr-ats/pkg/redis"
 )
 
-const (
-	heartbeatInterval = 30 * time.Second
-	shutdownTimeout   = 10 * time.Second
-)
+const workerConcurrency = 10
 
 func main() {
 	cfg, err := config.Load()
@@ -78,44 +76,40 @@ func main() {
 		log.Fatal().Err(err).Msg("blob connect failed")
 	}
 
+	// Health probe on its own port so docker-compose can check the worker.
 	checkers := []health.Checker{
 		health.NewChecker("postgres", func(ctx context.Context) error { return pool.Ping(ctx) }),
 		health.NewChecker("redis", func(ctx context.Context) error { return rdb.Ping(ctx).Err() }),
 		health.NewChecker("blob", blobClient.HealthCheck),
 	}
-
-	app := fiber.New(fiber.Config{
-		ErrorHandler:          httpx.ErrorHandler,
-		DisableStartupMessage: true,
-	})
-	app.Get("/health", health.Handler(checkers...))
-
+	probe := fiber.New(fiber.Config{ErrorHandler: httpx.ErrorHandler, DisableStartupMessage: true})
+	probe.Get("/health", health.Handler(checkers...))
 	go func() {
 		addr := "0.0.0.0:" + cfg.WorkerPort
 		log.Info().Str("service", "worker").Str("addr", addr).Msg("health probe listening")
-		if err := app.Listen(addr); err != nil {
+		if err := probe.Listen(addr); err != nil {
 			log.Fatal().Err(err).Msg("worker health server error")
 		}
 	}()
 
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+	// AI providers (mock by default; azure when configured).
+	ocr, parser := ai.New(cfg)
+	processor := pipeline.NewProcessor(
+		ocr, parser, blobClient,
+		candidates.NewRepository(pool),
+		applications.NewRepository(pool),
+	)
 
-	ticker := time.NewTicker(heartbeatInterval)
-	defer ticker.Stop()
+	redisOpt, err := queue.RedisOpt(cfg.RedisURL)
+	if err != nil {
+		log.Fatal().Err(err).Msg("queue redis opt failed")
+	}
+	srv := asynq.NewServer(redisOpt, asynq.Config{Concurrency: workerConcurrency})
+	mux := asynq.NewServeMux()
+	mux.HandleFunc(queue.TypeProcessApplication, processor.HandleProcessApplication)
 
-	log.Info().Msg("worker started (no queue consumption yet — Sprint 1)")
-	for {
-		select {
-		case <-ticker.C:
-			res := health.Evaluate(ctx, checkers)
-			log.Info().Bool("healthy", res.Healthy).Interface("checks", res.Checks).Msg("worker heartbeat")
-		case <-stop:
-			log.Info().Msg("shutting down worker")
-			sctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
-			_ = app.ShutdownWithContext(sctx)
-			cancel()
-			return
-		}
+	log.Info().Str("provider", cfg.AIProvider).Msg("worker started; consuming process_application")
+	if err := srv.Run(mux); err != nil {
+		log.Fatal().Err(err).Msg("asynq server error")
 	}
 }
