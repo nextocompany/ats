@@ -41,6 +41,9 @@ type Config struct {
 	// LINE Login — "mock" (default) or "real".
 	LINEProvider  string
 	LINEChannelID string
+
+	// CORSAllowOrigins is the comma-separated allowlist for browser clients.
+	CORSAllowOrigins string
 }
 
 // Provider values selecting real (vs mock) integrations.
@@ -78,6 +81,8 @@ func Load() (*Config, error) {
 
 		LINEProvider:  getenv("LINE_PROVIDER", "mock"),
 		LINEChannelID: os.Getenv("LINE_CHANNEL_ID"),
+
+		CORSAllowOrigins: getenv("CORS_ALLOW_ORIGINS", "http://localhost:3000"),
 	}
 
 	if c.DatabaseURL == "" {
