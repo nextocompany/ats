@@ -82,7 +82,7 @@ func Load() (*Config, error) {
 		LINEProvider:  getenv("LINE_PROVIDER", "mock"),
 		LINEChannelID: os.Getenv("LINE_CHANNEL_ID"),
 
-		CORSAllowOrigins: getenv("CORS_ALLOW_ORIGINS", "http://localhost:3000"),
+		CORSAllowOrigins: getenv("CORS_ALLOW_ORIGINS", "http://localhost:3000,http://localhost:3001"),
 	}
 
 	if c.DatabaseURL == "" {

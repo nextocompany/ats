@@ -1,0 +1,86 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-heading: var(--font-sans);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-brand-soft: var(--brand-soft);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+}
+
+/* Career Portal — warm, friendly, trust-building (candidate-facing, mobile-first).
+   Deliberately distinct from the HR console's neutral operations look. */
+:root {
+  --background: oklch(99% 0.012 95); /* warm off-white */
+  --foreground: oklch(25% 0.02 60);
+  --card: oklch(100% 0.006 95);
+  --card-foreground: oklch(25% 0.02 60);
+  --popover: oklch(100% 0.006 95);
+  --popover-foreground: oklch(25% 0.02 60);
+  --primary: oklch(58% 0.15 150); /* friendly green, LINE-adjacent */
+  --primary-foreground: oklch(99% 0.01 150);
+  --secondary: oklch(96% 0.02 95);
+  --secondary-foreground: oklch(32% 0.03 60);
+  --muted: oklch(96% 0.014 95);
+  --muted-foreground: oklch(48% 0.02 70);
+  --accent: oklch(94% 0.045 75); /* warm peach */
+  --accent-foreground: oklch(32% 0.06 55);
+  --destructive: oklch(57% 0.2 27);
+  --border: oklch(90% 0.014 90);
+  --input: oklch(90% 0.014 90);
+  --ring: oklch(58% 0.15 150);
+  --radius: 0.875rem;
+  --brand-soft: oklch(95% 0.04 150); /* tinted surface for hero/atmosphere */
+  --tap-min: 44px;
+  --duration-fast: 150ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+/* Honor reduced motion globally. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
