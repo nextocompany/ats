@@ -1,6 +1,7 @@
 package peoplesoft
 
 import (
+	"context"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -12,17 +13,26 @@ import (
 	"github.com/nexto/hr-ats/pkg/httpx"
 )
 
+// ReengageTrigger enqueues candidate re-engagement when a vacancy opens. It is an
+// interface (satisfied by reengage.Trigger) so this package needs no dependency
+// on reengage. A nil trigger disables re-engagement.
+type ReengageTrigger interface {
+	OnVacancyOpened(ctx context.Context, positionID uuid.UUID) error
+}
+
 // Handler serves the PeopleSoft webhook + sync endpoints.
 type Handler struct {
 	vac      vacancies.Repository
 	pos      positions.Repository
 	svc      *Service
 	provider string
+	reengage ReengageTrigger
 }
 
-// NewHandler builds the PeopleSoft handler.
-func NewHandler(vac vacancies.Repository, pos positions.Repository, svc *Service, provider string) *Handler {
-	return &Handler{vac: vac, pos: pos, svc: svc, provider: provider}
+// NewHandler builds the PeopleSoft handler. reengage may be nil to disable
+// re-engagement on vacancy open.
+func NewHandler(vac vacancies.Repository, pos positions.Repository, svc *Service, provider string, reengage ReengageTrigger) *Handler {
+	return &Handler{vac: vac, pos: pos, svc: svc, provider: provider, reengage: reengage}
 }
 
 type vacancyOpenedReq struct {
@@ -76,8 +86,13 @@ func (h *Handler) VacancyOpened(c *fiber.Ctx) error {
 	}); err != nil {
 		return err
 	}
-	// NOTE: HR LINE notification is Sprint 5; the vacancy is now visible on the
-	// public Career API.
+	// Re-engage matching talent-pool / prior candidates for the opened role
+	// (Sprint 5a). Best-effort: a queue failure must not fail the webhook.
+	if h.reengage != nil && positionID != nil {
+		if err := h.reengage.OnVacancyOpened(c.UserContext(), *positionID); err != nil {
+			log.Warn().Err(err).Str("ps_vacancy_id", req.PSVacancyID).Msg("peoplesoft: re-engagement enqueue failed")
+		}
+	}
 	return httpx.OK(c, fiber.Map{"ps_vacancy_id": req.PSVacancyID, "mapped": positionID != nil})
 }
 

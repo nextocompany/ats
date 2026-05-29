@@ -42,6 +42,15 @@ type Config struct {
 	LINEProvider  string
 	LINEChannelID string
 
+	// Notifications (re-engagement, report delivery) — "mock" (default) or "real".
+	NotifyProvider  string
+	NotifyLINEToken string // LINE Messaging API channel access token (push)
+	NotifyEmailFrom string // from-address for email delivery (real)
+
+	// PortalBaseURL is the public Career Portal origin used to build apply links
+	// in outbound notifications.
+	PortalBaseURL string
+
 	// CORSAllowOrigins is the comma-separated allowlist for browser clients.
 	CORSAllowOrigins string
 }
@@ -82,6 +91,12 @@ func Load() (*Config, error) {
 		LINEProvider:  getenv("LINE_PROVIDER", "mock"),
 		LINEChannelID: os.Getenv("LINE_CHANNEL_ID"),
 
+		NotifyProvider:  getenv("NOTIFY_PROVIDER", "mock"),
+		NotifyLINEToken: os.Getenv("NOTIFY_LINE_TOKEN"),
+		NotifyEmailFrom: os.Getenv("NOTIFY_EMAIL_FROM"),
+
+		PortalBaseURL: getenv("PORTAL_BASE_URL", "http://localhost:3001"),
+
 		CORSAllowOrigins: getenv("CORS_ALLOW_ORIGINS", "http://localhost:3000,http://localhost:3001"),
 	}
 
@@ -110,6 +125,9 @@ func Load() (*Config, error) {
 	if c.UsesRealLINE() && c.LINEChannelID == "" {
 		return nil, fmt.Errorf("config: LINE_CHANNEL_ID is required when LINE_PROVIDER=real")
 	}
+	if c.UsesRealNotify() && c.NotifyLINEToken == "" {
+		return nil, fmt.Errorf("config: NOTIFY_LINE_TOKEN is required when NOTIFY_PROVIDER=real")
+	}
 
 	return c, nil
 }
@@ -119,6 +137,10 @@ func (c *Config) UsesRealPeopleSoft() bool { return c.PSProvider == ProviderReal
 
 // UsesRealLINE reports whether real LINE id-token verification should be used.
 func (c *Config) UsesRealLINE() bool { return c.LINEProvider == ProviderReal }
+
+// UsesRealNotify reports whether the real notifier (LINE push / email) should be
+// constructed. Mock (log-only) is the default so local/CI need no credentials.
+func (c *Config) UsesRealNotify() bool { return c.NotifyProvider == ProviderReal }
 
 // UsesAzureAI reports whether real Azure AI clients should be constructed.
 func (c *Config) UsesAzureAI() bool {
