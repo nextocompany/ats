@@ -10,6 +10,7 @@ import type {
   Funnel,
   KPI,
   Me,
+  ReportExport,
   Source,
   TimelineEntry,
 } from "./types";
@@ -86,6 +87,21 @@ export function useKpi() {
 }
 export function useSources() {
   return useQuery({ queryKey: ["sources"], queryFn: () => api.get<Source[]>("/api/v1/reports/sources").then((r) => r.data) });
+}
+
+export function useReportExports() {
+  return useQuery({
+    queryKey: ["report-exports"],
+    queryFn: () => api.get<ReportExport[]>("/api/v1/reports/exports").then((r) => r.data),
+  });
+}
+
+export function useTriggerExport() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post("/api/v1/reports/exports"),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["report-exports"] }),
+  });
 }
 
 export function useSetStatus(id: string) {

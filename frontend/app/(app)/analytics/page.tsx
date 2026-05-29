@@ -1,6 +1,7 @@
 "use client";
 
 import { FunnelChart, KpiCards, SourcesChart } from "@/components/analytics/Charts";
+import { ScheduledExports } from "@/components/analytics/ScheduledExports";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFunnel, useKpi, useSources } from "@/lib/queries";
 
@@ -17,6 +18,7 @@ export default function AnalyticsPage() {
         {funnel ? <FunnelChart funnel={funnel} /> : <Skeleton className="h-72 w-full" />}
         {sources ? <SourcesChart sources={sources} /> : <Skeleton className="h-72 w-full" />}
       </div>
+      <ScheduledExports />
     </div>
   );
 }

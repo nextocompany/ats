@@ -1,0 +1,5 @@
+# Compiled command binaries left by `go build ./cmd/<name>` in the module root.
+/api
+/worker
+/scheduler
+/importref

@@ -89,3 +89,17 @@ export interface ApplicationFilter {
   page?: number;
   limit?: number;
 }
+
+// ReportExport mirrors reports.exportView (Sprint 5b): a stored export plus
+// short-lived signed download links.
+export interface ReportExport {
+  id: string;
+  kind: string;
+  period: string;
+  csv_blob: string;
+  json_blob: string;
+  delivered: boolean;
+  created_at: string;
+  csv_url?: string;
+  json_url?: string;
+}

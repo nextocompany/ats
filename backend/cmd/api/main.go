@@ -22,6 +22,7 @@ import (
 	"github.com/nexto/hr-ats/internal/candidates"
 	"github.com/nexto/hr-ats/internal/health"
 	"github.com/nexto/hr-ats/internal/middleware"
+	"github.com/nexto/hr-ats/internal/notify"
 	"github.com/nexto/hr-ats/internal/pdpa"
 	"github.com/nexto/hr-ats/internal/peoplesoft"
 	"github.com/nexto/hr-ats/internal/positions"
@@ -163,7 +164,11 @@ func main() {
 	activityLog := activity.New(pool)
 	applications.RegisterDashboardRoutes(app, applications.NewDashboardHandler(appRepo, blobClient, activityLog))
 	profiles.RegisterRoutes(app, profiles.NewHandler(candidateRepo, appRepo))
-	reports.RegisterRoutes(app, reports.NewHandler(reports.New(pool)))
+	// Analytics + report exports (Sprint 5b): on-demand export rides the same
+	// export service the scheduler/worker use; delivery via the notify seam.
+	reportRepo := reports.New(pool)
+	reportExporter := reports.NewExportService(reportRepo, blobClient, notify.NewNotifier(cfg), cfg.ReportRecipientList())
+	reports.RegisterRoutes(app, reports.NewHandler(reportRepo, reportExporter, blobClient))
 	pdpa.RegisterRoutes(app, pdpa.NewHandler(pdpaRepo))
 	users.RegisterRoutes(app, users.NewHandler())
 
