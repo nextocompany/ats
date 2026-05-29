@@ -69,3 +69,9 @@ tidy: ## Tidy go modules
 
 security: ## Run Go security scans (gosec + govulncheck)
 	cd backend && gosec ./... && govulncheck ./...
+
+e2e: ## Boot the stack, seed, and run the cross-system e2e suite
+	docker compose up -d --build
+	@echo "waiting for api health…"; for i in $$(seq 1 60); do curl -sf http://localhost:8080/health >/dev/null 2>&1 && break; sleep 1; done
+	$(MAKE) migrate-up && $(MAKE) seed
+	cd backend && go test -tags e2e ./e2e/... -count=1 -v
