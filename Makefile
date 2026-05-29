@@ -66,3 +66,6 @@ vet: ## Run go vet
 
 tidy: ## Tidy go modules
 	cd backend && go mod tidy
+
+security: ## Run Go security scans (gosec + govulncheck)
+	cd backend && gosec ./... && govulncheck ./...
