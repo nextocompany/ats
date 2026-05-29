@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/jackc/pgx/v5/pgxpool"
 	goredis "github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
@@ -109,6 +110,12 @@ func main() {
 		DisableStartupMessage: true,
 		BodyLimit:             maxBodyBytes,
 	})
+	app.Use(cors.New(cors.Config{
+		AllowOrigins:     cfg.CORSAllowOrigins,
+		AllowMethods:     "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+		AllowHeaders:     "Origin,Content-Type,Accept,Authorization,X-Request-ID,X-LINE-IdToken",
+		AllowCredentials: true,
+	}))
 	app.Use(middleware.RequestLogger())
 	app.Use(middleware.MockJWT(cfg.IsDevelopment()))
 
