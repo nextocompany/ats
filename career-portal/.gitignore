@@ -44,3 +44,8 @@ next-env.d.ts
 /test-results/
 /playwright-report/
 /e2e/__screens__/
+
+# Serwist (generated service worker — committed PWA icons in public/ are kept)
+/public/sw.js
+/public/sw.js.map
+/public/swe-worker-*.js

@@ -1,14 +1,20 @@
+import withSerwistInit from "@serwist/next";
+
 import type { NextConfig } from "next";
 
 // API origin the candidate's browser calls; allowed in CSP connect-src.
 const apiOrigin = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
-// Header-based CSP (Sprint 6a). connect-src must include the Go API origin or the
-// portal's apply/positions/status fetches break. worker-src/manifest-src kept
-// 'self' so a future PWA service worker + manifest (Sprint 6c) are allowed.
+// Header-based CSP (Sprint 6a; script-src relaxed Sprint 6c). Next's App Router
+// emits inline hydration/streaming scripts; a strict `script-src 'self'` blocks
+// them in production builds (the page renders but never hydrates). A per-request
+// nonce can't fix statically-prerendered pages (Next emits nonce=undefined for
+// them), so we allow 'unsafe-inline' for scripts — Next's inline scripts are
+// framework-generated and same-origin. worker-src/manifest-src 'self' permit the
+// PWA service worker + manifest (Sprint 6c).
 const csp = [
   "default-src 'self'",
-  "script-src 'self'",
+  "script-src 'self' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self'",
@@ -35,4 +41,13 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// Serwist (Sprint 6c): compiles app/sw.ts → public/sw.js (gitignored) and injects
+// the SW registration into the client bundle (same-origin, satisfies the 6a CSP
+// script-src/worker-src 'self'). Disabled in `next dev` so HMR isn't cached.
+const withSerwist = withSerwistInit({
+  swSrc: "app/sw.ts",
+  swDest: "public/sw.js",
+  disable: process.env.NODE_ENV === "development",
+});
+
+export default withSerwist(nextConfig);
