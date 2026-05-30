@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 
+import { InstallPrompt } from "@/components/InstallPrompt";
 import { JobCard } from "@/components/JobCard";
 import { PortalShell } from "@/components/PortalShell";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -19,6 +20,8 @@ export default function JobsPage() {
           <h1 className="text-2xl font-bold tracking-tight">ตำแหน่งงานที่เปิดรับ</h1>
           <p className="text-sm text-muted-foreground">เลือกตำแหน่งที่สนใจเพื่อดูรายละเอียดและสมัครงาน</p>
         </header>
+
+        <InstallPrompt />
 
         {isLoading ? (
           <div className="space-y-3" aria-hidden="true">

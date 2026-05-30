@@ -3,12 +3,15 @@ import type { NextConfig } from "next";
 // API origin the browser calls; allowed in CSP connect-src.
 const apiOrigin = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
-// Header-based CSP (Sprint 6a). style-src allows 'unsafe-inline' (no per-request
-// nonce without middleware — a documented follow-up). connect-src must include the
-// Go API origin or dashboard fetches break.
+// Header-based CSP (Sprint 6a; script-src relaxed Sprint 6c). Next's App Router
+// emits inline hydration/streaming scripts; a strict `script-src 'self'` blocks
+// them in production builds (page renders but never hydrates). A per-request nonce
+// can't fix statically-prerendered pages (Next emits nonce=undefined for them), so
+// we allow 'unsafe-inline' for scripts — Next's inline scripts are framework-
+// generated and same-origin. connect-src must include the Go API origin.
 const csp = [
   "default-src 'self'",
-  "script-src 'self'",
+  "script-src 'self' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self'",

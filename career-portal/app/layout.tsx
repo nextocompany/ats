@@ -16,13 +16,23 @@ const inter = Inter({ variable: "--font-latin", subsets: ["latin"], display: "sw
 export const metadata: Metadata = {
   title: "ร่วมงานกับเรา | สมัครงาน",
   description: "ดูตำแหน่งงานที่เปิดรับและสมัครงานได้ในไม่กี่ขั้นตอน",
+  // PWA (Sprint 6c): App Router serves the manifest at /manifest.webmanifest.
+  manifest: "/manifest.webmanifest",
+  applicationName: "สมัครงาน",
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "สมัครงาน" },
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
-  themeColor: "#ffffff",
+  // Match the manifest theme_color (brand green) so the standalone PWA chrome
+  // and the address bar share the portal's identity.
+  themeColor: "#1f9d57",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
