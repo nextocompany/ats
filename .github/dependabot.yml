@@ -1,0 +1,26 @@
+version: 2
+
+# Keeps CI pins from rotting (see Sprint 7 CI fix, review finding M1).
+# NOTE: the gomod updater bumps `require` dependencies (e.g. a future
+# golang.org/x/net CVE) but does NOT bump the `go`/`toolchain` directive,
+# and the github-actions updater bumps `uses:` action refs but NOT the
+# free-form `go-version:` input. The pinned Go patch in ci.yml therefore
+# still needs a periodic manual review.
+updates:
+  # GitHub Actions refs across all workflows (golangci-lint-action, setup-go, checkout, ...).
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # Backend Go module dependencies.
+  - package-ecosystem: "gomod"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+    groups:
+      go-deps:
+        patterns: ["*"]
