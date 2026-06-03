@@ -81,6 +81,40 @@ func TestLoad_PSRealRequiresCreds(t *testing.T) {
 	}
 }
 
+// setRealPSIBCreds sets the four PS Integration Broker creds so that only the
+// webhook-secret requirement is left to assert.
+func setRealPSIBCreds(t *testing.T) {
+	t.Helper()
+	t.Setenv("DB_URL", "postgres://localhost/db")
+	t.Setenv("REDIS_URL", "redis://localhost:6379")
+	t.Setenv("AZURE_BLOB_CONNECTION_STRING", "conn")
+	t.Setenv("PS_PROVIDER", "real")
+	t.Setenv("PS_IB_BASE_URL", "https://ps.example.com")
+	t.Setenv("PS_IB_TOKEN_URL", "https://ps.example.com/oauth/token")
+	t.Setenv("PS_IB_CLIENT_ID", "client")
+	t.Setenv("PS_IB_CLIENT_SECRET", "secret")
+}
+
+func TestLoad_PSRealRequiresWebhookSecret(t *testing.T) {
+	setRealPSIBCreds(t)
+	t.Setenv("PS_WEBHOOK_SECRET", "")
+	if _, err := Load(); err == nil {
+		t.Fatal("expected error when PS_PROVIDER=real without PS_WEBHOOK_SECRET")
+	}
+}
+
+func TestLoad_PSRealWithWebhookSecret(t *testing.T) {
+	setRealPSIBCreds(t)
+	t.Setenv("PS_WEBHOOK_SECRET", "shh")
+	c, err := Load()
+	if err != nil {
+		t.Fatalf("expected Load to succeed with full real PS config, got %v", err)
+	}
+	if c.PSWebhookSecret != "shh" {
+		t.Errorf("expected PSWebhookSecret %q, got %q", "shh", c.PSWebhookSecret)
+	}
+}
+
 func TestLoad_LINERealRequiresChannel(t *testing.T) {
 	t.Setenv("DB_URL", "postgres://localhost/db")
 	t.Setenv("REDIS_URL", "redis://localhost:6379")

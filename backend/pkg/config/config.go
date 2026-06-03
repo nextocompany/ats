@@ -48,6 +48,10 @@ type Config struct {
 	PSIBClientSecret       string
 	PSCSVFallbackContainer string
 
+	// PSWebhookSecret is the shared secret PeopleSoft uses to sign inbound webhook
+	// bodies (X-PS-Signature: hex HMAC-SHA256). Required when PSProvider == "real".
+	PSWebhookSecret string
+
 	// HR auth (Sprint 6a) — "mock" (dev super_admin, default) or "real" (Azure AD /
 	// Entra ID JWT validation). The middleware preserves the DevUser locals contract.
 	AuthProvider    string
@@ -117,6 +121,7 @@ func Load() (*Config, error) {
 		PSIBClientID:           os.Getenv("PS_IB_CLIENT_ID"),
 		PSIBClientSecret:       os.Getenv("PS_IB_CLIENT_SECRET"),
 		PSCSVFallbackContainer: getenv("PS_CSV_FALLBACK_CONTAINER", "ps-export"),
+		PSWebhookSecret:        os.Getenv("PS_WEBHOOK_SECRET"),
 
 		LINEProvider:  getenv("LINE_PROVIDER", "mock"),
 		LINEChannelID: os.Getenv("LINE_CHANNEL_ID"),
@@ -153,6 +158,9 @@ func Load() (*Config, error) {
 	if c.UsesRealPeopleSoft() {
 		if c.PSIBBaseURL == "" || c.PSIBTokenURL == "" || c.PSIBClientID == "" || c.PSIBClientSecret == "" {
 			return nil, fmt.Errorf("config: PS_IB_BASE_URL, PS_IB_TOKEN_URL, PS_IB_CLIENT_ID, PS_IB_CLIENT_SECRET are required when PS_PROVIDER=real")
+		}
+		if c.PSWebhookSecret == "" {
+			return nil, fmt.Errorf("config: PS_WEBHOOK_SECRET is required when PS_PROVIDER=real")
 		}
 	}
 	if c.UsesRealLINE() && c.LINEChannelID == "" {

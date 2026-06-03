@@ -14,9 +14,14 @@
   `AUTH_PROVIDER=real` validates an **Azure AD (Entra) JWT** (OIDC discovery + JWKS, checks `aud`/`iss`/`exp`)
   and maps claims → the same `DevUser` locals every handler reads (no handler changes).
 - Auth gates the **HR console only**. Bypassed paths: `/health`, `/api/v1/public/*` (LINE-authed candidate API),
-  `/api/v1/ps/*` (PeopleSoft machine webhooks).
-- **Follow-up**: PeopleSoft webhooks (`/api/v1/ps/*`) are currently unauthenticated machine endpoints — add an
-  HMAC/shared-secret check before production exposure.
+  `/api/v1/ps/*` (PeopleSoft machine webhooks — authenticated separately by HMAC, below).
+- **PeopleSoft webhook auth (Sprint 7)**: the state-changing PS POSTs (`/api/v1/ps/vacancy-opened`,
+  `/vacancy-closed`, `/sync-hired`) require `X-PS-Signature: <hex HMAC-SHA256(PS_WEBHOOK_SECRET, raw-body)>`,
+  verified constant-time (`hmac.Equal`); a missing/invalid signature returns 401. `GET /api/v1/ps/health` stays
+  open as a probe. Gated by the mock-default seam: enforced when `PS_WEBHOOK_SECRET` is set (mandatory and
+  fail-fast-validated when `PS_PROVIDER=real`); dev/CI (`mock`, no secret) leave the group open so tests stay green.
+- **Follow-up (optional hardening)**: replay protection (timestamp tolerance / nonce) on the PS webhooks — the
+  current HMAC + TLS posture does not detect a replayed, validly-signed request.
 
 ## Rate limiting
 - Per-IP limiter on `/api/v1/public/*` (apply/positions/status) — the public abuse surface — at
