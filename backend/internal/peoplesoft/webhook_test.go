@@ -57,7 +57,7 @@ func (f *fakeReengage) OnVacancyOpened(_ context.Context, positionID uuid.UUID) 
 
 func testApp(h *Handler) *fiber.App {
 	app := fiber.New(fiber.Config{ErrorHandler: httpx.ErrorHandler})
-	RegisterRoutes(app, h)
+	RegisterRoutes(app, h, "") // no secret → group open (mock/dev behavior)
 	return app
 }
 

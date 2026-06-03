@@ -168,7 +168,7 @@ func main() {
 
 	// PeopleSoft integration (Direction A webhooks + Direction B sync). Vacancy
 	// open fires candidate re-engagement (Sprint 5a).
-	peoplesoft.RegisterRoutes(app, peoplesoft.NewHandler(vacancyRepo, positionRepo, psService, cfg.PSProvider, reengageTrigger))
+	peoplesoft.RegisterRoutes(app, peoplesoft.NewHandler(vacancyRepo, positionRepo, psService, cfg.PSProvider, reengageTrigger), cfg.PSWebhookSecret)
 
 	// Re-engagement manual trigger (Sprint 5a).
 	reengage.RegisterRoutes(app, reengage.NewHandler(reengageTrigger))
