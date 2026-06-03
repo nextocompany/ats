@@ -26,7 +26,7 @@ func main() {
 	}
 	dsn := os.Getenv("DB_URL")
 	if dsn == "" {
-		dsn = "postgres://hruser:hrpass@localhost:5432/hr_db?sslmode=disable"
+		dsn = "postgres://hruser:hrpass@localhost:5432/hr_db?sslmode=disable" //#nosec G101 -- local-dev fallback DSN only (mirrors docker-compose/Makefile); real deployments set DB_URL.
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
@@ -56,7 +56,7 @@ func fatal(msg string, err error) {
 
 // readCSV returns header-indexed rows.
 func readCSV(path string) ([]map[string]string, error) {
-	f, err := os.Open(path)
+	f, err := os.Open(path) //#nosec G304,G703 -- importref is an operator-run admin CLI; path is an explicit argv CSV path, not untrusted external input.
 	if err != nil {
 		return nil, err
 	}
