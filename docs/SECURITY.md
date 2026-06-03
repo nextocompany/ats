@@ -25,7 +25,15 @@
 
 ## Rate limiting
 - Per-IP limiter on `/api/v1/public/*` (apply/positions/status) — the public abuse surface — at
-  `publicRateMax` req/min (in-memory). **Follow-up**: Redis-backed limiter for multi-instance deployments.
+  `RATE_LIMIT_PUBLIC_MAX` req/min (default 30). **Redis-backed** (Sprint 7), so the window is shared
+  across api replicas instead of counted per process; keys live under `ratelimit:*`. The limiter **fails
+  open** on a Redis outage (availability over strict limiting for a public endpoint) and never touches
+  non-rate-limit keys (`Reset` is scoped to `ratelimit:*`, never `FLUSHDB`).
+- **Follow-up (deployment-dependent)**: the limiter keys on `c.IP()`, the direct TCP peer. If the api is
+  deployed behind a trusted reverse proxy / load balancer, configure Fiber's `EnableTrustedProxyCheck` +
+  `TrustedProxies` (LB CIDR) + `ProxyHeader: X-Forwarded-For` so the key is the real client IP rather than
+  the LB (otherwise all clients share one bucket). Do **not** trust `X-Forwarded-For` without the trusted-
+  proxy allowlist — it is client-spoofable and would let an attacker mint a fresh bucket per request.
 
 ## Secrets
 - No secrets are committed; only `.env.example` is tracked (`.env` is gitignored and untracked).

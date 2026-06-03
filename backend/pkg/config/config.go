@@ -85,6 +85,10 @@ type Config struct {
 	RetentionSweepCron    string
 	RetentionSweepBatch   int
 
+	// Public API rate limit (Sprint 7): max requests per IP per minute on
+	// /api/v1/public/*. Enforced cluster-wide via the Redis-backed store.
+	RateLimitPublicMax int
+
 	// CORSAllowOrigins is the comma-separated allowlist for browser clients.
 	CORSAllowOrigins string
 }
@@ -148,6 +152,8 @@ func Load() (*Config, error) {
 		RetentionDays:         getenvInt("RETENTION_DAYS", 365),
 		RetentionSweepCron:    getenv("RETENTION_SWEEP_CRON", "30 3 * * *"), // daily 03:30
 		RetentionSweepBatch:   getenvInt("RETENTION_SWEEP_BATCH", 500),
+
+		RateLimitPublicMax: getenvInt("RATE_LIMIT_PUBLIC_MAX", 30),
 
 		CORSAllowOrigins: getenv("CORS_ALLOW_ORIGINS", "http://localhost:3000,http://localhost:3001"),
 	}
