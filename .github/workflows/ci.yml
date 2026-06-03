@@ -25,9 +25,9 @@ jobs:
     env:
       DB_URL: postgres://hruser:hrpass@localhost:5432/hr_db?sslmode=disable
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: "1.26.4"
           cache-dependency-path: backend/go.sum
@@ -41,7 +41,7 @@ jobs:
         run: go build ./...
 
       - name: Lint
-        uses: golangci/golangci-lint-action@v8
+        uses: golangci/golangci-lint-action@v9
         with:
           version: v2.11.3
           working-directory: backend
@@ -61,8 +61,8 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
         with:
           go-version: "1.26.4"
           cache-dependency-path: backend/go.sum
@@ -87,8 +87,8 @@ jobs:
   security:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
         with:
           go-version: "1.26.4"
           cache-dependency-path: backend/go.sum
