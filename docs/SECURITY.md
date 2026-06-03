@@ -45,5 +45,10 @@
 - PII (name/phone/email/id_card, resume blobs) is stored in Postgres + Blob; resume access is via short-lived
   signed URLs (15 min). Status is exposed only via an opaque random token (no enumerable IDs).
 - Re-engagement suppresses repeat contact; report exports are delivered via short-lived signed links.
-- **Retention** (documented to candidates): ≤ 1 year, then deletion/anonymisation — operationalising the
-  retention sweep is a future task.
+- **Retention**: candidate PII (name/phone/email/id_card/address/DOB, resume blobs) is anonymized in place
+  ≤ 1 year after intake by a daily scheduled sweep (`retention:sweep`, Sprint 7). Rows are de-identified,
+  not deleted, to preserve referential integrity + aggregate analytics; resume blobs are removed from
+  storage and consent-ledger IPs nulled. The sweep is gated behind `RETENTION_SWEEP_ENABLED` (off by
+  default) and skips candidates still in an active pipeline (`pending`/`parsed`/`scored`) as well as
+  hired candidates (`hired`), whose records are retained in the ATS beyond the window for HR/PeopleSoft
+  reconciliation. Each anonymization writes a `retention_anonymize` audit log entry.

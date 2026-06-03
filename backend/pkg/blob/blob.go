@@ -88,6 +88,27 @@ func (c *Client) SignedURLForStored(storedURL string, ttl time.Duration) (string
 	return c.SignedURL(storedURL[i+len(marker):], ttl)
 }
 
+// Delete removes the named blob. A missing blob is treated as success so the
+// retention sweep is idempotent across re-runs.
+func (c *Client) Delete(ctx context.Context, name string) error {
+	_, err := c.client.DeleteBlob(ctx, c.container, name, nil)
+	if err != nil && !bloberror.HasCode(err, bloberror.BlobNotFound) {
+		return fmt.Errorf("blob: delete %q: %w", name, err)
+	}
+	return nil
+}
+
+// DeleteStored derives the blob key from a previously stored full URL and deletes
+// it. Mirrors SignedURLForStored's key derivation.
+func (c *Client) DeleteStored(ctx context.Context, storedURL string) error {
+	marker := "/" + c.container + "/"
+	i := strings.Index(storedURL, marker)
+	if i < 0 {
+		return fmt.Errorf("blob: cannot derive key from %q", storedURL)
+	}
+	return c.Delete(ctx, storedURL[i+len(marker):])
+}
+
 // Download reads the named blob into memory.
 func (c *Client) Download(ctx context.Context, name string) ([]byte, error) {
 	resp, err := c.client.DownloadStream(ctx, c.container, name, nil)

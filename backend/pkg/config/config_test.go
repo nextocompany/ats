@@ -148,3 +148,49 @@ func TestLoad_AzureWithKeys(t *testing.T) {
 		t.Error("expected UsesAzureAI true when AI_PROVIDER=azure")
 	}
 }
+
+func TestLoad_RetentionDefaults(t *testing.T) {
+	t.Setenv("DB_URL", "postgres://localhost/db")
+	t.Setenv("REDIS_URL", "redis://localhost:6379")
+	t.Setenv("AZURE_BLOB_CONNECTION_STRING", "conn")
+
+	c, err := Load()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if c.RetentionSweepEnabled {
+		t.Error("expected retention sweep disabled by default")
+	}
+	if c.RetentionDays != 365 {
+		t.Errorf("expected RetentionDays 365, got %d", c.RetentionDays)
+	}
+	if c.RetentionSweepBatch != 500 {
+		t.Errorf("expected RetentionSweepBatch 500, got %d", c.RetentionSweepBatch)
+	}
+	if c.RetentionSweepCron != "30 3 * * *" {
+		t.Errorf("expected default cron '30 3 * * *', got %q", c.RetentionSweepCron)
+	}
+}
+
+func TestLoad_RetentionEnabledParsed(t *testing.T) {
+	t.Setenv("DB_URL", "postgres://localhost/db")
+	t.Setenv("REDIS_URL", "redis://localhost:6379")
+	t.Setenv("AZURE_BLOB_CONNECTION_STRING", "conn")
+	t.Setenv("RETENTION_SWEEP_ENABLED", "true")
+	t.Setenv("RETENTION_DAYS", "30")
+	t.Setenv("RETENTION_SWEEP_BATCH", "10")
+
+	c, err := Load()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !c.RetentionSweepEnabled {
+		t.Error("expected RetentionSweepEnabled true")
+	}
+	if c.RetentionDays != 30 {
+		t.Errorf("expected RetentionDays 30, got %d", c.RetentionDays)
+	}
+	if c.RetentionSweepBatch != 10 {
+		t.Errorf("expected RetentionSweepBatch 10, got %d", c.RetentionSweepBatch)
+	}
+}

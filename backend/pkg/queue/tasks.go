@@ -123,3 +123,43 @@ func ParseExportReportPayload(body []byte) (ExportReportPayload, error) {
 	}
 	return p, nil
 }
+
+// TypeRetentionSweep is the asynq task type for the daily PDPA retention sweep
+// (Sprint 7): anonymize candidates whose retention window has elapsed.
+const TypeRetentionSweep = "retention:sweep"
+
+// RetentionSweepPayload is the job body for a retention sweep. The field is
+// optional; the handler derives the default batch from config when zero.
+type RetentionSweepPayload struct {
+	Batch int `json:"batch"` // max candidates per run; 0 → config default
+}
+
+// retentionUniqueTTL dedups overlapping sweep enqueues during a rolling deploy,
+// mirroring exportUniqueTTL.
+const retentionUniqueTTL = 1 * time.Hour
+
+// NewRetentionSweepTask builds the retention-sweep task with retry/timeout policy
+// and enqueue-scoped uniqueness.
+func NewRetentionSweepTask(p RetentionSweepPayload) (*asynq.Task, error) {
+	body, err := json.Marshal(p)
+	if err != nil {
+		return nil, fmt.Errorf("queue: marshal payload: %w", err)
+	}
+	return asynq.NewTask(
+		TypeRetentionSweep,
+		body,
+		asynq.MaxRetry(taskMaxRetry),
+		asynq.Timeout(taskTimeout),
+		asynq.Retention(taskRetention),
+		asynq.Unique(retentionUniqueTTL),
+	), nil
+}
+
+// ParseRetentionSweepPayload decodes a retention-sweep task body.
+func ParseRetentionSweepPayload(body []byte) (RetentionSweepPayload, error) {
+	var p RetentionSweepPayload
+	if err := json.Unmarshal(body, &p); err != nil {
+		return p, fmt.Errorf("queue: unmarshal payload: %w", err)
+	}
+	return p, nil
+}

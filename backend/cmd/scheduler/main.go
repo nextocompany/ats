@@ -42,6 +42,23 @@ func main() {
 	}
 
 	log.Info().Str("cron", cfg.ReportScheduleCron).Str("entry_id", entryID).Msg("scheduler started; report:export registered")
+
+	// Retention sweep (Sprint 7): registered only when explicitly enabled, so a
+	// disabled environment never enqueues the destructive PDPA job.
+	if cfg.RetentionSweepEnabled {
+		sweepTask, err := queue.NewRetentionSweepTask(queue.RetentionSweepPayload{})
+		if err != nil {
+			log.Fatal().Err(err).Msg("build retention sweep task failed")
+		}
+		sweepID, err := scheduler.Register(cfg.RetentionSweepCron, sweepTask)
+		if err != nil {
+			log.Fatal().Err(err).Str("cron", cfg.RetentionSweepCron).Msg("register retention sweep failed")
+		}
+		log.Info().Str("cron", cfg.RetentionSweepCron).Str("entry_id", sweepID).Msg("scheduler: retention:sweep registered")
+	} else {
+		log.Info().Msg("scheduler: retention sweep disabled (RETENTION_SWEEP_ENABLED=false)")
+	}
+
 	if err := scheduler.Run(); err != nil {
 		log.Fatal().Err(err).Msg("scheduler error")
 	}
