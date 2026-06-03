@@ -50,7 +50,9 @@ Made the backend `build-and-test` (Lint) and `security` (govulncheck + gosec) CI
    - **G304 + G703** (HIGH, line 59): `os.Open(path)` where `path` is an explicit `argv` CSV path to an operator-run admin import CLI — not untrusted external input.
    - **WHY annotate, not refactor**: this is a CI-fix PR; changing the CLI's runtime behavior (e.g. removing the dev DSN default, or scoping reads via `os.Root`) would break the tool's zero-config local UX and arbitrary-path imports. Justified `//#nosec Gxxx -- reason` is the idiomatic, behavior-preserving, transparent gosec resolution for admin tooling. **Flagged for reviewer scrutiny in `/code-review`.**
 
-2. **Task 5 (`.golangci.yml`) skipped** — intentional. The plan marked it optional for drift-protection; pinning `version: v2.11.3` already freezes the linter set, so the config adds no value and only enlarges the diff.
+2. **pnpm install failure unmasked in CI (handled).** Same masking chain, one layer deeper: after the govulncheck + gosec fixes let the `security` job run further, it failed at the `pnpm audit (frontend)` step. Not the audit (`|| true`) — the `pnpm install --frozen-lockfile` line exited 1 with `ERR_PNPM_IGNORED_BUILDS` (msw/sharp/unrs-resolver). Cause: no `packageManager` pin, so CI's `corepack enable` floated to the **latest pnpm (11.5.1)**, which errors on un-approved build scripts; local + lockfile use **9.15.9** (no such behavior). **Fix**: pin `corepack prepare pnpm@9.15.9 --activate` in both pnpm steps (CI-scoped, no app-file change, matches lockfile origin — same determinism theme as the Go/golangci-lint pins). Verified locally: `pnpm install --frozen-lockfile` passes in both apps under 9.15.9. Caught only by the first CI run — `build-and-test` + `e2e` were green on that run; the Go security steps (govulncheck + gosec) **passed in CI**, confirming the core fix.
+
+3. **Task 5 (`.golangci.yml`) skipped** — intentional. The plan marked it optional for drift-protection; pinning `version: v2.11.3` already freezes the linter set, so the config adds no value and only enlarges the diff.
 
 ## Issues Encountered
 

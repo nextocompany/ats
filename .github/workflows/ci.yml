@@ -106,11 +106,13 @@ jobs:
         working-directory: frontend
         run: |
           corepack enable
+          corepack prepare pnpm@9.15.9 --activate
           pnpm install --frozen-lockfile
           pnpm audit --audit-level=high || true
       - name: pnpm audit (career-portal)
         working-directory: career-portal
         run: |
           corepack enable
+          corepack prepare pnpm@9.15.9 --activate
           pnpm install --frozen-lockfile
           pnpm audit --audit-level=high || true
