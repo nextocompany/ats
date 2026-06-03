@@ -89,8 +89,11 @@ func (s *RetentionService) Sweep(ctx context.Context, batch int) (int, error) {
 	return anonymized, nil
 }
 
-// eligible returns candidate IDs past the retention window with no active
-// application, not already anonymized, oldest first.
+// eligible returns candidate IDs past the retention window that are neither in
+// an active pipeline ('pending'/'parsed'/'scored') nor hired, not already
+// anonymized, oldest first. Hired candidates are excluded so their PII is kept
+// in the ATS beyond the window (client policy: hired records retained for HR/PS
+// reconciliation).
 func (s *RetentionService) eligible(ctx context.Context, days, batch int) ([]uuid.UUID, error) {
 	const q = `
 		SELECT c.id
@@ -100,7 +103,7 @@ func (s *RetentionService) eligible(ctx context.Context, days, batch int) ([]uui
 		  AND NOT EXISTS (
 		      SELECT 1 FROM applications a
 		      WHERE a.candidate_id = c.id
-		        AND a.status IN ('pending','parsed','scored')
+		        AND a.status IN ('pending','parsed','scored','hired')
 		  )
 		ORDER BY c.created_at
 		LIMIT $2`

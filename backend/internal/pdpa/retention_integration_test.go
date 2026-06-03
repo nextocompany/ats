@@ -36,8 +36,9 @@ func (f *fakeAudit) Record(_ context.Context, _ string, _ string, _ uuid.UUID, _
 
 // seededIDs holds the candidate IDs created by setupRetention.
 type seededIDs struct {
-	expiredTerminal uuid.UUID // expired + only terminal app → eligible
-	expiredActive   uuid.UUID // expired + active app → skipped
+	expiredTerminal uuid.UUID // expired + only terminal (rejected) app → eligible
+	expiredActive   uuid.UUID // expired + active (pending) app → skipped
+	expiredHired    uuid.UUID // expired + hired app → skipped (retained for HR/PS)
 	recent          uuid.UUID // within window, no apps → skipped
 }
 
@@ -99,7 +100,20 @@ func setupRetention(t *testing.T) (*pgxpool.Pool, seededIDs) {
 		t.Fatalf("seed expiredActive app: %v", err)
 	}
 
-	// 3) Recent candidate (within window) with no applications → must be skipped.
+	// 3) Expired (400 days) but HIRED → must be skipped (retained for HR/PS).
+	if err := pool.QueryRow(ctx,
+		`INSERT INTO candidates (full_name, phone, source_channel, status, created_at)
+		 VALUES ('ผ่าน ได้งาน','0800000004','career_portal','available', NOW() - INTERVAL '400 days')
+		 RETURNING id`).Scan(&ids.expiredHired); err != nil {
+		t.Fatalf("seed expiredHired: %v", err)
+	}
+	if _, err := pool.Exec(ctx,
+		`INSERT INTO applications (candidate_id, position_id, status) VALUES ($1,$2,'hired')`,
+		ids.expiredHired, posID); err != nil {
+		t.Fatalf("seed expiredHired app: %v", err)
+	}
+
+	// 4) Recent candidate (within window) with no applications → must be skipped.
 	if err := pool.QueryRow(ctx,
 		`INSERT INTO candidates (full_name, phone, source_channel, status)
 		 VALUES ('ใหม่ เพิ่งสมัคร','0800000003','career_portal','available')
@@ -192,8 +206,8 @@ func TestSweep_AnonymizesExpiredTerminal(t *testing.T) {
 		t.Errorf("expected 1 audit record, got %d", audit.records)
 	}
 
-	// Candidates 2 & 3 untouched.
-	for _, id := range []uuid.UUID{ids.expiredActive, ids.recent} {
+	// Candidates 2, 3 (hired) & 4 untouched.
+	for _, id := range []uuid.UUID{ids.expiredActive, ids.expiredHired, ids.recent} {
 		var anon *string
 		if err := pool.QueryRow(ctx,
 			`SELECT pdpa_anonymized_at::text FROM candidates WHERE id=$1`, id).Scan(&anon); err != nil {

@@ -49,5 +49,6 @@
   ≤ 1 year after intake by a daily scheduled sweep (`retention:sweep`, Sprint 7). Rows are de-identified,
   not deleted, to preserve referential integrity + aggregate analytics; resume blobs are removed from
   storage and consent-ledger IPs nulled. The sweep is gated behind `RETENTION_SWEEP_ENABLED` (off by
-  default) and skips candidates still in an active pipeline (`pending`/`parsed`/`scored`). Each
-  anonymization writes a `retention_anonymize` audit log entry.
+  default) and skips candidates still in an active pipeline (`pending`/`parsed`/`scored`) as well as
+  hired candidates (`hired`), whose records are retained in the ATS beyond the window for HR/PeopleSoft
+  reconciliation. Each anonymization writes a `retention_anonymize` audit log entry.
