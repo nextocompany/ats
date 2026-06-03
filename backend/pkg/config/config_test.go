@@ -194,3 +194,26 @@ func TestLoad_RetentionEnabledParsed(t *testing.T) {
 		t.Errorf("expected RetentionSweepBatch 10, got %d", c.RetentionSweepBatch)
 	}
 }
+
+func TestLoad_RateLimitDefault(t *testing.T) {
+	t.Setenv("DB_URL", "postgres://localhost/db")
+	t.Setenv("REDIS_URL", "redis://localhost:6379")
+	t.Setenv("AZURE_BLOB_CONNECTION_STRING", "conn")
+
+	c, err := Load()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if c.RateLimitPublicMax != 30 {
+		t.Errorf("expected default RateLimitPublicMax 30, got %d", c.RateLimitPublicMax)
+	}
+
+	t.Setenv("RATE_LIMIT_PUBLIC_MAX", "5")
+	c2, err := Load()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if c2.RateLimitPublicMax != 5 {
+		t.Errorf("expected RateLimitPublicMax 5, got %d", c2.RateLimitPublicMax)
+	}
+}

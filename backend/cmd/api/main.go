@@ -42,13 +42,14 @@ import (
 	"github.com/nexto/hr-ats/pkg/httpx"
 	"github.com/nexto/hr-ats/pkg/logging"
 	"github.com/nexto/hr-ats/pkg/queue"
+	"github.com/nexto/hr-ats/pkg/ratelimit"
 	appredis "github.com/nexto/hr-ats/pkg/redis"
 )
 
 const (
-	shutdownTimeout = 10 * time.Second
-	maxBodyBytes    = 12 * 1024 * 1024 // headroom over the 10MB resume limit
-	publicRateMax   = 30               // requests per IP per minute on /api/v1/public/*
+	shutdownTimeout  = 10 * time.Second
+	maxBodyBytes     = 12 * 1024 * 1024 // headroom over the 10MB resume limit
+	publicRateWindow = time.Minute      // rate-limit window for /api/v1/public/* (Max from config)
 )
 
 func main() {
@@ -175,9 +176,13 @@ func main() {
 
 	// Public Career API (consumed by the Next.js portal in Sprint 4). Rate-limited
 	// per IP (Sprint 6a) — apply/status are the public abuse surface.
+	// Redis-backed storage makes the per-IP window shared across api replicas
+	// (Sprint 7) — in-memory storage counted per process, so R replicas allowed
+	// R×Max. Fails open on a Redis outage (see pkg/ratelimit).
 	app.Use("/api/v1/public", limiter.New(limiter.Config{
-		Max:          publicRateMax,
-		Expiration:   time.Minute,
+		Max:          cfg.RateLimitPublicMax,
+		Expiration:   publicRateWindow,
+		Storage:      ratelimit.New(rdb),
 		KeyGenerator: func(c *fiber.Ctx) string { return c.IP() },
 		LimitReached: func(c *fiber.Ctx) error {
 			return fiber.NewError(fiber.StatusTooManyRequests, "rate limit exceeded")
