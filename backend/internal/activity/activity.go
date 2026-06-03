@@ -19,6 +19,8 @@ const (
 	ActionViewResume   = "view_resume"
 	ActionConsent      = "consent"
 	ActionReengage     = "reengage"
+	// ActionRetentionAnonymize records a PDPA retention-sweep anonymization (S7).
+	ActionRetentionAnonymize = "retention_anonymize"
 )
 
 // Entry is a single audit record.

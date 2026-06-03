@@ -6,6 +6,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/rs/zerolog/log"
@@ -76,6 +77,14 @@ type Config struct {
 	ReportScheduleCron string
 	ReportRecipients   string
 
+	// Retention sweep (Sprint 7, F-PDPA): daily anonymization of expired candidate
+	// PII. Disabled by default — a destructive job must be explicitly enabled per
+	// environment so CI/dev/mock never purge. RetentionDays is the ≤1-year window.
+	RetentionSweepEnabled bool
+	RetentionDays         int
+	RetentionSweepCron    string
+	RetentionSweepBatch   int
+
 	// CORSAllowOrigins is the comma-separated allowlist for browser clients.
 	CORSAllowOrigins string
 }
@@ -134,6 +143,11 @@ func Load() (*Config, error) {
 
 		ReportScheduleCron: getenv("REPORT_SCHEDULE_CRON", "0 7 * * 1"), // Mon 07:00
 		ReportRecipients:   os.Getenv("REPORT_RECIPIENTS"),
+
+		RetentionSweepEnabled: getenvBool("RETENTION_SWEEP_ENABLED", false),
+		RetentionDays:         getenvInt("RETENTION_DAYS", 365),
+		RetentionSweepCron:    getenv("RETENTION_SWEEP_CRON", "30 3 * * *"), // daily 03:30
+		RetentionSweepBatch:   getenvInt("RETENTION_SWEEP_BATCH", 500),
 
 		CORSAllowOrigins: getenv("CORS_ALLOW_ORIGINS", "http://localhost:3000,http://localhost:3001"),
 	}
@@ -227,6 +241,24 @@ func (c *Config) IsDevelopment() bool {
 func getenv(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
+	}
+	return fallback
+}
+
+func getenvInt(key string, fallback int) int {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
+	}
+	return fallback
+}
+
+func getenvBool(key string, fallback bool) bool {
+	if v := os.Getenv(key); v != "" {
+		if b, err := strconv.ParseBool(v); err == nil {
+			return b
+		}
 	}
 	return fallback
 }
