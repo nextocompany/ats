@@ -87,6 +87,60 @@ jobs:
         if: failure()
         run: docker compose logs --tail=200
 
+  playwright:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.26.4"
+          cache-dependency-path: backend/go.sum
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Boot stack
+        run: docker compose up -d --build
+      - name: Wait for API health
+        run: for i in $(seq 1 60); do curl -sf http://localhost:8080/health && break; sleep 2; done
+      - name: Migrate + seed
+        run: |
+          go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+          make migrate-up && make seed
+      # Sequential per app: each Playwright webServer binds its own port (3001/3000).
+      # Prod build (`pnpm start`) so the career-portal service worker is generated.
+      - name: Career portal — build + Playwright
+        working-directory: career-portal
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.15.9 --activate
+          pnpm install --frozen-lockfile
+          pnpm exec playwright install --with-deps chromium
+          pnpm build
+          pnpm test:e2e
+      - name: Dashboard — build + Playwright
+        working-directory: frontend
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.15.9 --activate
+          pnpm install --frozen-lockfile
+          pnpm exec playwright install --with-deps chromium
+          pnpm build
+          pnpm test:e2e
+      - name: Upload Playwright artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts
+          path: |
+            frontend/e2e/__screens__/
+            career-portal/e2e/__screens__/
+            frontend/test-results/
+            career-portal/test-results/
+          if-no-files-found: ignore
+      - name: Stack logs on failure
+        if: failure()
+        run: docker compose logs --tail=200
+
   security:
     runs-on: ubuntu-latest
     steps:
