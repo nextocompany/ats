@@ -111,6 +111,7 @@ jobs:
       - name: Career portal — build + Playwright
         working-directory: career-portal
         run: |
+          corepack enable
           corepack prepare pnpm@9.15.9 --activate
           pnpm install --frozen-lockfile
           pnpm exec playwright install --with-deps chromium
@@ -119,6 +120,7 @@ jobs:
       - name: Dashboard — build + Playwright
         working-directory: frontend
         run: |
+          corepack enable
           corepack prepare pnpm@9.15.9 --activate
           pnpm install --frozen-lockfile
           pnpm exec playwright install --with-deps chromium
