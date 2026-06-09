@@ -85,6 +85,9 @@ param scaleToZero bool = false
 @description('When false, deploy without creating role assignments (for Contributor-only subscriptions): ACR admin-user pull + inline Container App secrets instead of managed identity + Key Vault. Set false on MPN/credit subs.')
 param rbacMode bool = true
 
+@description('Run Redis as an in-cluster Container App (cheap, ephemeral) instead of Azure Cache for Redis. Use on credit/pilot subscriptions where managed Redis is unavailable/too costly.')
+param redisAsContainer bool = false
+
 // ---------------------------------------------------------------------------
 // Naming
 // ---------------------------------------------------------------------------
@@ -101,6 +104,10 @@ var openAiName = toLower('${prefix}-openai-${uniq}')
 var docIntelName = toLower('${prefix}-docintel-${uniq}')
 var redisName = toLower('${prefix}-redis-${uniq}')
 var postgresName = toLower('${prefix}-pg-${uniq}')
+
+// In-cluster Redis Container App name (no uniqueString suffix — the internal
+// FQDN must be predictable to compose REDIS_URL without a deploy ordering cycle).
+var redisContainerAppName = '${prefix}-redis'
 
 var workspaceName = '${prefix}-logs'
 var appInsightsName = '${prefix}-appi'
@@ -176,7 +183,10 @@ module postgres 'modules/postgres.bicep' = {
   }
 }
 
-module redis 'modules/redis.bicep' = {
+// Managed Azure Cache for Redis — skipped when redisAsContainer=true (the
+// service is retiring on some subs / too costly for the credit pilot). When
+// absent it exposes no outputs, so every reference below is safe-deref guarded.
+module redis 'modules/redis.bicep' = if (!redisAsContainer) {
   name: 'redis'
   params: {
     location: location
@@ -229,8 +239,18 @@ module docintel 'modules/docintel.bicep' = if (deployAi) {
 // reserved chars would otherwise break URL parsing.
 var dbUrl = 'postgres://${postgresAdminLogin}:${uriComponent(postgresAdminPassword)}@${postgres.outputs.fqdn}:5432/${postgres.outputs.databaseName}?sslmode=require'
 
-// TLS Redis URL on port 6380. Password-only auth (empty username).
-var redisUrl = 'rediss://:${uriComponent(redis.outputs.primaryKey)}@${redis.outputs.hostName}:${redis.outputs.sslPort}'
+// REDIS_URL composition. Two shapes:
+//   - Managed (redisAsContainer=false): TLS URL on port 6380, password-only auth
+//     (empty username). The key is uriComponent-encoded so go-redis ParseURL can
+//     URL-decode the base64 (+ / =) Azure key without breaking URL parsing.
+//   - In-cluster (redisAsContainer=true): plaintext redis:// to the internal
+//     Container App FQDN on 6379 — no TLS, no password (env-internal only).
+// The managed branch uses safe-deref so it stays valid when the redis module is
+// skipped (the whole expression is never evaluated at runtime in that mode, but
+// the symbol must remain resolvable at compile time).
+var managedRedisUrl = 'rediss://:${uriComponent(redis.?outputs.primaryKey ?? '')}@${redis.?outputs.hostName ?? ''}:${redis.?outputs.sslPort ?? 0}'
+var containerRedisUrl = 'redis://${redisContainerAppName}.internal.${envDomain}:6379'
+var redisUrl = redisAsContainer ? containerRedisUrl : managedRedisUrl
 
 // Key Vault is only provisioned in RBAC mode. In no-RBAC mode the same secret
 // values are injected as inline Container App secrets instead (see below).
@@ -286,6 +306,20 @@ var portalFqdn = '${portalAppName}.${envDomain}'
 var dashboardFqdn = '${dashboardAppName}.${envDomain}'
 var portalUrl = 'https://${portalFqdn}'
 var dashboardUrl = 'https://${dashboardFqdn}'
+
+// ---------------------------------------------------------------------------
+// In-cluster Redis (pilot path) — only when redisAsContainer=true.
+// Registry-less Container App on the same env; reached internally on :6379.
+// ---------------------------------------------------------------------------
+
+module redisContainer 'modules/redis-container.bicep' = if (redisAsContainer) {
+  name: 'redis-container'
+  params: {
+    name: redisContainerAppName
+    location: location
+    environmentId: acaEnv.outputs.id
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Backend secret wiring — two modes
@@ -557,8 +591,8 @@ output postgresHost string = postgres.outputs.fqdn
 @description('Postgres database name.')
 output postgresDatabase string = postgres.outputs.databaseName
 
-@description('Redis hostname.')
-output redisHost string = redis.outputs.hostName
+@description('Redis hostname. Managed cache host when redisAsContainer=false; the internal Container App FQDN when redisAsContainer=true.')
+output redisHost string = redisAsContainer ? '${redisContainerAppName}.internal.${envDomain}' : (redis.?outputs.hostName ?? '')
 
 @description('Storage account name.')
 output storageAccountName string = storage.outputs.name
