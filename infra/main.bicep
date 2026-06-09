@@ -249,7 +249,9 @@ var dbUrl = 'postgres://${postgresAdminLogin}:${uriComponent(postgresAdminPasswo
 // skipped (the whole expression is never evaluated at runtime in that mode, but
 // the symbol must remain resolvable at compile time).
 var managedRedisUrl = 'rediss://:${uriComponent(redis.?outputs.primaryKey ?? '')}@${redis.?outputs.hostName ?? ''}:${redis.?outputs.sslPort ?? 0}'
-var containerRedisUrl = 'redis://${redisContainerAppName}.internal.${envDomain}:6379'
+// Same-environment apps reach an internal TCP-ingress app via its short app name
+// (ACA internal DNS); the full .internal.<domain> FQDN does not route for TCP.
+var containerRedisUrl = 'redis://${redisContainerAppName}:6379'
 var redisUrl = redisAsContainer ? containerRedisUrl : managedRedisUrl
 
 // Key Vault is only provisioned in RBAC mode. In no-RBAC mode the same secret
