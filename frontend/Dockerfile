@@ -3,14 +3,14 @@
 # --- deps: install with frozen lockfile -----------------------------------
 FROM node:20-alpine AS deps
 WORKDIR /app
-RUN corepack enable
+RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
 # --- builder: bake NEXT_PUBLIC_* into the SPA bundle ----------------------
 FROM node:20-alpine AS builder
 WORKDIR /app
-RUN corepack enable
+RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 
 # Public build args are inlined into the client bundle at build time.
 ARG NEXT_PUBLIC_API_URL
