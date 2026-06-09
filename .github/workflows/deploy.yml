@@ -1,0 +1,128 @@
+name: Deploy to Azure Container Apps
+
+# Builds the five images in ACR (server-side, via `az acr build` — no Docker on the
+# runner) and rolls each Container App to the new tag. Auth is OIDC (federated
+# credentials) — no long-lived secrets. Infra must already exist (see infra/README.md).
+#
+# Required GitHub config (Settings → Secrets and variables → Actions):
+#   secrets: AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
+#   vars:    AZURE_RESOURCE_GROUP   (e.g. hrats-prod-rg)
+#
+# The federated app registration needs (on the resource group): AcrPush + Contributor
+# (or the narrower "Container Apps Contributor" + "AcrPush").
+
+on:
+  workflow_dispatch:
+    inputs:
+      imageTag:
+        description: "Image tag to build & deploy (default: git SHA)"
+        required: false
+        default: ""
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: deploy-aca
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Resolve image tag
+        id: tag
+        run: |
+          TAG="${{ inputs.imageTag }}"
+          if [ -z "$TAG" ]; then TAG="${GITHUB_SHA::12}"; fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Deploying tag: $TAG"
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Discover ACR + API FQDN
+        id: env
+        run: |
+          set -euo pipefail
+          ACR_NAME=$(az acr list -g "$RESOURCE_GROUP" --query "[0].name" -o tsv)
+          ACR_LOGIN=$(az acr show -n "$ACR_NAME" --query loginServer -o tsv)
+          # FQDN exists as soon as the api app is created, even before a working image.
+          API_FQDN=$(az containerapp show -n hrats-prod-api -g "$RESOURCE_GROUP" \
+            --query properties.configuration.ingress.fqdn -o tsv)
+          echo "acr_name=$ACR_NAME"     >> "$GITHUB_OUTPUT"
+          echo "acr_login=$ACR_LOGIN"   >> "$GITHUB_OUTPUT"
+          echo "api_url=https://$API_FQDN" >> "$GITHUB_OUTPUT"
+          echo "ACR=$ACR_LOGIN  API=https://$API_FQDN"
+
+      # --- Build all five images server-side in ACR (parallel-ish, each is a task) ---
+      - name: Build backend images (api/worker/scheduler)
+        env:
+          ACR: ${{ steps.env.outputs.acr_name }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          for SVC in api worker scheduler; do
+            az acr build -r "$ACR" -t "hr-ats/$SVC:$TAG" -t "hr-ats/$SVC:latest" \
+              --build-arg SVC=$SVC -f backend/Dockerfile backend &
+          done
+          wait
+
+      - name: Build web images (career-portal/dashboard)
+        env:
+          ACR: ${{ steps.env.outputs.acr_name }}
+          TAG: ${{ steps.tag.outputs.tag }}
+          API_URL: ${{ steps.env.outputs.api_url }}
+        run: |
+          set -euo pipefail
+          az acr build -r "$ACR" -t "hr-ats/career-portal:$TAG" -t "hr-ats/career-portal:latest" \
+            --build-arg NEXT_PUBLIC_API_URL="$API_URL" -f career-portal/Dockerfile career-portal &
+          az acr build -r "$ACR" -t "hr-ats/dashboard:$TAG" -t "hr-ats/dashboard:latest" \
+            --build-arg NEXT_PUBLIC_API_URL="$API_URL" -f frontend/Dockerfile frontend &
+          wait
+
+      # --- Roll each Container App to the new tag ---
+      - name: Update Container Apps
+        env:
+          ACR_LOGIN: ${{ steps.env.outputs.acr_login }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          declare -A APP_IMAGE=(
+            [hrats-prod-api]=api
+            [hrats-prod-worker]=worker
+            [hrats-prod-scheduler]=scheduler
+            [hrats-prod-portal]=career-portal
+            [hrats-prod-dashboard]=dashboard
+          )
+          for APP in "${!APP_IMAGE[@]}"; do
+            REPO="${APP_IMAGE[$APP]}"
+            echo "::group::$APP -> $ACR_LOGIN/hr-ats/$REPO:$TAG"
+            az containerapp update -n "$APP" -g "$RESOURCE_GROUP" \
+              --image "$ACR_LOGIN/hr-ats/$REPO:$TAG"
+            echo "::endgroup::"
+          done
+
+      - name: Smoke check API health
+        run: |
+          set -euo pipefail
+          API_URL="${{ steps.env.outputs.api_url }}"
+          for i in $(seq 1 20); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "$API_URL/health" || true)
+            if [ "$code" = "200" ]; then echo "API healthy"; exit 0; fi
+            echo "waiting for API ($code)..."; sleep 10
+          done
+          echo "API did not report healthy in time"; exit 1

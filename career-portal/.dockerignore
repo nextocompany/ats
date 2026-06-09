@@ -1,0 +1,33 @@
+# Dependencies and build output (regenerated inside the image)
+node_modules
+.next
+out
+.turbo
+
+# Generated service worker (Serwist regenerates it during `pnpm build`)
+public/sw.js
+public/sw.js.map
+
+# Version control / CI
+.git
+.gitignore
+.github
+
+# Test artifacts
+e2e/__screens__
+e2e/test-results
+playwright-report
+test-results
+gan-harness
+gan-shoot.mjs
+
+# Local env (never bake secrets into the image)
+.env
+.env.*
+!.env.example
+
+# Logs / OS / editor cruft
+*.log
+.DS_Store
+.idea
+.vscode
