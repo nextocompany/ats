@@ -1,62 +1,35 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 
-import { signOut } from "@/lib/auth";
-import { useMe } from "@/lib/queries";
-import { Button } from "@/components/ui/button";
+import { NAV } from "./nav-config";
 
-const NAV = [
-  { href: "/dashboard", label: "Overview" },
-  { href: "/applications", label: "Inbox" },
-  { href: "/candidates", label: "Candidates" },
-  { href: "/search", label: "Search" },
-  { href: "/analytics", label: "Analytics" },
-];
-
+// Slim desktop context bar above the page — orients the operator without
+// duplicating the sidebar's navigation landmark. Hidden on mobile (MobileBar covers it).
 export function AppHeader() {
   const pathname = usePathname();
-  const router = useRouter();
-  const { data: me } = useMe();
+  const active = NAV.find((n) => pathname.startsWith(n.href));
+
+  const now = new Date();
+  const stamp = now.toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+  });
 
   return (
-    <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-[1400px] items-center gap-6 px-4">
-        <Link href="/applications" className="text-sm font-bold tracking-tight">
-          HR<span className="text-[var(--color-accent)]">·</span>ATS
-        </Link>
-        <nav aria-label="Main navigation" className="flex items-center gap-1 text-sm">
-          {NAV.map((item) => {
-            const active = pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-current={active ? "page" : undefined}
-                className={`rounded-md px-3 py-1.5 transition-colors ${
-                  active ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
-        <div className="ml-auto flex items-center gap-3">
-          <span className="hidden text-xs text-muted-foreground sm:inline">{me?.email ?? "…"}</span>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              signOut();
-              router.push("/login");
-            }}
-          >
-            Sign out
-          </Button>
-        </div>
+    <div className="hidden h-16 items-center justify-between border-b border-hairline px-8 lg:flex">
+      <div className="flex items-baseline gap-2 text-sm">
+        <span className="text-muted-foreground">Console</span>
+        <span className="text-muted-foreground/50">/</span>
+        <span className="font-medium text-foreground">{active?.label ?? "Overview"}</span>
       </div>
-    </header>
+      <div className="flex items-center gap-4">
+        <span className="flex items-center gap-2 text-xs text-muted-foreground tabular-nums">
+          <span className="inline-block size-1.5 rounded-full bg-brand" aria-hidden />
+          Live · {stamp}
+        </span>
+      </div>
+    </div>
   );
 }

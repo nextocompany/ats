@@ -16,18 +16,19 @@ export function ScheduledExports() {
   const trigger = useTriggerExport();
 
   return (
-    <section className="rounded-xl bg-card ring-1 ring-foreground/10">
-      <header className="flex items-center justify-between gap-4 border-b border-border px-4 py-3">
+    <section className="rounded-xl bg-card ring-1 ring-hairline">
+      <header className="flex items-center justify-between gap-4 border-b border-hairline px-6 py-4">
         <div>
-          <h2 className="font-heading text-base font-medium">Scheduled exports</h2>
-          <p className="text-sm text-muted-foreground">Funnel · KPI · sources — delivered on a recurring schedule</p>
+          <p className="eyebrow">Delivery</p>
+          <h2 className="mt-1 font-heading text-lg font-semibold tracking-tight">Scheduled exports</h2>
+          <p className="mt-0.5 text-sm text-muted-foreground">Funnel · KPI · sources — delivered on a recurring schedule</p>
         </div>
         <Button onClick={() => trigger.mutate()} disabled={trigger.isPending}>
           {trigger.isPending ? "Exporting…" : "Export now"}
         </Button>
       </header>
 
-      <div className="p-4">
+      <div className="p-6">
         {isLoading ? (
           <Skeleton className="h-20 w-full" />
         ) : !exports || exports.length === 0 ? (

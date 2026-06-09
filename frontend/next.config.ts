@@ -9,9 +9,17 @@ const apiOrigin = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 // can't fix statically-prerendered pages (Next emits nonce=undefined for them), so
 // we allow 'unsafe-inline' for scripts — Next's inline scripts are framework-
 // generated and same-origin. connect-src must include the Go API origin.
+//
+// Dev-only: Next's webpack dev runtime wraps modules in eval(); without 'unsafe-eval'
+// the client bundle never executes under `next dev` (blank/unstyled page). We add it
+// ONLY when not building for production, so the prod CSP stays strict (no eval).
+const isProd = process.env.NODE_ENV === "production";
+const scriptSrc = isProd
+  ? "script-src 'self' 'unsafe-inline'"
+  : "script-src 'self' 'unsafe-inline' 'unsafe-eval'";
 const csp = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'",
+  scriptSrc,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self'",

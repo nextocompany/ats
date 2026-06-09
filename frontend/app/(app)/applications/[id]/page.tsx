@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
 
 import { AiSummaryPanel } from "@/components/resume/AiSummaryPanel";
 import { ResumeViewer } from "@/components/resume/ResumeViewer";
@@ -13,20 +14,34 @@ export default function ApplicationDetailPage() {
   const { data: app, isLoading, isError } = useApplication(id);
 
   return (
-    <div className="space-y-4">
-      <Link href="/applications" className="text-sm text-muted-foreground hover:text-foreground">
-        ← Back to inbox
+    <div className="settle space-y-5">
+      <Link
+        href="/applications"
+        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+      >
+        <ArrowLeft className="size-4" /> Back to inbox
       </Link>
 
-      {isLoading && <Skeleton className="h-[70vh] w-full" />}
-      {isError && <p className="text-sm text-destructive">Application not found.</p>}
+      {isLoading && <Skeleton className="h-[70vh] w-full rounded-xl" />}
+      {isError && (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+          Application not found, or it has been removed.
+        </div>
+      )}
 
       {app && (
         <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-          <section aria-label="Resume">
+          <section aria-label="Resume" className="min-w-0">
+            <div className="mb-3 flex items-baseline justify-between">
+              <p className="eyebrow">Source document</p>
+              <span className="font-mono text-xs text-muted-foreground">{app.id.slice(0, 8)}</span>
+            </div>
             <ResumeViewer applicationId={app.id} />
           </section>
-          <aside aria-label="AI summary and actions" className="rounded-lg border p-5">
+          <aside
+            aria-label="AI summary and actions"
+            className="h-fit rounded-xl bg-card p-6 ring-1 ring-hairline lg:sticky lg:top-6"
+          >
             <AiSummaryPanel app={app} />
           </aside>
         </div>
