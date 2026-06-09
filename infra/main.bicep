@@ -82,6 +82,9 @@ param deployAi bool = true
 @description('Scale stateless apps (api/worker/portal/dashboard) to 0 when idle to conserve credit. Scheduler always stays at 1 replica.')
 param scaleToZero bool = false
 
+@description('When false, deploy without creating role assignments (for Contributor-only subscriptions): ACR admin-user pull + inline Container App secrets instead of managed identity + Key Vault. Set false on MPN/credit subs.')
+param rbacMode bool = true
+
 // ---------------------------------------------------------------------------
 // Naming
 // ---------------------------------------------------------------------------
@@ -113,12 +116,20 @@ var dashboardAppName = '${prefix}-dashboard'
 
 // ---------------------------------------------------------------------------
 // Shared user-assigned managed identity (AcrPull + Key Vault Secrets User)
+// Only provisioned in RBAC mode. In no-RBAC mode (Contributor-only subs) the
+// apps attach no identity and pull from ACR with the admin user instead.
 // ---------------------------------------------------------------------------
 
-resource appIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+resource appIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = if (rbacMode) {
   name: identityName
   location: location
 }
+
+// In no-RBAC mode the conditional appIdentity resource exposes no properties;
+// safe-deref + '' keeps every reference valid and yields an empty identity ID
+// (which the container-app module treats as "attach no identity").
+var appIdentityIdSafe = rbacMode ? (appIdentity.?id ?? '') : ''
+var appIdentityPrincipalIdSafe = rbacMode ? (appIdentity.?properties.principalId ?? '') : ''
 
 // ---------------------------------------------------------------------------
 // Observability
@@ -142,7 +153,11 @@ module registry 'modules/registry.bicep' = {
   params: {
     location: location
     registryName: acrName
-    pullIdentityPrincipalId: appIdentity.properties.principalId
+    // RBAC mode: grant AcrPull to the UAMI. No-RBAC mode: enable the admin user
+    // so apps can pull with username/password (no role assignment created).
+    pullIdentityPrincipalId: appIdentityPrincipalIdSafe
+    grantAcrPull: rbacMode
+    adminUserEnabled: !rbacMode
   }
 }
 
@@ -214,12 +229,14 @@ var dbUrl = 'postgres://${postgresAdminLogin}:${postgresAdminPassword}@${postgre
 // TLS Redis URL on port 6380. Password-only auth (empty username).
 var redisUrl = 'rediss://:${redis.outputs.primaryKey}@${redis.outputs.hostName}:${redis.outputs.sslPort}'
 
-module keyVault 'modules/keyvault.bicep' = {
+// Key Vault is only provisioned in RBAC mode. In no-RBAC mode the same secret
+// values are injected as inline Container App secrets instead (see below).
+module keyVault 'modules/keyvault.bicep' = if (rbacMode) {
   name: 'keyvault'
   params: {
     location: location
     keyVaultName: keyVaultName
-    rbacPrincipalObjectId: appIdentity.properties.principalId
+    rbacPrincipalObjectId: appIdentityPrincipalIdSafe
     dbUrl: dbUrl
     redisUrl: redisUrl
     jwtSecret: jwtSecret
@@ -268,14 +285,22 @@ var portalUrl = 'https://${portalFqdn}'
 var dashboardUrl = 'https://${dashboardFqdn}'
 
 // ---------------------------------------------------------------------------
-// Key Vault secret references (ACA keyVaultUrl syntax)
+// Backend secret wiring — two modes
+//   RBAC mode: Key Vault-backed secrets (ACA keyVaultUrl syntax), read by the
+//     UAMI which holds Key Vault Secrets User.
+//   No-RBAC mode: the same secret values injected as inline literal Container
+//     App secrets (no Key Vault, no role assignment).
+// In both modes the secret env vars (DB_URL, REDIS_URL, ...) reference the same
+// app-secret names, so secretEnvVars is identical across modes.
 // ---------------------------------------------------------------------------
 
-var kvUri = keyVault.outputs.vaultUri
+// keyVault is conditional; safe-deref yields '' in no-RBAC mode so this var
+// stays valid (the keyVaultSecrets array is empty in that mode anyway).
+var kvUri = rbacMode ? (keyVault.?outputs.vaultUri ?? '') : ''
 
 // AI secrets/env are only present when deployAi — the openai-key/docintel-key
-// vault secrets are not created otherwise, so referencing them would break the
-// app. Concatenate conditionally to keep every array valid in both modes.
+// secrets are not created otherwise, so referencing them would break the app.
+// Concatenate conditionally to keep every array valid in both modes.
 var coreKeyVaultSecrets = [
   { name: 'db-url', keyVaultUrl: '${kvUri}secrets/db-url' }
   { name: 'redis-url', keyVaultUrl: '${kvUri}secrets/redis-url' }
@@ -286,7 +311,30 @@ var aiKeyVaultSecrets = [
   { name: 'openai-key', keyVaultUrl: '${kvUri}secrets/openai-key' }
   { name: 'docintel-key', keyVaultUrl: '${kvUri}secrets/docintel-key' }
 ]
-var backendKeyVaultSecrets = concat(coreKeyVaultSecrets, deployAi ? aiKeyVaultSecrets : [])
+// Only populated in RBAC mode; empty in no-RBAC mode (inline secrets used).
+var backendKeyVaultSecrets = rbacMode ? concat(coreKeyVaultSecrets, deployAi ? aiKeyVaultSecrets : []) : []
+
+// Inline literal secrets for no-RBAC mode. Same composed values that would
+// otherwise be written to Key Vault. These flow only into Container App secret
+// blocks (never plain env / outputs). Wrapped in an object ({ items: [...] }) so
+// the whole payload can be passed through the module's @secure() object param.
+var coreInlineSecrets = [
+  { name: 'db-url', value: dbUrl }
+  { name: 'redis-url', value: redisUrl }
+  { name: 'jwt-secret', value: jwtSecret }
+  { name: 'blob-conn-string', value: storage.outputs.connectionString }
+]
+var aiInlineSecrets = [
+  { name: 'openai-key', value: deployAi ? (openai.?outputs.key ?? '') : '' }
+  { name: 'docintel-key', value: deployAi ? (docintel.?outputs.key ?? '') : '' }
+]
+var backendInlineSecrets = rbacMode
+  ? {}
+  : { items: concat(coreInlineSecrets, deployAi ? aiInlineSecrets : []) }
+
+// ACR admin pull credentials (no-RBAC mode only). Empty in RBAC mode.
+var acrAdminUsername = rbacMode ? '' : registry.outputs.adminUsername
+var acrAdminPassword = rbacMode ? '' : registry.outputs.adminPassword
 
 var coreSecretEnv = [
   { name: 'DB_URL', secretRef: 'db-url' }
@@ -342,8 +390,10 @@ module apiApp 'modules/container-app.bicep' = {
     name: apiAppName
     location: location
     environmentId: acaEnv.outputs.id
-    identityId: appIdentity.id
+    identityId: appIdentityIdSafe
     acrLoginServer: acrLoginServer
+    registryUsername: acrAdminUsername
+    registryPasswordSecretValue: acrAdminPassword
     image: apiImage
     ingressMode: 'external'
     targetPort: 8080
@@ -351,6 +401,7 @@ module apiApp 'modules/container-app.bicep' = {
     maxReplicas: 3
     envVars: backendPlainEnv
     keyVaultSecrets: backendKeyVaultSecrets
+    inlineSecrets: backendInlineSecrets
     secretEnvVars: backendSecretEnv
   }
 }
@@ -362,8 +413,10 @@ module workerApp 'modules/container-app.bicep' = {
     name: workerAppName
     location: location
     environmentId: acaEnv.outputs.id
-    identityId: appIdentity.id
+    identityId: appIdentityIdSafe
     acrLoginServer: acrLoginServer
+    registryUsername: acrAdminUsername
+    registryPasswordSecretValue: acrAdminPassword
     image: workerImage
     ingressMode: 'internal'
     targetPort: 8081
@@ -371,6 +424,7 @@ module workerApp 'modules/container-app.bicep' = {
     maxReplicas: 3
     envVars: backendPlainEnv
     keyVaultSecrets: backendKeyVaultSecrets
+    inlineSecrets: backendInlineSecrets
     secretEnvVars: backendSecretEnv
   }
 }
@@ -382,14 +436,17 @@ module schedulerApp 'modules/container-app.bicep' = {
     name: schedulerAppName
     location: location
     environmentId: acaEnv.outputs.id
-    identityId: appIdentity.id
+    identityId: appIdentityIdSafe
     acrLoginServer: acrLoginServer
+    registryUsername: acrAdminUsername
+    registryPasswordSecretValue: acrAdminPassword
     image: schedulerImage
     ingressMode: 'none'
     minReplicas: 1
     maxReplicas: 1
     envVars: backendPlainEnv
     keyVaultSecrets: backendKeyVaultSecrets
+    inlineSecrets: backendInlineSecrets
     secretEnvVars: backendSecretEnv
   }
 }
@@ -402,8 +459,10 @@ module portalApp 'modules/container-app.bicep' = {
     name: portalAppName
     location: location
     environmentId: acaEnv.outputs.id
-    identityId: appIdentity.id
+    identityId: appIdentityIdSafe
     acrLoginServer: acrLoginServer
+    registryUsername: acrAdminUsername
+    registryPasswordSecretValue: acrAdminPassword
     image: portalImage
     ingressMode: 'external'
     targetPort: 3000
@@ -422,8 +481,10 @@ module dashboardApp 'modules/container-app.bicep' = {
     name: dashboardAppName
     location: location
     environmentId: acaEnv.outputs.id
-    identityId: appIdentity.id
+    identityId: appIdentityIdSafe
     acrLoginServer: acrLoginServer
+    registryUsername: acrAdminUsername
+    registryPasswordSecretValue: acrAdminPassword
     image: dashboardImage
     ingressMode: 'external'
     targetPort: 3000
@@ -445,16 +506,16 @@ output acrLoginServer string = acrLoginServer
 @description('ACR resource name.')
 output acrName string = registry.outputs.name
 
-@description('User-assigned managed identity resource ID (apps + CI image pull).')
-output appIdentityId string = appIdentity.id
+@description('User-assigned managed identity resource ID (apps + CI image pull). Empty in no-RBAC mode.')
+output appIdentityId string = appIdentityIdSafe
 
-@description('User-assigned managed identity client ID.')
-output appIdentityClientId string = appIdentity.properties.clientId
+@description('User-assigned managed identity client ID. Empty in no-RBAC mode.')
+output appIdentityClientId string = rbacMode ? (appIdentity.?properties.clientId ?? '') : ''
 
-@description('Key Vault name.')
-output keyVaultName string = keyVault.outputs.name
+@description('Key Vault name. Empty in no-RBAC mode (inline secrets used instead).')
+output keyVaultName string = rbacMode ? (keyVault.?outputs.name ?? '') : ''
 
-@description('Key Vault base URI.')
+@description('Key Vault base URI. Empty in no-RBAC mode.')
 output keyVaultUri string = kvUri
 
 @description('Container Apps environment name.')

@@ -1,9 +1,14 @@
 // Reusable Azure Container App module.
 //
 // Encapsulates a single Container App bound to a shared managed environment.
-// Each app pulls its image from ACR using a user-assigned managed identity
-// (AcrPull) and reads its secrets directly from Key Vault using the ACA
-// keyVaultUrl secret syntax — no secret values ever flow through this template.
+// Supports two wiring styles:
+//   - RBAC mode (default): pulls its image from ACR using a user-assigned managed
+//     identity (AcrPull) and reads secrets directly from Key Vault via the ACA
+//     keyVaultUrl secret syntax — no secret values flow through this template.
+//   - No-RBAC mode (Contributor-only subs): pulls from ACR with the admin
+//     username + password (stored as the 'acr-password' app secret) and reads
+//     secrets from inline literal Container App secrets. No managed identity is
+//     attached and no role assignments are needed.
 //
 // Ingress is optional and configurable:
 //   - external (public FQDN), internal (env-internal FQDN), or none.
@@ -18,8 +23,12 @@ param location string
 @description('Resource ID of the shared Container Apps managed environment.')
 param environmentId string
 
-@description('Resource ID of the user-assigned managed identity used for ACR pull and Key Vault access.')
-param identityId string
+@description('''
+Resource ID of the user-assigned managed identity used for ACR pull and Key Vault
+access. Empty in no-RBAC mode — the app then attaches no identity and pulls with
+the ACR admin username/password instead.
+''')
+param identityId string = ''
 
 @description('ACR login server (e.g. hratsxxxx.azurecr.io). Used as the registry server for image pulls.')
 param acrLoginServer string
@@ -57,10 +66,27 @@ The managed identity (identityId) must have Key Vault Secrets User on the vault.
 param keyVaultSecrets array = []
 
 @description('''
+Inline literal secret definitions (no-RBAC mode). Shape:
+  { items: [ { name: '<aca-secret-name>', value: '<literal secret value>' } ] }
+Wrapped in an object so the @secure() decorator (object-only) can protect the
+literal values. They are stored as Container App secrets and never surfaced as
+plain env or outputs. Mutually exclusive in practice with keyVaultSecrets.
+''')
+@secure()
+param inlineSecrets object = {}
+
+@description('''
 Secret-backed environment variables. Each item:
   { name: '<ENV_NAME>', secretRef: '<aca-secret-name>' }
 ''')
 param secretEnvVars array = []
+
+@description('ACR admin username for no-RBAC (admin-user) image pull. Empty in RBAC mode.')
+param registryUsername string = ''
+
+@description('ACR admin password for no-RBAC (admin-user) image pull. Stored as the acr-password app secret. Empty in RBAC mode.')
+@secure()
+param registryPasswordSecretValue string = ''
 
 @description('CPU cores per replica.')
 param cpu string = '0.5'
@@ -70,6 +96,66 @@ param memory string = '1Gi'
 
 // Build the merged env array: plain vars + secret-backed vars.
 var mergedEnv = concat(envVars, secretEnvVars)
+
+// --- Identity / registry wiring -------------------------------------------
+// RBAC mode is signalled by a non-empty identityId. No-RBAC mode (empty
+// identityId) attaches no managed identity and pulls with the ACR admin
+// username + the acr-password app secret.
+var useManagedIdentity = !empty(identityId)
+
+var identityConfig = useManagedIdentity
+  ? {
+      type: 'UserAssigned'
+      userAssignedIdentities: {
+        '${identityId}': {}
+      }
+    }
+  : null
+
+var registriesConfig = useManagedIdentity
+  ? [
+      {
+        server: acrLoginServer
+        identity: identityId
+      }
+    ]
+  : [
+      {
+        server: acrLoginServer
+        username: registryUsername
+        passwordSecretRef: 'acr-password'
+      }
+    ]
+
+// --- Secret composition ----------------------------------------------------
+// (a) Key Vault-backed secrets (RBAC mode), (b) inline literal secrets
+// (no-RBAC mode), (c) the acr-password secret (no-RBAC admin pull only).
+var keyVaultSecretDefs = [
+  for s in keyVaultSecrets: {
+    name: s.name
+    keyVaultUrl: s.keyVaultUrl
+    identity: identityId
+  }
+]
+
+var inlineSecretItems = inlineSecrets.?items ?? []
+var inlineSecretDefs = [
+  for s in inlineSecretItems: {
+    name: s.name
+    value: s.value
+  }
+]
+
+var acrPasswordSecretDefs = useManagedIdentity
+  ? []
+  : [
+      {
+        name: 'acr-password'
+        value: registryPasswordSecretValue
+      }
+    ]
+
+var allSecrets = concat(keyVaultSecretDefs, inlineSecretDefs, acrPasswordSecretDefs)
 
 var ingressConfig = ingressMode == 'none'
   ? null
@@ -89,30 +175,14 @@ var ingressConfig = ingressMode == 'none'
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: name
   location: location
-  identity: {
-    type: 'UserAssigned'
-    userAssignedIdentities: {
-      '${identityId}': {}
-    }
-  }
+  identity: identityConfig
   properties: {
     managedEnvironmentId: environmentId
     configuration: {
       activeRevisionsMode: 'Single'
       ingress: ingressConfig
-      registries: [
-        {
-          server: acrLoginServer
-          identity: identityId
-        }
-      ]
-      secrets: [
-        for s in keyVaultSecrets: {
-          name: s.name
-          keyVaultUrl: s.keyVaultUrl
-          identity: identityId
-        }
-      ]
+      registries: registriesConfig
+      secrets: allSecrets
     }
     template: {
       containers: [
