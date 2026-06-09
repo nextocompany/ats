@@ -37,10 +37,15 @@ export function BulkActionBar({ selected, onDone }: BulkActionBarProps) {
     <div
       role="region"
       aria-label="Bulk actions"
-      className="sticky bottom-4 z-10 mx-auto flex w-fit items-center gap-2 rounded-lg border bg-background px-4 py-2 shadow-lg"
+      className="settle sticky bottom-5 z-10 mx-auto flex w-fit items-center gap-2.5 rounded-xl bg-sidebar px-4 py-2.5 text-sidebar-foreground shadow-2xl ring-1 ring-black/20"
     >
-      <span className="text-sm font-medium">{selected.length} selected</span>
-      <span className="mx-1 h-4 w-px bg-border" />
+      <span className="flex items-center gap-2 text-sm font-medium">
+        <span className="grid size-5 place-items-center rounded-full bg-sidebar-primary text-[0.6875rem] font-semibold text-sidebar-primary-foreground tabular-nums">
+          {selected.length}
+        </span>
+        selected
+      </span>
+      <span className="mx-1 h-5 w-px bg-sidebar-border" />
       {ACTIONS.map((a) => (
         <Button
           key={a.value}

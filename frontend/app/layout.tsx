@@ -17,7 +17,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en" className={`${geist.variable} ${notoThai.variable} h-full antialiased`}>
       <body
-        className="min-h-full flex flex-col bg-background text-foreground"
+        className="min-h-full flex flex-col bg-background text-foreground paper-grain"
         style={{ fontFamily: "var(--font-geist-sans), var(--font-thai), system-ui, sans-serif" }}
       >
         <Providers>{children}</Providers>

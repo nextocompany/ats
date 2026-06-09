@@ -2,6 +2,7 @@
 
 import { FunnelChart, KpiCards, SourcesChart } from "@/components/analytics/Charts";
 import { ScheduledExports } from "@/components/analytics/ScheduledExports";
+import { PageHeader } from "@/components/shell/PageHeader";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFunnel, useKpi, useSources } from "@/lib/queries";
 
@@ -11,13 +12,20 @@ export default function AnalyticsPage() {
   const { data: sources } = useSources();
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold tracking-tight">Analytics</h1>
-      {kpi ? <KpiCards kpi={kpi} /> : <Skeleton className="h-24 w-full" />}
-      <div className="grid gap-4 lg:grid-cols-2">
-        {funnel ? <FunnelChart funnel={funnel} /> : <Skeleton className="h-72 w-full" />}
-        {sources ? <SourcesChart sources={sources} /> : <Skeleton className="h-72 w-full" />}
+    <div className="settle space-y-8">
+      <PageHeader
+        eyebrow="Reporting"
+        title="Analytics"
+        meta="Pipeline conversion, sourcing efficiency, and scheduled deliveries."
+      />
+
+      {kpi ? <KpiCards kpi={kpi} variant="reporting" /> : <Skeleton className="h-24 w-full rounded-xl" />}
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        {funnel ? <FunnelChart funnel={funnel} /> : <Skeleton className="h-80 w-full rounded-xl" />}
+        {sources ? <SourcesChart sources={sources} /> : <Skeleton className="h-80 w-full rounded-xl" />}
       </div>
+
       <ScheduledExports />
     </div>
   );
