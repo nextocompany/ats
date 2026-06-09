@@ -1,13 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { ArrowRight, ShieldCheck } from "lucide-react";
+import { ArrowRight, Building2, ShieldCheck } from "lucide-react";
 
-import { signIn } from "@/lib/auth";
+import { isEntraConfigured, signIn } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 
 export default function LoginPage() {
   const router = useRouter();
+  const entra = isEntraConfigured();
 
   return (
     <main className="grid min-h-dvh lg:grid-cols-[1.1fr_1fr]">
@@ -78,21 +79,35 @@ export default function LoginPage() {
             Continue to the recruitment command center.
           </p>
 
-          <Button
-            className="mt-7 h-11 w-full gap-2 text-sm"
-            onClick={() => {
-              signIn();
-              router.push("/applications");
-            }}
-          >
-            Sign in as HR (dev)
-            <ArrowRight className="size-4" />
-          </Button>
+          {entra ? (
+            <Button
+              className="mt-7 h-11 w-full gap-2 text-sm"
+              onClick={() => {
+                // Redirect to Microsoft; AuthProvider routes onward post-login.
+                void signIn();
+              }}
+            >
+              <Building2 className="size-4" />
+              Sign in with Microsoft
+            </Button>
+          ) : (
+            <Button
+              className="mt-7 h-11 w-full gap-2 text-sm"
+              onClick={() => {
+                signIn();
+                router.push("/applications");
+              }}
+            >
+              Sign in as HR (dev)
+              <ArrowRight className="size-4" />
+            </Button>
+          )}
 
           <div className="mt-6 rounded-lg border border-hairline bg-card/60 p-4">
             <p className="text-xs leading-relaxed text-muted-foreground">
-              Development sign-in for the screening team. Production access will move to
-              Azure AD single sign-on with role-based permissions.
+              {entra
+                ? "Single sign-on via Microsoft Entra ID. Access and role permissions are managed by your organization."
+                : "Development sign-in for the screening team. Production access will move to Azure AD single sign-on with role-based permissions."}
             </p>
           </div>
         </div>

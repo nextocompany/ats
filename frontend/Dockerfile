@@ -1,45 +1,48 @@
 # syntax=docker/dockerfile:1
-# Multi-stage build for the HR dashboard (Next.js 16, standalone output).
-# Build context is the frontend/ directory (pnpm-lock.yaml lives here).
-#   docker build -f frontend/Dockerfile \
-#     --build-arg NEXT_PUBLIC_API_URL=https://api.example.com \
-#     -t hr-ats/dashboard frontend
-ARG NODE_VERSION=20-alpine
 
-# ---- Stage 1: deps ----------------------------------------------------------
-FROM node:${NODE_VERSION} AS deps
+# --- deps: install with frozen lockfile -----------------------------------
+FROM node:20-alpine AS deps
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
-# ---- Stage 2: build ---------------------------------------------------------
-FROM node:${NODE_VERSION} AS build
+# --- builder: bake NEXT_PUBLIC_* into the SPA bundle ----------------------
+FROM node:20-alpine AS builder
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
+
+# Public build args are inlined into the client bundle at build time.
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_AZURE_AD_CLIENT_ID
+ARG NEXT_PUBLIC_AZURE_AD_TENANT_ID
+ARG NEXT_PUBLIC_AZURE_AD_REDIRECT_URI
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
+    NEXT_PUBLIC_AZURE_AD_CLIENT_ID=$NEXT_PUBLIC_AZURE_AD_CLIENT_ID \
+    NEXT_PUBLIC_AZURE_AD_TENANT_ID=$NEXT_PUBLIC_AZURE_AD_TENANT_ID \
+    NEXT_PUBLIC_AZURE_AD_REDIRECT_URI=$NEXT_PUBLIC_AZURE_AD_REDIRECT_URI \
+    NEXT_TELEMETRY_DISABLED=1
+
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# Public API origin baked into the client bundle at build time.
-ARG NEXT_PUBLIC_API_URL=http://localhost:8080
-ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm build
 
-# ---- Stage 3: runtime -------------------------------------------------------
-FROM node:${NODE_VERSION} AS runtime
+# --- runner: minimal standalone server ------------------------------------
+FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000 \
     HOSTNAME=0.0.0.0
-# Non-root runtime user (uid/gid 1001).
-RUN addgroup -g 1001 -S nodejs \
-  && adduser -S -u 1001 -G nodejs nextjs
-# Standalone server + assets. server.js sits at the root of the standalone tree;
-# static and public are copied to the paths the server expects at runtime.
-COPY --from=build --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=build --chown=nextjs:nodejs /app/.next/static ./.next/static
-COPY --from=build --chown=nextjs:nodejs /app/public ./public
+
+# Non-root user.
+RUN addgroup --system --gid 1001 nodejs \
+  && adduser --system --uid 1001 nextjs
+
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+
 USER nextjs
 EXPOSE 3000
 CMD ["node", "server.js"]

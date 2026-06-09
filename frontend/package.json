@@ -10,6 +10,8 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@azure/msal-browser": "^5.12.0",
+    "@azure/msal-react": "^5.4.3",
     "@base-ui/react": "^1.5.0",
     "@tanstack/react-query": "^5.100.14",
     "class-variance-authority": "^0.7.1",
