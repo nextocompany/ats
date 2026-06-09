@@ -74,6 +74,12 @@ param deploySearch bool = false
 @description('Phase-2: wire Entra (real AUTH_PROVIDER) inputs. Keep false for v1.')
 param deployEntra bool = false
 
+@description('Entra (Azure AD) tenant ID — required when deployEntra=true.')
+param azureAdTenantId string = ''
+
+@description('Entra (Azure AD) app client ID — the API validates token aud against this. Required when deployEntra=true.')
+param azureAdClientId string = ''
+
 // --- Cost-lean / thin-pilot toggles ----------------------------------------
 
 @description('Provision Azure OpenAI + Document Intelligence. Set false on subscriptions without OpenAI access (e.g. MPN/credit) — backend then runs AI_PROVIDER=mock.')
@@ -416,7 +422,14 @@ var basePlainEnv = [
   { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: monitoring.outputs.appInsightsConnectionString }
 ]
 
-var backendPlainEnv = concat(basePlainEnv, deployAi ? aiPlainEnv : [])
+// Entra (real HR auth) inputs — only wired when deployEntra. The backend reads
+// AZURE_AD_TENANT_ID/CLIENT_ID to do OIDC discovery and validate the ID token aud.
+var entraPlainEnv = [
+  { name: 'AZURE_AD_TENANT_ID', value: azureAdTenantId }
+  { name: 'AZURE_AD_CLIENT_ID', value: azureAdClientId }
+]
+
+var backendPlainEnv = concat(basePlainEnv, deployAi ? aiPlainEnv : [], deployEntra ? entraPlainEnv : [])
 
 // ---------------------------------------------------------------------------
 // Container Apps
