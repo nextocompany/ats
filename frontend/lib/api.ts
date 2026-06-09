@@ -1,7 +1,10 @@
 // Envelope-aware API client for the Go backend. Unwraps {success,data,error,meta}
 // and throws ApiError on failure. In dev the backend trusts a mock super_admin,
-// so no bearer token is required.
+// so no bearer token is required. In Entra mode we attach the Entra ID token
+// (aud = our client ID) as `Authorization: Bearer <idToken>`, which the Go API
+// validates via OIDC discovery.
 import type { Envelope, Meta } from "./types";
+import { getIdToken, isEntraConfigured } from "./auth";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
@@ -16,9 +19,16 @@ export class ApiError extends Error {
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<{ data: T; meta?: Meta }> {
+  const headers: Record<string, string> = {};
+  if (body) headers["Content-Type"] = "application/json";
+  if (isEntraConfigured()) {
+    const token = await getIdToken();
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+  }
+
   const res = await fetch(`${BASE}${path}`, {
     method,
-    headers: body ? { "Content-Type": "application/json" } : undefined,
+    headers: Object.keys(headers).length ? headers : undefined,
     body: body ? JSON.stringify(body) : undefined,
     credentials: "include",
   });

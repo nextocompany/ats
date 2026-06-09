@@ -23,7 +23,10 @@ const csp = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self'",
-  `connect-src 'self' ${apiOrigin}`,
+  // Entra SSO: MSAL talks to Microsoft login over connect-src, and its silent
+  // token acquisition renders a hidden login.microsoftonline.com iframe.
+  `connect-src 'self' ${apiOrigin} https://login.microsoftonline.com`,
+  "frame-src https://login.microsoftonline.com",
   "frame-ancestors 'none'",
   "object-src 'none'",
   "base-uri 'self'",
@@ -39,6 +42,8 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Emit a self-contained server bundle for the container image.
+  output: "standalone",
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },

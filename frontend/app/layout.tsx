@@ -3,6 +3,7 @@ import { Geist, Noto_Sans_Thai } from "next/font/google";
 import "./globals.css";
 
 import { Providers } from "./providers";
+import { AuthProvider } from "@/components/auth/AuthProvider";
 
 const geist = Geist({ variable: "--font-geist-sans", subsets: ["latin"], display: "swap" });
 // Thai support is the deliberate exception to the two-font rule.
@@ -20,7 +21,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         className="min-h-full flex flex-col bg-background text-foreground paper-grain"
         style={{ fontFamily: "var(--font-geist-sans), var(--font-thai), system-ui, sans-serif" }}
       >
-        <Providers>{children}</Providers>
+        <Providers>
+          <AuthProvider>{children}</AuthProvider>
+        </Providers>
       </body>
     </html>
   );
