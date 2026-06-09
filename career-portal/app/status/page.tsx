@@ -27,9 +27,10 @@ function StatusContent() {
 
   return (
     <div className="space-y-6">
-      <header className="space-y-2">
-        <h1 className="text-2xl font-bold tracking-tight">ตรวจสอบสถานะใบสมัคร</h1>
-        <p className="text-sm text-muted-foreground">กรอกรหัสติดตามที่คุณได้รับหลังสมัครงาน</p>
+      <header className="space-y-3">
+        <p className="text-sm font-medium uppercase tracking-[0.2em] text-accent">ติดตามใบสมัคร</p>
+        <h1 className="text-[length:var(--text-display)] font-bold leading-tight tracking-tight">ตรวจสอบสถานะใบสมัคร</h1>
+        <p className="text-base text-muted-foreground">กรอกรหัสติดตามที่คุณได้รับหลังสมัครงาน</p>
       </header>
 
       <form onSubmit={handleSubmit} className="space-y-3">
@@ -52,7 +53,7 @@ function StatusContent() {
       {token && isLoading ? <Skeleton className="h-48 w-full rounded-2xl" /> : null}
 
       {token && isError ? (
-        <div className="rounded-2xl bg-card p-6 text-center ring-1 ring-foreground/10">
+        <div className="rounded-2xl border border-border bg-card p-6 text-center">
           <p className="text-sm text-muted-foreground">ไม่พบใบสมัครสำหรับรหัสนี้ กรุณาตรวจสอบรหัสอีกครั้ง</p>
         </div>
       ) : null}
@@ -64,7 +65,7 @@ function StatusContent() {
 
 export default function StatusPage() {
   return (
-    <PortalShell backHref="/jobs">
+    <PortalShell backHref="/jobs" narrow>
       <Suspense fallback={<Skeleton className="h-64 w-full rounded-2xl" />}>
         <StatusContent />
       </Suspense>

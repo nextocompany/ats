@@ -30,9 +30,9 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
-  // Match the manifest theme_color (brand green) so the standalone PWA chrome
+  // Match the manifest theme_color (deep emerald) so the standalone PWA chrome
   // and the address bar share the portal's identity.
-  themeColor: "#1f9d57",
+  themeColor: "#0f5132",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

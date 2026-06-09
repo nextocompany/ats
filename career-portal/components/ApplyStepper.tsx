@@ -100,7 +100,7 @@ export function ApplyStepper({ positionId, positionTitle }: ApplyStepperProps) {
   if (statusToken) {
     return (
       <div className="space-y-6 text-center">
-        <div className="mx-auto grid size-16 place-content-center rounded-full bg-brand-soft text-primary">
+        <div className="mx-auto grid size-16 place-content-center rounded-full bg-brand-soft text-accent">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
@@ -147,7 +147,7 @@ export function ApplyStepper({ positionId, positionTitle }: ApplyStepperProps) {
         {STEP_LABELS.map((label, i) => (
           <li key={label} className="flex flex-1 flex-col items-center gap-1.5">
             <div
-              className={`h-1.5 w-full rounded-full transition-colors ${i <= step ? "bg-primary" : "bg-muted"}`}
+              className={`h-1.5 w-full rounded-full transition-colors ${i <= step ? "bg-accent" : "bg-muted"}`}
               aria-current={i === step ? "step" : undefined}
             />
             <span className={`text-xs ${i <= step ? "font-medium text-foreground" : "text-muted-foreground"}`}>
@@ -208,7 +208,7 @@ export function ApplyStepper({ positionId, positionTitle }: ApplyStepperProps) {
             />
             <p className="text-xs text-muted-foreground">รองรับ PDF, DOCX, JPG, PNG ขนาดไม่เกิน 10MB</p>
             {fileError ? <p className="text-sm text-destructive">{fileError}</p> : null}
-            {file && !fileError ? <p className="text-sm text-primary">เลือกไฟล์: {file.name}</p> : null}
+            {file && !fileError ? <p className="text-sm text-accent">เลือกไฟล์: {file.name}</p> : null}
           </div>
 
           <div className="space-y-2">

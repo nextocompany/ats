@@ -28,7 +28,7 @@ test("manifest is linked and served with the expected PWA fields", async ({ page
   expect(manifest.name).toBe("ร่วมงานกับเรา");
   expect(manifest.start_url).toBe("/jobs");
   expect(manifest.display).toBe("standalone");
-  expect(manifest.theme_color).toBe("#1f9d57");
+  expect(manifest.theme_color).toBe("#0f5132");
   expect(manifest.icons.length).toBeGreaterThanOrEqual(2);
   expect(manifest.icons.some((i) => i.purpose === "maskable")).toBe(true);
 });
@@ -48,8 +48,8 @@ test("PWA icons and apple-touch metadata resolve", async ({ page }) => {
 test("offline fallback renders the branded shell", async ({ page }, testInfo) => {
   await page.goto("/offline");
   await expect(page.getByRole("heading", { name: "คุณกำลังออฟไลน์" })).toBeVisible();
-  // The shared PortalShell header brands the page.
-  await expect(page.getByRole("link", { name: "ร่วมงานกับเรา" })).toBeVisible();
+  // The shared shell brands the page (header + footer both link home).
+  await expect(page.getByRole("link", { name: "ร่วมงานกับเรา" }).first()).toBeVisible();
   await page.screenshot({ path: `${SCREEN_DIR}/offline-${testInfo.project.name}.png`, fullPage: true });
 });
 
