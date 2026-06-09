@@ -224,10 +224,13 @@ module docintel 'modules/docintel.bicep' = if (deployAi) {
 
 // libpq/URL form expected by lib/pq. sslmode=require because the flexible
 // server enforces TLS.
-var dbUrl = 'postgres://${postgresAdminLogin}:${postgresAdminPassword}@${postgres.outputs.fqdn}:5432/${postgres.outputs.databaseName}?sslmode=require'
+// Credentials are URL-encoded — the Go clients (pgx, go-redis ParseURL) URL-decode
+// the userinfo, so an Azure Redis key (base64 with + / =) or a password with
+// reserved chars would otherwise break URL parsing.
+var dbUrl = 'postgres://${postgresAdminLogin}:${uriComponent(postgresAdminPassword)}@${postgres.outputs.fqdn}:5432/${postgres.outputs.databaseName}?sslmode=require'
 
 // TLS Redis URL on port 6380. Password-only auth (empty username).
-var redisUrl = 'rediss://:${redis.outputs.primaryKey}@${redis.outputs.hostName}:${redis.outputs.sslPort}'
+var redisUrl = 'rediss://:${uriComponent(redis.outputs.primaryKey)}@${redis.outputs.hostName}:${redis.outputs.sslPort}'
 
 // Key Vault is only provisioned in RBAC mode. In no-RBAC mode the same secret
 // values are injected as inline Container App secrets instead (see below).
