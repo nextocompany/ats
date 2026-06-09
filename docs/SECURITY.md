@@ -29,16 +29,21 @@
   across api replicas instead of counted per process; keys live under `ratelimit:*`. The limiter **fails
   open** on a Redis outage (availability over strict limiting for a public endpoint) and never touches
   non-rate-limit keys (`Reset` is scoped to `ratelimit:*`, never `FLUSHDB`).
-- **Follow-up (deployment-dependent)**: the limiter keys on `c.IP()`, the direct TCP peer. If the api is
-  deployed behind a trusted reverse proxy / load balancer, configure Fiber's `EnableTrustedProxyCheck` +
-  `TrustedProxies` (LB CIDR) + `ProxyHeader: X-Forwarded-For` so the key is the real client IP rather than
-  the LB (otherwise all clients share one bucket). Do **not** trust `X-Forwarded-For` without the trusted-
-  proxy allowlist — it is client-spoofable and would let an attacker mint a fresh bucket per request.
+- **Trusted-proxy client IP (Sprint 8)**: the Fiber app runs with `EnableTrustedProxyCheck` +
+  `ProxyHeader: X-Forwarded-For` and a `TRUSTED_PROXIES` allowlist (IPs/CIDRs). When the request comes from
+  a trusted proxy (set `TRUSTED_PROXIES` to the prod ingress/LB CIDR), `c.IP()` is the real client; an empty
+  allowlist (dev/CI) trusts no proxy and uses the direct peer. `X-Forwarded-For` is **never** honoured from a
+  non-allowlisted source (it is client-spoofable), so an attacker cannot mint a fresh rate-limit bucket per
+  request.
 
 ## Secrets
 - No secrets are committed; only `.env.example` is tracked (`.env` is gitignored and untracked).
-- Required at startup: `DB_URL`, `REDIS_URL`, `AZURE_BLOB_CONNECTION_STRING`. `JWT_SECRET` should be set in
-  non-dev (a warning is logged when empty outside `ENV=development`).
+- Required at startup: `DB_URL`, `REDIS_URL`, `AZURE_BLOB_CONNECTION_STRING`.
+- **Prod fail-fast guards (Sprint 8)**: when `ENV != development`, startup **fails** if `JWT_SECRET` is empty
+  or `CORS_ALLOW_ORIGINS` still contains `localhost`/`127.0.0.1`. Provider flags are value-validated always
+  (`AI_PROVIDER`/`AI_SEARCH_PROVIDER` ∈ `mock|azure`; `AUTH_PROVIDER`/`PS_PROVIDER`/`LINE_PROVIDER`/
+  `NOTIFY_PROVIDER` ∈ `mock|real`) so a typo (e.g. `AI_PROVIDER=real`) fails fast instead of silently
+  falling back to mock.
 - Integration secrets (Azure AI/Search, PeopleSoft, LINE, Notify, Entra) are required only when their
   provider is `real`/`azure`; everything defaults to mock.
 - **Rotation runbook**: rotate `JWT_SECRET` and any real integration credentials at the secret manager,

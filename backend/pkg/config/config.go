@@ -8,8 +8,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-
-	"github.com/rs/zerolog/log"
 )
 
 // Config holds every runtime setting. It is constructed once via Load and then
@@ -91,6 +89,11 @@ type Config struct {
 
 	// CORSAllowOrigins is the comma-separated allowlist for browser clients.
 	CORSAllowOrigins string
+
+	// TrustedProxies is the comma-separated allowlist of proxy IPs/CIDRs (e.g. the
+	// ACA ingress range) whose X-Forwarded-For is trusted for client-IP resolution.
+	// Empty (dev/CI) ⇒ no proxy trusted ⇒ c.IP() is the direct peer.
+	TrustedProxies string
 }
 
 // Provider values selecting real (vs mock) integrations.
@@ -156,6 +159,7 @@ func Load() (*Config, error) {
 		RateLimitPublicMax: getenvInt("RATE_LIMIT_PUBLIC_MAX", 30),
 
 		CORSAllowOrigins: getenv("CORS_ALLOW_ORIGINS", "http://localhost:3000,http://localhost:3001"),
+		TrustedProxies:   os.Getenv("TRUSTED_PROXIES"),
 	}
 
 	if c.DatabaseURL == "" {
@@ -167,6 +171,26 @@ func Load() (*Config, error) {
 	if c.BlobConnString == "" {
 		return nil, fmt.Errorf("config: AZURE_BLOB_CONNECTION_STRING is required")
 	}
+
+	// Catch typo'd provider flags (e.g. AI_PROVIDER=real) that would otherwise
+	// silently fall back to mock. AI/Search use "azure"; the rest use "real".
+	for _, p := range []struct {
+		name    string
+		val     string
+		allowed []string
+	}{
+		{"AI_PROVIDER", c.AIProvider, []string{"mock", AIProviderAzure}},
+		{"AI_SEARCH_PROVIDER", c.AISearchProvider, []string{"mock", AIProviderAzure}},
+		{"AUTH_PROVIDER", c.AuthProvider, []string{"mock", ProviderReal}},
+		{"PS_PROVIDER", c.PSProvider, []string{"mock", ProviderReal}},
+		{"LINE_PROVIDER", c.LINEProvider, []string{"mock", ProviderReal}},
+		{"NOTIFY_PROVIDER", c.NotifyProvider, []string{"mock", ProviderReal}},
+	} {
+		if !isOneOf(p.val, p.allowed) {
+			return nil, fmt.Errorf("config: %s must be one of %v, got %q", p.name, p.allowed, p.val)
+		}
+	}
+
 	if c.UsesAzureAI() {
 		if c.AzureOpenAIEndpoint == "" || c.AzureOpenAIKey == "" {
 			return nil, fmt.Errorf("config: AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_KEY are required when AI_PROVIDER=azure")
@@ -195,8 +219,13 @@ func Load() (*Config, error) {
 	if c.UsesRealAuth() && (c.AzureADTenantID == "" || c.AzureADClientID == "") {
 		return nil, fmt.Errorf("config: AZURE_AD_TENANT_ID and AZURE_AD_CLIENT_ID are required when AUTH_PROVIDER=real")
 	}
-	if !c.IsDevelopment() && c.JWTSecret == "" {
-		log.Warn().Msg("config: JWT_SECRET is empty outside development")
+	if !c.IsDevelopment() {
+		if c.JWTSecret == "" {
+			return nil, fmt.Errorf("config: JWT_SECRET is required when ENV != development")
+		}
+		if strings.Contains(c.CORSAllowOrigins, "localhost") || strings.Contains(c.CORSAllowOrigins, "127.0.0.1") {
+			return nil, fmt.Errorf("config: CORS_ALLOW_ORIGINS must be set to real origins (not localhost) when ENV != development")
+		}
 	}
 
 	return c, nil
@@ -228,6 +257,18 @@ func (c *Config) ReportRecipientList() []string {
 	return out
 }
 
+// TrustedProxyList splits TRUSTED_PROXIES into trimmed, non-empty entries (IPs or
+// CIDRs). Empty ⇒ nil ⇒ Fiber trusts no proxy ⇒ c.IP() is the direct peer.
+func (c *Config) TrustedProxyList() []string {
+	var out []string
+	for _, p := range strings.Split(c.TrustedProxies, ",") {
+		if t := strings.TrimSpace(p); t != "" {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
 // UsesAzureAI reports whether real Azure AI clients should be constructed.
 func (c *Config) UsesAzureAI() bool {
 	return c.AIProvider == AIProviderAzure
@@ -249,6 +290,15 @@ func getenv(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func isOneOf(v string, allowed []string) bool {
+	for _, a := range allowed {
+		if v == a {
+			return true
+		}
+	}
+	return false
 }
 
 func getenvInt(key string, fallback int) int {

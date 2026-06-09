@@ -217,3 +217,87 @@ func TestLoad_RateLimitDefault(t *testing.T) {
 		t.Errorf("expected RateLimitPublicMax 5, got %d", c2.RateLimitPublicMax)
 	}
 }
+
+// setProdRequired sets the always-required vars plus a non-development ENV so the
+// prod-only guards (JWT, CORS) are exercised.
+func setProdRequired(t *testing.T) {
+	t.Helper()
+	t.Setenv("DB_URL", "postgres://localhost/db")
+	t.Setenv("REDIS_URL", "redis://localhost:6379")
+	t.Setenv("AZURE_BLOB_CONNECTION_STRING", "conn")
+	t.Setenv("ENV", "production")
+}
+
+func TestLoad_NonDevRequiresJWT(t *testing.T) {
+	setProdRequired(t)
+	t.Setenv("JWT_SECRET", "")
+	t.Setenv("CORS_ALLOW_ORIGINS", "https://hr.example.com")
+	if _, err := Load(); err == nil {
+		t.Fatal("expected error when JWT_SECRET is empty outside development")
+	}
+
+	t.Setenv("JWT_SECRET", "s3cr3t")
+	if _, err := Load(); err != nil {
+		t.Fatalf("expected success with JWT + real CORS in prod, got %v", err)
+	}
+}
+
+func TestLoad_NonDevRejectsLocalhostCORS(t *testing.T) {
+	setProdRequired(t)
+	t.Setenv("JWT_SECRET", "s3cr3t")
+	// Default CORS (localhost) must be rejected in prod.
+	if _, err := Load(); err == nil {
+		t.Fatal("expected error when CORS_ALLOW_ORIGINS is localhost outside development")
+	}
+
+	t.Setenv("CORS_ALLOW_ORIGINS", "https://hr.example.com,https://careers.example.com")
+	if _, err := Load(); err != nil {
+		t.Fatalf("expected success with real CORS origins in prod, got %v", err)
+	}
+}
+
+func TestLoad_InvalidProviderValue(t *testing.T) {
+	base := func() {
+		t.Setenv("DB_URL", "postgres://localhost/db")
+		t.Setenv("REDIS_URL", "redis://localhost:6379")
+		t.Setenv("AZURE_BLOB_CONNECTION_STRING", "conn")
+	}
+	// AI_PROVIDER uses "azure"; "real" is a typo that must fail fast.
+	base()
+	t.Setenv("AI_PROVIDER", "real")
+	if _, err := Load(); err == nil {
+		t.Fatal("expected error for AI_PROVIDER=real")
+	}
+
+	// AUTH_PROVIDER uses "real"; "azure" is a typo that must fail fast.
+	t.Setenv("AI_PROVIDER", "mock")
+	t.Setenv("AUTH_PROVIDER", "azure")
+	if _, err := Load(); err == nil {
+		t.Fatal("expected error for AUTH_PROVIDER=azure")
+	}
+}
+
+func TestLoad_TrustedProxyList(t *testing.T) {
+	t.Setenv("DB_URL", "postgres://localhost/db")
+	t.Setenv("REDIS_URL", "redis://localhost:6379")
+	t.Setenv("AZURE_BLOB_CONNECTION_STRING", "conn")
+
+	c, err := Load()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(c.TrustedProxyList()) != 0 {
+		t.Errorf("expected empty TrustedProxyList by default, got %v", c.TrustedProxyList())
+	}
+
+	t.Setenv("TRUSTED_PROXIES", " 10.0.0.0/8 , 100.64.0.1 ,")
+	c2, err := Load()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	got := c2.TrustedProxyList()
+	want := []string{"10.0.0.0/8", "100.64.0.1"}
+	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
+		t.Errorf("expected %v, got %v", want, got)
+	}
+}
