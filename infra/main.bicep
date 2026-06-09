@@ -74,6 +74,14 @@ param deploySearch bool = false
 @description('Phase-2: wire Entra (real AUTH_PROVIDER) inputs. Keep false for v1.')
 param deployEntra bool = false
 
+// --- Cost-lean / thin-pilot toggles ----------------------------------------
+
+@description('Provision Azure OpenAI + Document Intelligence. Set false on subscriptions without OpenAI access (e.g. MPN/credit) — backend then runs AI_PROVIDER=mock.')
+param deployAi bool = true
+
+@description('Scale stateless apps (api/worker/portal/dashboard) to 0 when idle to conserve credit. Scheduler always stays at 1 replica.')
+param scaleToZero bool = false
+
 // ---------------------------------------------------------------------------
 // Naming
 // ---------------------------------------------------------------------------
@@ -172,9 +180,12 @@ module storage 'modules/storage.bicep' = {
 
 // ---------------------------------------------------------------------------
 // AI plane (separate region — model availability differs)
+// Conditional: skipped entirely when deployAi=false (MPN/credit subscriptions
+// without OpenAI access). When absent these modules expose no outputs, so every
+// reference below is guarded by deployAi.
 // ---------------------------------------------------------------------------
 
-module openai 'modules/openai.bicep' = {
+module openai 'modules/openai.bicep' = if (deployAi) {
   name: 'openai'
   params: {
     location: aiLocation
@@ -184,7 +195,7 @@ module openai 'modules/openai.bicep' = {
   }
 }
 
-module docintel 'modules/docintel.bicep' = {
+module docintel 'modules/docintel.bicep' = if (deployAi) {
   name: 'docintel'
   params: {
     location: aiLocation
@@ -213,8 +224,13 @@ module keyVault 'modules/keyvault.bicep' = {
     redisUrl: redisUrl
     jwtSecret: jwtSecret
     blobConnString: storage.outputs.connectionString
-    openAiKey: openai.outputs.key
-    docIntelKey: docintel.outputs.key
+    // Conditional modules expose no outputs when deployAi=false; the safe-access
+    // operator (.?) yields null, and ?? falls back to '' so no empty AI secrets
+    // are written (createAiSecrets gates that). Avoids BCP318 on a possibly-null
+    // conditional module.
+    openAiKey: deployAi ? (openai.?outputs.key ?? '') : ''
+    docIntelKey: deployAi ? (docintel.?outputs.key ?? '') : ''
+    createAiSecrets: deployAi
   }
 }
 
@@ -256,47 +272,64 @@ var dashboardUrl = 'https://${dashboardFqdn}'
 // ---------------------------------------------------------------------------
 
 var kvUri = keyVault.outputs.vaultUri
-var backendKeyVaultSecrets = [
+
+// AI secrets/env are only present when deployAi — the openai-key/docintel-key
+// vault secrets are not created otherwise, so referencing them would break the
+// app. Concatenate conditionally to keep every array valid in both modes.
+var coreKeyVaultSecrets = [
   { name: 'db-url', keyVaultUrl: '${kvUri}secrets/db-url' }
   { name: 'redis-url', keyVaultUrl: '${kvUri}secrets/redis-url' }
   { name: 'jwt-secret', keyVaultUrl: '${kvUri}secrets/jwt-secret' }
   { name: 'blob-conn-string', keyVaultUrl: '${kvUri}secrets/blob-conn-string' }
+]
+var aiKeyVaultSecrets = [
   { name: 'openai-key', keyVaultUrl: '${kvUri}secrets/openai-key' }
   { name: 'docintel-key', keyVaultUrl: '${kvUri}secrets/docintel-key' }
 ]
+var backendKeyVaultSecrets = concat(coreKeyVaultSecrets, deployAi ? aiKeyVaultSecrets : [])
 
-var backendSecretEnv = [
+var coreSecretEnv = [
   { name: 'DB_URL', secretRef: 'db-url' }
   { name: 'REDIS_URL', secretRef: 'redis-url' }
   { name: 'JWT_SECRET', secretRef: 'jwt-secret' }
   { name: 'AZURE_BLOB_CONNECTION_STRING', secretRef: 'blob-conn-string' }
+]
+var aiSecretEnv = [
   { name: 'AZURE_OPENAI_KEY', secretRef: 'openai-key' }
   { name: 'AZURE_DOC_INTEL_KEY', secretRef: 'docintel-key' }
 ]
+var backendSecretEnv = concat(coreSecretEnv, deployAi ? aiSecretEnv : [])
 
 // Plain backend env shared by api/worker/scheduler. AUTH_PROVIDER stays mock in
 // v1 (HR dashboard login fails closed until Entra/phase-2). AI_SEARCH_PROVIDER
 // stays mock unless deploySearch flips on (phase-2).
-var backendPlainEnv = [
+// AI endpoint env vars reference conditional-module outputs, so they only join
+// the array when deployAi. AI_PROVIDER flips to mock when AI is not provisioned.
+var aiPlainEnv = [
+  { name: 'AZURE_OPENAI_ENDPOINT', value: openai.?outputs.endpoint ?? '' }
+  { name: 'AZURE_OPENAI_DEPLOYMENT', value: openai.?outputs.deploymentName ?? '' }
+  { name: 'AZURE_DOC_INTEL_ENDPOINT', value: docintel.?outputs.endpoint ?? '' }
+]
+
+var basePlainEnv = [
   { name: 'ENV', value: 'production' }
   { name: 'HTTP_PORT', value: '8080' }
   { name: 'WORKER_PORT', value: '8081' }
   { name: 'AZURE_BLOB_CONTAINER', value: 'resumes' }
-  { name: 'AI_PROVIDER', value: 'azure' }
+  { name: 'AI_PROVIDER', value: deployAi ? 'azure' : 'mock' }
   { name: 'AI_SEARCH_PROVIDER', value: deploySearch ? 'azure' : 'mock' }
   { name: 'AUTH_PROVIDER', value: deployEntra ? 'real' : 'mock' }
   { name: 'LINE_PROVIDER', value: 'mock' }
   { name: 'NOTIFY_PROVIDER', value: 'mock' }
   { name: 'PS_PROVIDER', value: 'mock' }
-  { name: 'AZURE_OPENAI_ENDPOINT', value: openai.outputs.endpoint }
-  { name: 'AZURE_OPENAI_DEPLOYMENT', value: openai.outputs.deploymentName }
-  { name: 'AZURE_DOC_INTEL_ENDPOINT', value: docintel.outputs.endpoint }
   { name: 'PORTAL_BASE_URL', value: portalUrl }
   { name: 'CORS_ALLOW_ORIGINS', value: '${portalUrl},${dashboardUrl}' }
   { name: 'RETENTION_DAYS', value: retentionDays }
   { name: 'RETENTION_SWEEP_ENABLED', value: 'false' }
   { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: monitoring.outputs.appInsightsConnectionString }
 ]
+
+var backendPlainEnv = concat(basePlainEnv, deployAi ? aiPlainEnv : [])
 
 // ---------------------------------------------------------------------------
 // Container Apps
@@ -314,7 +347,7 @@ module apiApp 'modules/container-app.bicep' = {
     image: apiImage
     ingressMode: 'external'
     targetPort: 8080
-    minReplicas: 1
+    minReplicas: scaleToZero ? 0 : 1
     maxReplicas: 3
     envVars: backendPlainEnv
     keyVaultSecrets: backendKeyVaultSecrets
@@ -334,7 +367,7 @@ module workerApp 'modules/container-app.bicep' = {
     image: workerImage
     ingressMode: 'internal'
     targetPort: 8081
-    minReplicas: 1
+    minReplicas: scaleToZero ? 0 : 1
     maxReplicas: 3
     envVars: backendPlainEnv
     keyVaultSecrets: backendKeyVaultSecrets
@@ -374,7 +407,7 @@ module portalApp 'modules/container-app.bicep' = {
     image: portalImage
     ingressMode: 'external'
     targetPort: 3000
-    minReplicas: 1
+    minReplicas: scaleToZero ? 0 : 1
     maxReplicas: 3
     envVars: [
       { name: 'NODE_ENV', value: 'production' }
@@ -394,7 +427,7 @@ module dashboardApp 'modules/container-app.bicep' = {
     image: dashboardImage
     ingressMode: 'external'
     targetPort: 3000
-    minReplicas: 1
+    minReplicas: scaleToZero ? 0 : 1
     maxReplicas: 3
     envVars: [
       { name: 'NODE_ENV', value: 'production' }
@@ -469,14 +502,14 @@ output storageAccountName string = storage.outputs.name
 @description('Resume blob container name.')
 output blobContainerName string = storage.outputs.containerName
 
-@description('Azure OpenAI endpoint.')
-output openAiEndpoint string = openai.outputs.endpoint
+@description('Azure OpenAI endpoint (empty when deployAi=false).')
+output openAiEndpoint string = openai.?outputs.endpoint ?? ''
 
-@description('Azure OpenAI deployment name (AZURE_OPENAI_DEPLOYMENT).')
-output openAiDeployment string = openai.outputs.deploymentName
+@description('Azure OpenAI deployment name (AZURE_OPENAI_DEPLOYMENT; empty when deployAi=false).')
+output openAiDeployment string = openai.?outputs.deploymentName ?? ''
 
-@description('Document Intelligence endpoint.')
-output docIntelEndpoint string = docintel.outputs.endpoint
+@description('Document Intelligence endpoint (empty when deployAi=false).')
+output docIntelEndpoint string = docintel.?outputs.endpoint ?? ''
 
 @description('Application Insights connection string.')
 output appInsightsConnectionString string = monitoring.outputs.appInsightsConnectionString

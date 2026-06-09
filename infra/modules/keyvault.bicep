@@ -39,6 +39,13 @@ param openAiKey string
 @secure()
 param docIntelKey string
 
+@description('''
+Create the AI secrets (openai-key, docintel-key). Set false on subscriptions
+without OpenAI access (deployAi=false in main.bicep) — the keys are empty then
+and no AI secrets are written to the vault.
+''')
+param createAiSecrets bool = true
+
 resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
   name: keyVaultName
   location: location
@@ -57,15 +64,22 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
 }
 
 // Secret names match the contract expected by the CD workflow and the
-// container-app secret references.
-var secrets = [
+// container-app secret references. The AI secrets (openai-key, docintel-key)
+// are only appended when createAiSecrets is true so we never write empty
+// secrets on AI-less (MPN/credit) subscriptions.
+var coreSecrets = [
   { name: 'db-url', value: dbUrl }
   { name: 'redis-url', value: redisUrl }
   { name: 'jwt-secret', value: jwtSecret }
   { name: 'blob-conn-string', value: blobConnString }
+]
+
+var aiSecrets = [
   { name: 'openai-key', value: openAiKey }
   { name: 'docintel-key', value: docIntelKey }
 ]
+
+var secrets = concat(coreSecrets, createAiSecrets ? aiSecrets : [])
 
 resource kvSecrets 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = [
   for s in secrets: {
