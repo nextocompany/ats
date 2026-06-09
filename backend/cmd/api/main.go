@@ -116,6 +116,12 @@ func main() {
 		ErrorHandler:          httpx.ErrorHandler,
 		DisableStartupMessage: true,
 		BodyLimit:             maxBodyBytes,
+		// Behind a trusted proxy/LB (e.g. the ACA ingress, set via TRUSTED_PROXIES),
+		// resolve c.IP() from X-Forwarded-For so the rate limiter keys on the real
+		// client. Empty allowlist ⇒ no proxy trusted ⇒ direct peer (dev/CI).
+		EnableTrustedProxyCheck: true,
+		TrustedProxies:          cfg.TrustedProxyList(),
+		ProxyHeader:             fiber.HeaderXForwardedFor,
 	})
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     cfg.CORSAllowOrigins,
