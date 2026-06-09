@@ -13,33 +13,49 @@ function levelLabel(level: string): string {
   return LEVEL_LABELS[level.toLowerCase()] ?? level;
 }
 
-// JobCard is a large, fully-tappable row linking to the position detail.
-// Mobile-first: the whole card is the touch target (well over 44px tall).
+// JobCard is a fully-tappable card linking to the position detail. Works as a
+// row on mobile and a grid cell on larger screens; the whole card is the touch
+// target (well over 44px). Clean-luxury: white surface, hairline border, a
+// refined emerald hover lift, and a gold corner accent on hover.
 export function JobCard({ position }: { position: PublicPosition }) {
   return (
     <Link
       href={`/jobs/${position.id}`}
-      className="group flex items-center gap-4 rounded-2xl bg-card p-4 ring-1 ring-foreground/10 transition-all hover:ring-primary/40 active:translate-y-px focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+      className="group relative flex h-full flex-col gap-4 overflow-hidden rounded-2xl border border-border bg-card p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-[0_12px_40px_-12px_oklch(44%_0.09_158/0.25)] active:translate-y-0 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none sm:p-6"
     >
-      <div className="min-w-0 flex-1">
-        <h2 className="truncate text-base font-semibold text-card-foreground">{position.title_th}</h2>
-        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-          {position.level ? <span>{levelLabel(position.level)}</span> : null}
-          <span className="inline-flex items-center gap-1 rounded-full bg-brand-soft px-2 py-0.5 text-xs font-medium text-primary">
-            เปิดรับ {position.open_count} อัตรา
-          </span>
-        </div>
-      </div>
-      <svg
-        width="20"
-        height="20"
-        viewBox="0 0 24 24"
-        fill="none"
+      {/* hairline gold top-accent revealed on hover */}
+      <span
         aria-hidden="true"
-        className="shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
-      >
-        <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
+        className="absolute inset-x-0 top-0 h-px scale-x-0 bg-gold transition-transform duration-300 group-hover:scale-x-100"
+      />
+      <div className="flex items-start justify-between gap-3">
+        {position.level ? (
+          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {levelLabel(position.level)}
+          </span>
+        ) : (
+          <span />
+        )}
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          aria-hidden="true"
+          className="shrink-0 text-muted-foreground/60 transition-all group-hover:translate-x-0.5 group-hover:text-accent"
+        >
+          <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </div>
+
+      <h2 className="text-lg font-semibold leading-snug text-card-foreground sm:text-xl">{position.title_th}</h2>
+
+      <div className="mt-auto flex items-center gap-2 pt-1">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-soft px-3 py-1 text-xs font-semibold text-accent">
+          <span className="size-1.5 rounded-full bg-accent" aria-hidden="true" />
+          เปิดรับ {position.open_count} อัตรา
+        </span>
+      </div>
     </Link>
   );
 }

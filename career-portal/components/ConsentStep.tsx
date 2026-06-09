@@ -34,7 +34,7 @@ export function ConsentStep({ checked, onChange }: ConsentStepProps) {
         </p>
       </div>
 
-      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border p-4 transition-colors has-data-checked:border-primary has-data-checked:bg-brand-soft/50">
+      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border p-4 transition-colors has-data-checked:border-accent has-data-checked:bg-brand-soft/50">
         <Checkbox
           checked={checked}
           onCheckedChange={(value) => onChange(value === true)}

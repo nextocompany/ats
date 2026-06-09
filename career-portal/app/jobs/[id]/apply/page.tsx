@@ -14,7 +14,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
   const { data: position, isLoading, isError } = usePublicPosition(id);
 
   return (
-    <PortalShell backHref={`/jobs/${id}`}>
+    <PortalShell backHref={`/jobs/${id}`} narrow>
       {isLoading ? (
         <div className="space-y-4">
           <Skeleton className="h-6 w-1/2" />
@@ -24,7 +24,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
       ) : null}
 
       {isError || (!isLoading && !position) ? (
-        <div className="space-y-4 rounded-2xl bg-card p-6 text-center ring-1 ring-foreground/10">
+        <div className="space-y-4 rounded-2xl border border-border bg-card p-8 text-center">
           <p className="text-sm text-muted-foreground">ไม่พบตำแหน่งงานนี้</p>
           <Link href="/jobs" className={buttonVariants({ variant: "outline", size: "tap" })}>
             กลับไปดูตำแหน่งงานทั้งหมด
@@ -32,7 +32,11 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
         </div>
       ) : null}
 
-      {position ? <ApplyStepper positionId={position.id} positionTitle={position.title_th} /> : null}
+      {position ? (
+        <div className="rounded-2xl border border-border bg-card p-6 sm:p-8">
+          <ApplyStepper positionId={position.id} positionTitle={position.title_th} />
+        </div>
+      ) : null}
     </PortalShell>
   );
 }
