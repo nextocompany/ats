@@ -435,7 +435,11 @@ var backendPlainEnv = concat(basePlainEnv, deployAi ? aiPlainEnv : [], deployEnt
 // Container Apps
 // ---------------------------------------------------------------------------
 
-// API — public HTTP ingress on :8080, scale 1..3.
+// API — public HTTP ingress on :8080. Always-on (min 1): it is the public data
+// source for the career portal + dashboard, and a cold scale-from-zero makes the
+// first visitor's request fail ("ไม่สามารถโหลดตำแหน่งงานได้"). scaleToZero is not
+// applied here — only the candidate-facing portal/dashboard may cold-start (a
+// slower first paint, not a data error).
 module apiApp 'modules/container-app.bicep' = {
   name: 'app-api'
   params: {
@@ -449,7 +453,7 @@ module apiApp 'modules/container-app.bicep' = {
     image: apiImage
     ingressMode: 'external'
     targetPort: 8080
-    minReplicas: scaleToZero ? 0 : 1
+    minReplicas: 1
     maxReplicas: 3
     envVars: backendPlainEnv
     keyVaultSecrets: backendKeyVaultSecrets
