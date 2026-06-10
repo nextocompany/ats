@@ -18,7 +18,7 @@ export default function LoginPage() {
   const entra = isEntraConfigured();
 
   return (
-    <main className="grid min-h-dvh lg:grid-cols-[1.15fr_1fr]">
+    <main className="grid min-h-dvh lg:grid-cols-[1.4fr_minmax(26rem,0.85fr)]">
       {/* Brand panel — the CP Axtra blue "front door" of the enterprise */}
       <section className="relative hidden flex-col justify-between overflow-hidden bg-sidebar p-12 text-sidebar-foreground lg:flex">
         {/* Brass glow + dot dither — layered atmosphere, not a flat gradient */}
@@ -97,9 +97,18 @@ export default function LoginPage() {
         </div>
       </section>
 
-      {/* Sign-in panel */}
-      <section className="relative flex items-center justify-center px-6 py-10 sm:py-12">
+      {/* Sign-in panel — its own brass keyline + dot accent so the form half
+          carries the CP Axtra identity instead of reading as a plain white pane. */}
+      <section className="relative flex items-center justify-center px-6 py-10 sm:px-10 sm:py-12">
+        {/* Brass keyline seam between the brand panel and the form (desktop) */}
+        <span
+          aria-hidden
+          className="absolute inset-y-12 left-0 hidden w-px lg:block"
+          style={{ background: "linear-gradient(to bottom, transparent, var(--brass) 18%, var(--brass) 82%, transparent)" }}
+        />
         <div className="w-full max-w-sm">
+          {/* Desktop-only dot accent crowning the form — the signature motif */}
+          <div className="dot-cluster mb-6 hidden lg:flex" aria-hidden />
           {/* Mobile brand hero — a compact version of the desktop "front door" so
               the brand holds at 390 instead of dropping a form into white space.
               Navy panel, monogram, headline, and a single proof line. */}

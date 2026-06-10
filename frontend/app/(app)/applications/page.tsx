@@ -162,7 +162,97 @@ function InboxInner() {
         />
       )}
 
-      <div className="overflow-hidden rounded-xl bg-card ring-1 ring-hairline">
+      {/* Mobile (<768px) — stacked card-rows. The desktop table's right-hand
+          columns (status, store, gate) would truncate off-screen at 390, so
+          below md each application becomes a two-line card: score + mono-id +
+          select on row 1, status + store + gate on row 2. No horizontal overflow. */}
+      <ul className="space-y-2.5 md:hidden">
+        {isLoading &&
+          Array.from({ length: 6 }).map((_, i) => (
+            <li key={i} className="rounded-xl bg-card p-4 ring-1 ring-hairline">
+              <Skeleton className="h-5 w-full" />
+            </li>
+          ))}
+        {!isLoading && items.length === 0 && (
+          <li className="rounded-xl bg-card px-5 py-16 text-center ring-1 ring-hairline">
+            <span
+              aria-hidden
+              className="mx-auto mb-5 grid size-12 place-items-center rounded-2xl bg-brand-soft text-brand"
+            >
+              <InboxIcon className="size-6" strokeWidth={1.75} />
+            </span>
+            <p className="text-base font-semibold text-foreground">
+              {activeFilters.length > 0 ? "No applications match these filters" : "The queue is clear"}
+            </p>
+            <p className="mx-auto mt-1.5 max-w-xs text-sm text-muted-foreground">
+              {activeFilters.length > 0
+                ? "Try widening the status or lowering the minimum score."
+                : "Newly scored applications land here, ranked by AI fit."}
+            </p>
+            {activeFilters.length > 0 && (
+              <Button variant="outline" size="sm" className="mt-5" onClick={() => router.replace("/applications")}>
+                Clear filters
+              </Button>
+            )}
+            <span className="dot-rule mx-auto mt-6 opacity-70" aria-hidden />
+          </li>
+        )}
+        {items.map((a) => (
+          <li
+            key={a.id}
+            className="rounded-xl bg-card ring-1 ring-hairline data-[sel=true]:bg-brand-soft/55 data-[sel=true]:ring-brand/30"
+            data-sel={selected.includes(a.id)}
+          >
+            <div className="flex items-start gap-3 p-4">
+              <span className="flex items-center pt-0.5">
+                <Checkbox
+                  checked={selected.includes(a.id)}
+                  aria-label={`Select ${a.id}`}
+                  onCheckedChange={(c) =>
+                    setSelected((s) => (c ? [...s, a.id] : s.filter((x) => x !== a.id)))
+                  }
+                />
+              </span>
+              <span className="inline-flex flex-col items-start pt-0.5">
+                <ScoreBadge score={a.ai_score} />
+                <ScoreRail score={a.ai_score} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <Link
+                    href={`/applications/${a.id}`}
+                    className="font-mono text-[0.8125rem] font-medium text-foreground underline-offset-2 hover:text-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                  >
+                    {a.id.slice(0, 8)}
+                  </Link>
+                  {a.needs_manual_review && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-brass-soft px-1.5 py-0.5 text-[10px] font-medium text-brass">
+                      <Flag className="size-2.5" /> review
+                    </span>
+                  )}
+                </div>
+                <div className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-hairline pt-2.5">
+                  <StatusPill status={a.status} />
+                  <span className="text-xs tabular-nums text-muted-foreground">
+                    Store {a.assigned_store_id ?? (a.talent_pool ? "· pool" : "—")}
+                  </span>
+                  <span className="ml-auto">
+                    {a.must_have_passed === null ? (
+                      <span className="text-xs text-muted-foreground">Gate —</span>
+                    ) : a.must_have_passed ? (
+                      <Pill tone="pass">Pass</Pill>
+                    ) : (
+                      <Pill tone="fail">Fail</Pill>
+                    )}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      <div className="hidden overflow-hidden rounded-xl bg-card ring-1 ring-hairline md:block">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
             <thead className="ledger-head sticky top-0 z-10 text-left">

@@ -201,13 +201,34 @@ const FUNNEL_STAGES = [
 // Honest proportion drives the rest: width = (value / appliedMax).
 const FUNNEL_MIN_WIDTH = 16;
 
+// Per-stage tonal ramp: a deliberate blue → brass descent down the funnel so
+// the four stages never read as near-identical blue fills. Deep CP Axtra blue at
+// the mouth, warming through to a brass-leaning tone at Hired (the conversion
+// win). Hue sweeps 264 (blue) → 86 (brass), lightness lifts, chroma holds.
+const FUNNEL_SHADES = [
+  "oklch(46% 0.17 264)", // Applied — deep blue
+  "oklch(53% 0.15 240)", // Passed AI — cooler mid-blue
+  "oklch(62% 0.13 196)", // Reviewed — teal-blue, clearly lighter
+  "oklch(72% 0.155 86)", // Hired — brass
+] as const;
+
+// Width taper: even when raw stage values are close, the funnel must visibly
+// narrow stage-to-stage. We blend the honest proportional width with a fixed
+// descending ceiling so the silhouette always reads as a funnel.
+const FUNNEL_TAPER = [100, 78, 56, 36] as const;
+
 export function FunnelChart({ funnel }: { funnel: Funnel }) {
   // Applied is the top of funnel and the proportional reference.
   const max = Math.max(funnel.applied, 1);
   const endToEnd = max > 0 ? Math.round((funnel.hired / max) * 100) : 0;
 
-  const widthFor = (value: number) =>
-    Math.min(100, Math.max((value / max) * 100, FUNNEL_MIN_WIDTH));
+  const widthFor = (value: number, stageIndex: number) => {
+    const proportional = Math.min(100, Math.max((value / max) * 100, FUNNEL_MIN_WIDTH));
+    const ceiling = FUNNEL_TAPER[stageIndex];
+    // Take the smaller of the honest proportion and the taper ceiling, but never
+    // below the floor — guarantees a monotonic narrowing silhouette.
+    return Math.max(FUNNEL_MIN_WIDTH, Math.min(proportional, ceiling));
+  };
 
   return (
     <section className="rounded-xl bg-card p-6 ring-1 ring-hairline">
@@ -228,13 +249,16 @@ export function FunnelChart({ funnel }: { funnel: Funnel }) {
       <ol className="flex flex-col">
         {FUNNEL_STAGES.map((stage, i) => {
           const value = funnel[stage.key];
-          const widthPct = widthFor(value);
+          const widthPct = widthFor(value, i);
           const prev = i > 0 ? funnel[FUNNEL_STAGES[i - 1].key] : value;
-          const prevWidthPct = i > 0 ? widthFor(prev) : widthPct;
+          const prevWidthPct = i > 0 ? widthFor(prev, i - 1) : widthPct;
           const step = prev > 0 ? Math.round((value / prev) * 100) : 100;
           const isHired = i === FUNNEL_STAGES.length - 1;
-          // Blue tonal ramp deepening toward the point of the funnel.
-          const shade = `oklch(${48 - i * 2.4}% ${0.18 - i * 0.012} 264)`;
+          // Deliberate blue → brass ramp down the stages (see FUNNEL_SHADES).
+          const shade = FUNNEL_SHADES[i];
+          // The lighter, warmer lower bands need navy ink for AA contrast; the
+          // deep upper blues carry white. Index 2+ flips to dark text.
+          const bandInk = i >= 2 ? "oklch(22% 0.05 264)" : "var(--brand-foreground)";
 
           return (
             <li key={stage.key}>
@@ -294,11 +318,12 @@ export function FunnelChart({ funnel }: { funnel: Funnel }) {
                   Count is mirrored inside the band for the wider stages; the
                   label above guarantees legibility regardless of band width. */}
               <div
-                className="relative mx-auto flex h-11 items-center justify-end rounded-md px-4 text-brand-foreground transition-[width] duration-500"
+                className="relative mx-auto flex h-11 items-center justify-end rounded-md px-4 transition-[width] duration-500"
                 style={{
                   width: `${widthPct}%`,
                   minWidth: "8.5rem",
                   background: shade,
+                  color: bandInk,
                   transitionTimingFunction: "var(--ease-out)",
                 }}
               >
@@ -357,7 +382,7 @@ export function SourcesChart({ sources }: { sources: Source[] }) {
   const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) => Math.round(maxApplied * t));
 
   return (
-    <section className="flex flex-col rounded-xl bg-card p-6 ring-1 ring-hairline">
+    <section className="flex flex-col self-start rounded-xl bg-card p-6 ring-1 ring-hairline">
       <header className="mb-5 flex items-baseline justify-between">
         <div>
           <p className="eyebrow brass-underline inline-block">Channels</p>
@@ -367,7 +392,7 @@ export function SourcesChart({ sources }: { sources: Source[] }) {
       </header>
 
       {ranked.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center py-14 text-center">
+        <div className="flex flex-col items-center justify-center py-14 text-center">
           <span
             aria-hidden
             className="mb-4 grid size-11 place-items-center rounded-2xl bg-brand-soft text-brand"
@@ -382,7 +407,7 @@ export function SourcesChart({ sources }: { sources: Source[] }) {
           <span className="dot-rule mt-5 opacity-70" aria-hidden />
         </div>
       ) : (
-        <div className="flex flex-1 flex-col">
+        <div className="flex flex-col">
           {/* Volume axis ticks — the bars now sit against a labeled scale, so
               even a single channel reads as a chart, not a floating bar. */}
           <div className="relative mb-2 h-4">
@@ -397,7 +422,7 @@ export function SourcesChart({ sources }: { sources: Source[] }) {
             ))}
           </div>
 
-          <ol className="flex flex-1 flex-col justify-center gap-3.5">
+          <ol className="flex flex-col gap-3.5">
             {ranked.map((s, i) => {
               const widthPct = Math.max((s.applied / maxApplied) * 100, 6);
               const conv = Math.round(s.conversion * 100);

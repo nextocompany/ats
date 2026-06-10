@@ -55,7 +55,70 @@ function CandidatesInner() {
         ]}
       />
 
-      <div className="overflow-hidden rounded-xl bg-card ring-1 ring-hairline">
+      {/* Mobile (<768px) — stacked card-rows. No horizontal table overflow at
+          320/390: each candidate is a two-line card (avatar + name/id, then
+          province + status pill), tap-target sized and fully on-screen. */}
+      <ul className="space-y-2.5 md:hidden">
+        {isLoading &&
+          Array.from({ length: 6 }).map((_, i) => (
+            <li key={i} className="rounded-xl bg-card p-4 ring-1 ring-hairline">
+              <div className="flex items-center gap-3">
+                <Skeleton className="size-11 shrink-0 rounded-lg" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-3.5 w-36" />
+                  <Skeleton className="h-2.5 w-24" />
+                </div>
+              </div>
+            </li>
+          ))}
+        {!isLoading && items.length === 0 && (
+          <li className="rounded-xl bg-card px-5 py-16 text-center ring-1 ring-hairline">
+            <span
+              aria-hidden
+              className="mx-auto mb-5 grid size-12 place-items-center rounded-2xl bg-brand-soft text-brand"
+            >
+              <Users className="size-6" strokeWidth={1.75} />
+            </span>
+            <p className="text-base font-semibold text-foreground">No candidates on file yet</p>
+            <p className="mx-auto mt-1.5 max-w-xs text-sm text-muted-foreground">
+              Records appear here automatically as applications are received and parsed.
+            </p>
+            <span className="dot-rule mx-auto mt-6 opacity-70" aria-hidden />
+          </li>
+        )}
+        {items.map((c) => (
+          <li key={c.id} className="rounded-xl bg-card ring-1 ring-hairline">
+            <Link
+              href={`/candidates/${c.id}`}
+              className="block rounded-xl p-4 outline-none transition-colors hover:bg-brand-soft/40 focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <div className="flex items-center gap-3">
+                <InitialChip name={c.full_name} size="lg" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-semibold text-foreground">{c.full_name}</span>
+                  <span className="mt-0.5 block font-mono text-[0.6875rem] uppercase tracking-wide text-muted-foreground">
+                    {c.id.slice(0, 8)}
+                  </span>
+                </span>
+                <SourceChip channel={c.source_channel} />
+              </div>
+              <div className="mt-3 flex items-center justify-between border-t border-hairline pt-3">
+                {c.province ? (
+                  <span className="inline-flex items-center gap-1.5 text-sm text-foreground/80">
+                    <MapPin className="size-3.5 text-muted-foreground" strokeWidth={1.75} />
+                    {c.province}
+                  </span>
+                ) : (
+                  <span className="text-sm text-muted-foreground">No province on file</span>
+                )}
+                <StatusPill status={c.status} />
+              </div>
+            </Link>
+          </li>
+        ))}
+      </ul>
+
+      <div className="hidden overflow-hidden rounded-xl bg-card ring-1 ring-hairline md:block">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
             <thead className="ledger-head text-left">
