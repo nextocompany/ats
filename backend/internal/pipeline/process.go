@@ -35,6 +35,18 @@ type BlobStore interface {
 	Download(ctx context.Context, name string) ([]byte, error)
 }
 
+// CandidateIndexer keeps the search index in sync with a candidate's state. The
+// interface lives here (not in internal/search) so the pipeline doesn't import
+// search — avoiding an import cycle. The default is a no-op; the worker injects
+// the real (search-backed) implementation via SetIndexer.
+type CandidateIndexer interface {
+	Index(ctx context.Context, candidateID uuid.UUID) error
+}
+
+type noopCandidateIndexer struct{}
+
+func (noopCandidateIndexer) Index(context.Context, uuid.UUID) error { return nil }
+
 // Processor holds the dependencies for the process_application task.
 type Processor struct {
 	ocr        ai.OCR
@@ -46,6 +58,7 @@ type Processor struct {
 	scorer     scoring.Scorer
 	assigner   *branch.Assigner
 	positions  positions.Repository
+	indexer    CandidateIndexer
 }
 
 // NewProcessor wires the pipeline processor.
@@ -57,6 +70,15 @@ func NewProcessor(
 	return &Processor{
 		ocr: o, parser: p, blob: b, candidates: c, apps: a,
 		dedup: d, scorer: s, assigner: asn, positions: pos,
+		indexer: noopCandidateIndexer{},
+	}
+}
+
+// SetIndexer injects a search indexer (no-op by default). Called by the worker
+// when AI_SEARCH_PROVIDER=azure; ignored for nil so callers/tests stay simple.
+func (pr *Processor) SetIndexer(idx CandidateIndexer) {
+	if idx != nil {
+		pr.indexer = idx
 	}
 }
 
@@ -91,6 +113,12 @@ func (pr *Processor) HandleProcessApplication(ctx context.Context, t *asynq.Task
 			logger.Error().Err(serr).Msg("failed to mark application failed")
 		}
 		return err
+	}
+
+	// Keep the search index fresh — best-effort. The candidate's searchable state
+	// (status/score/store) is now final; a stale index must never fail the task.
+	if err := pr.indexer.Index(ctx, candID); err != nil {
+		logger.Warn().Err(err).Msg("search index update failed (non-fatal)")
 	}
 	return nil
 }

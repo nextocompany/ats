@@ -26,6 +26,7 @@ import (
 	"github.com/nexto/hr-ats/internal/reengage"
 	"github.com/nexto/hr-ats/internal/reports"
 	"github.com/nexto/hr-ats/internal/scoring"
+	"github.com/nexto/hr-ats/internal/search"
 	"github.com/nexto/hr-ats/internal/vacancies"
 	"github.com/nexto/hr-ats/pkg/blob"
 	"github.com/nexto/hr-ats/pkg/bootstrap"
@@ -116,6 +117,9 @@ func main() {
 		branch.NewAssigner(vacancyRepo),
 		positions.NewRepository(pool),
 	)
+	// Keep the search index fresh as applications are scored (no-op unless
+	// AI_SEARCH_PROVIDER=azure). Best-effort inside the pipeline — never fatal.
+	processor.SetIndexer(search.NewCandidateSync(pool, search.NewIndexer(cfg)))
 
 	redisOpt, err := queue.RedisOpt(cfg.RedisURL)
 	if err != nil {

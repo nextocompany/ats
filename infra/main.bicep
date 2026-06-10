@@ -109,6 +109,7 @@ var storageName = toLower('${resourcePrefix}st${uniq}')
 var keyVaultName = take(toLower('${resourcePrefix}-kv-${uniq}'), 24)
 var openAiName = toLower('${prefix}-openai-${uniq}')
 var docIntelName = toLower('${prefix}-docintel-${uniq}')
+var searchName = toLower('${prefix}-search-${uniq}')
 var redisName = toLower('${prefix}-redis-${uniq}')
 var postgresName = toLower('${prefix}-pg-${uniq}')
 
@@ -235,6 +236,16 @@ module docintel 'modules/docintel.bicep' = if (deployAi) {
   }
 }
 
+// Azure AI Search — candidate search index (phase-2 seam). Provisioned in the
+// app region (broadly available, unlike OpenAI models).
+module search 'modules/search.bicep' = if (deploySearch) {
+  name: 'search'
+  params: {
+    location: location
+    serviceName: searchName
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Secret composition (kept local; passed securely into Key Vault module)
 // ---------------------------------------------------------------------------
@@ -357,8 +368,11 @@ var aiKeyVaultSecrets = [
   { name: 'openai-key', keyVaultUrl: '${kvUri}secrets/openai-key' }
   { name: 'docintel-key', keyVaultUrl: '${kvUri}secrets/docintel-key' }
 ]
+var searchKeyVaultSecrets = [
+  { name: 'search-key', keyVaultUrl: '${kvUri}secrets/search-key' }
+]
 // Only populated in RBAC mode; empty in no-RBAC mode (inline secrets used).
-var backendKeyVaultSecrets = rbacMode ? concat(coreKeyVaultSecrets, deployAi ? aiKeyVaultSecrets : []) : []
+var backendKeyVaultSecrets = rbacMode ? concat(coreKeyVaultSecrets, deployAi ? aiKeyVaultSecrets : [], deploySearch ? searchKeyVaultSecrets : []) : []
 
 // Inline literal secrets for no-RBAC mode. Same composed values that would
 // otherwise be written to Key Vault. These flow only into Container App secret
@@ -374,9 +388,12 @@ var aiInlineSecrets = [
   { name: 'openai-key', value: deployAi ? (openai.?outputs.key ?? '') : '' }
   { name: 'docintel-key', value: deployAi ? (docintel.?outputs.key ?? '') : '' }
 ]
+var searchInlineSecrets = [
+  { name: 'search-key', value: deploySearch ? (search.?outputs.adminKey ?? '') : '' }
+]
 var backendInlineSecrets = rbacMode
   ? {}
-  : { items: concat(coreInlineSecrets, deployAi ? aiInlineSecrets : []) }
+  : { items: concat(coreInlineSecrets, deployAi ? aiInlineSecrets : [], deploySearch ? searchInlineSecrets : []) }
 
 // ACR admin pull credentials (no-RBAC mode only). Empty in RBAC mode.
 var acrAdminUsername = rbacMode ? '' : registry.outputs.adminUsername
@@ -388,11 +405,14 @@ var coreSecretEnv = [
   { name: 'JWT_SECRET', secretRef: 'jwt-secret' }
   { name: 'AZURE_BLOB_CONNECTION_STRING', secretRef: 'blob-conn-string' }
 ]
+var searchSecretEnv = [
+  { name: 'AZURE_SEARCH_KEY', secretRef: 'search-key' }
+]
 var aiSecretEnv = [
   { name: 'AZURE_OPENAI_KEY', secretRef: 'openai-key' }
   { name: 'AZURE_DOC_INTEL_KEY', secretRef: 'docintel-key' }
 ]
-var backendSecretEnv = concat(coreSecretEnv, deployAi ? aiSecretEnv : [])
+var backendSecretEnv = concat(coreSecretEnv, deployAi ? aiSecretEnv : [], deploySearch ? searchSecretEnv : [])
 
 // Plain backend env shared by api/worker/scheduler. AUTH_PROVIDER stays mock in
 // v1 (HR dashboard login fails closed until Entra/phase-2). AI_SEARCH_PROVIDER
@@ -403,6 +423,11 @@ var aiPlainEnv = [
   { name: 'AZURE_OPENAI_ENDPOINT', value: openai.?outputs.endpoint ?? '' }
   { name: 'AZURE_OPENAI_DEPLOYMENT', value: openai.?outputs.deploymentName ?? '' }
   { name: 'AZURE_DOC_INTEL_ENDPOINT', value: docintel.?outputs.endpoint ?? '' }
+]
+
+var searchPlainEnv = [
+  { name: 'AZURE_SEARCH_ENDPOINT', value: search.?outputs.endpoint ?? '' }
+  { name: 'AZURE_SEARCH_INDEX', value: 'candidates' }
 ]
 
 var basePlainEnv = [
@@ -430,7 +455,7 @@ var entraPlainEnv = [
   { name: 'AZURE_AD_CLIENT_ID', value: azureAdClientId }
 ]
 
-var backendPlainEnv = concat(basePlainEnv, deployAi ? aiPlainEnv : [], deployEntra ? entraPlainEnv : [])
+var backendPlainEnv = concat(basePlainEnv, deployAi ? aiPlainEnv : [], deploySearch ? searchPlainEnv : [], deployEntra ? entraPlainEnv : [])
 
 // ---------------------------------------------------------------------------
 // Container Apps
