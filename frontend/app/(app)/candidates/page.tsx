@@ -3,14 +3,24 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import { MapPin, Users } from "lucide-react";
 
 import { Pagination } from "@/app/(app)/applications/page";
-import { InitialChip, SourceChip, StatusPill } from "@/components/people/PeopleBits";
+import { InitialChip, SourceChip, StatusPill, toneForStatus } from "@/components/people/PeopleBits";
 import { PageHeader } from "@/components/shell/PageHeader";
+import { SummaryStrip } from "@/components/shell/SummaryStrip";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCandidates } from "@/lib/queries";
+import type { Candidate } from "@/lib/types";
 
 const LIMIT = 20;
+
+function summarize(items: Candidate[], total: number) {
+  const active = items.filter((c) => toneForStatus(c.status) === "pass").length;
+  const provinces = new Set(items.map((c) => c.province).filter(Boolean)).size;
+  const channels = new Set(items.map((c) => c.source_channel).filter(Boolean)).size;
+  return { total, active, provinces, channels };
+}
 
 function CandidatesInner() {
   const params = useSearchParams();
@@ -21,13 +31,28 @@ function CandidatesInner() {
   const items = data?.data ?? [];
   const total = data?.meta?.total ?? 0;
   const pages = Math.max(1, Math.ceil(total / LIMIT));
+  const s = summarize(items, total);
 
   return (
     <div className="settle space-y-6">
       <PageHeader
         eyebrow="Talent records"
         title="Candidates"
-        meta={<span className="tabular-nums">{total} candidate{total === 1 ? "" : "s"} on file</span>}
+        meta={
+          <span className="tabular-nums">
+            {total} candidate{total === 1 ? "" : "s"} on file · the national roster
+          </span>
+        }
+      />
+
+      {/* Header summary strip — the roster never reads as a lonely single row. */}
+      <SummaryStrip
+        stats={[
+          { label: "On file", value: <span className="tabular-nums">{total}</span>, lead: true, accent: true },
+          { label: "Active / shortlisted", value: <span className="tabular-nums">{s.active}</span>, hint: "on this page" },
+          { label: "Provinces", value: <span className="tabular-nums">{s.provinces}</span>, hint: "represented here" },
+          { label: "Sourcing channels", value: <span className="tabular-nums">{s.channels}</span>, hint: "in this view" },
+        ]}
       />
 
       <div className="overflow-hidden rounded-xl bg-card ring-1 ring-hairline">
@@ -36,9 +61,9 @@ function CandidatesInner() {
             <thead className="ledger-head text-left">
               <tr>
                 <th className="py-3 pl-5 pr-3">Candidate</th>
-                <th className="px-3 py-3">Province</th>
+                <th className="px-3 py-3">Location</th>
                 <th className="px-3 py-3">Source</th>
-                <th className="w-32 py-3 pl-3 pr-5 text-right">Status</th>
+                <th className="w-36 py-3 pl-3 pr-5 text-right">Status</th>
               </tr>
             </thead>
             <tbody>
@@ -47,19 +72,30 @@ function CandidatesInner() {
                   <tr key={i} className="border-b border-hairline last:border-0">
                     <td colSpan={4} className="px-5 py-3.5">
                       <div className="flex items-center gap-3">
-                        <Skeleton className="size-9 shrink-0 rounded-lg" />
-                        <Skeleton className="h-5 w-full" />
+                        <Skeleton className="size-10 shrink-0 rounded-lg" />
+                        <div className="flex-1 space-y-1.5">
+                          <Skeleton className="h-3.5 w-40" />
+                          <Skeleton className="h-2.5 w-24" />
+                        </div>
                       </div>
                     </td>
                   </tr>
                 ))}
               {!isLoading && items.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-5 py-16 text-center">
-                    <p className="text-sm font-medium text-foreground">No candidates yet</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Records appear here as applications are parsed.
+                  <td colSpan={4} className="px-5 py-20 text-center">
+                    <span
+                      aria-hidden
+                      className="mx-auto mb-5 grid size-12 place-items-center rounded-2xl bg-brand-soft text-brand"
+                    >
+                      <Users className="size-6" strokeWidth={1.75} />
+                    </span>
+                    <p className="text-base font-semibold text-foreground">No candidates on file yet</p>
+                    <p className="mx-auto mt-1.5 max-w-sm text-sm text-muted-foreground">
+                      Records appear here automatically as applications are received and parsed by the
+                      screening engine.
                     </p>
+                    <span className="dot-rule mx-auto mt-6 opacity-70" aria-hidden />
                   </td>
                 </tr>
               )}
@@ -70,22 +106,30 @@ function CandidatesInner() {
                       href={`/candidates/${c.id}`}
                       className="-my-1 flex items-center gap-3 rounded-md py-1 outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
-                      <InitialChip name={c.full_name} />
+                      <InitialChip name={c.full_name} size="lg" />
                       <span className="min-w-0">
                         <span className="block truncate font-semibold text-foreground">
                           {c.full_name}
                         </span>
-                        <span className="block truncate font-mono text-[0.6875rem] uppercase tracking-wide text-muted-foreground">
-                          {c.id.slice(0, 8)}
-                          {/* Region is hidden at narrow widths so the mono id never clips */}
+                        <span className="mt-0.5 flex items-center gap-2 font-mono text-[0.6875rem] uppercase tracking-wide text-muted-foreground">
+                          <span>{c.id.slice(0, 8)}</span>
                           {c.subregion ? (
-                            <span className="hidden sm:inline">{` · ${c.subregion}`}</span>
+                            <span className="hidden truncate sm:inline">· {c.subregion}</span>
                           ) : null}
                         </span>
                       </span>
                     </Link>
                   </td>
-                  <td className="px-3 py-3 text-foreground/80">{c.province || "—"}</td>
+                  <td className="px-3 py-3">
+                    {c.province ? (
+                      <span className="inline-flex items-center gap-1.5 text-sm text-foreground/80">
+                        <MapPin className="size-3.5 text-muted-foreground" strokeWidth={1.75} />
+                        {c.province}
+                      </span>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">—</span>
+                    )}
+                  </td>
                   <td className="px-3 py-3">
                     <SourceChip channel={c.source_channel} />
                   </td>

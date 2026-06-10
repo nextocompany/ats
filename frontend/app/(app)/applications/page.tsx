@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
-import { Check, X, ChevronLeft, ChevronRight, Flag, SlidersHorizontal } from "lucide-react";
+import { Suspense, useMemo, useState } from "react";
+import { X, ChevronLeft, ChevronRight, Flag, SlidersHorizontal, Inbox as InboxIcon } from "lucide-react";
 
 import { BulkActionBar } from "@/components/bulk/BulkActionBar";
 import { ScoreBadge, ScoreRail } from "@/components/inbox/ScoreBadge";
+import { Pill, StatusPill } from "@/components/people/PeopleBits";
 import { PageHeader } from "@/components/shell/PageHeader";
-import { Badge } from "@/components/ui/badge";
+import { SummaryStrip } from "@/components/shell/SummaryStrip";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -54,6 +55,16 @@ function InboxInner() {
   const total = data?.meta?.total ?? 0;
   const pages = Math.max(1, Math.ceil(total / LIMIT));
   const allChecked = items.length > 0 && selected.length === items.length;
+
+  // Page-level read of the visible queue — drives the summary strip so a
+  // one-row table still presents as a designed screening surface.
+  const queue = useMemo(() => {
+    const passed = items.filter((a) => a.must_have_passed === true).length;
+    const flagged = items.filter((a) => a.needs_manual_review).length;
+    const scores = items.map((a) => a.ai_score).filter((s): s is number => typeof s === "number");
+    const top = scores.length ? Math.round(Math.max(...scores)) : null;
+    return { passed, flagged, top };
+  }, [items]);
 
   const activeFilters: { key: string; label: string }[] = [];
   if (status) activeFilters.push({ key: "status", label: `Status · ${status[0].toUpperCase() + status.slice(1)}` });
@@ -134,6 +145,23 @@ function InboxInner() {
         </div>
       )}
 
+      {/* Queue summary — the ranked inbox reads as a screening surface, not a
+          bare table, even when only one application matches the filters. */}
+      {!isError && (
+        <SummaryStrip
+          stats={[
+            { label: "In queue", value: <span className="tabular-nums">{total}</span>, lead: true, accent: true },
+            { label: "Passed AI gate", value: <span className="tabular-nums">{queue.passed}</span>, hint: "on this page" },
+            { label: "Flagged for review", value: <span className="tabular-nums">{queue.flagged}</span>, hint: "needs an operator" },
+            {
+              label: "Top match",
+              value: queue.top !== null ? <span className="tabular-nums">{queue.top}</span> : <span className="text-muted-foreground">—</span>,
+              hint: "best AI score here",
+            },
+          ]}
+        />
+      )}
+
       <div className="overflow-hidden rounded-xl bg-card ring-1 ring-hairline">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
@@ -167,10 +195,19 @@ function InboxInner() {
               {!isLoading && items.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-5 py-20 text-center">
-                    <span className="dot-rule mx-auto mb-5 opacity-70" aria-hidden />
-                    <p className="text-base font-semibold text-foreground">Nothing in the queue</p>
+                    <span
+                      aria-hidden
+                      className="mx-auto mb-5 grid size-12 place-items-center rounded-2xl bg-brand-soft text-brand"
+                    >
+                      <InboxIcon className="size-6" strokeWidth={1.75} />
+                    </span>
+                    <p className="text-base font-semibold text-foreground">
+                      {activeFilters.length > 0 ? "No applications match these filters" : "The queue is clear"}
+                    </p>
                     <p className="mx-auto mt-1.5 max-w-sm text-sm text-muted-foreground">
-                      No applications match these filters. Try widening the status or lowering the minimum score.
+                      {activeFilters.length > 0
+                        ? "Try widening the status or lowering the minimum score to see more candidates."
+                        : "Newly scored applications land here, ranked by AI fit. You're all caught up."}
                     </p>
                     {activeFilters.length > 0 && (
                       <Button
@@ -182,6 +219,7 @@ function InboxInner() {
                         Clear filters
                       </Button>
                     )}
+                    <span className="dot-rule mx-auto mt-6 opacity-70" aria-hidden />
                   </td>
                 </tr>
               )}
@@ -222,22 +260,18 @@ function InboxInner() {
                     )}
                   </td>
                   <td className="px-3 py-3.5">
-                    <Badge variant="secondary" className="capitalize">{a.status}</Badge>
+                    <StatusPill status={a.status} />
                   </td>
                   <td className="px-3 py-3.5 tabular-nums text-muted-foreground">
                     {a.assigned_store_id ?? (a.talent_pool ? "pool" : "—")}
                   </td>
                   <td className="py-3.5 pl-3 pr-5">
                     {a.must_have_passed === null ? (
-                      <span className="text-muted-foreground">—</span>
+                      <span className="text-xs text-muted-foreground">—</span>
                     ) : a.must_have_passed ? (
-                      <span className="inline-flex items-center gap-1 text-xs font-medium text-brand">
-                        <Check className="size-3.5" /> Pass
-                      </span>
+                      <Pill tone="pass">Pass</Pill>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-xs font-medium text-destructive">
-                        <X className="size-3.5" /> Fail
-                      </span>
+                      <Pill tone="fail">Fail</Pill>
                     )}
                   </td>
                 </tr>

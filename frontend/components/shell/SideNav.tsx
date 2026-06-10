@@ -7,12 +7,40 @@ import { LogOut } from "lucide-react";
 import { signOut } from "@/lib/auth";
 import { useMe } from "@/lib/queries";
 import { NAV, BrandMark } from "./nav-config";
+import type { Me } from "@/lib/types";
+
+const ROLE_LABELS: Record<string, string> = {
+  superadmin: "Super Admin",
+  admin: "Administrator",
+  hr: "HR Specialist",
+  recruiter: "Recruiter",
+  manager: "Hiring Manager",
+  staff: "Staff",
+};
+
+// Derive a presentable identity from the raw account — a Title-Cased human name
+// from the email local-part (drops the domain so the spine never shows a
+// "name@lo…" truncation), plus a friendly role label and avatar initials.
+function deriveIdentity(me: Me | undefined): { name: string; role: string; initials: string } {
+  if (!me) return { name: "Loading…", role: "Staff", initials: "HR" };
+  const local = (me.email ?? "").split("@")[0] ?? "";
+  const words = local.split(/[._-]+/).filter(Boolean);
+  const name = words.length
+    ? words.map((w) => w[0].toUpperCase() + w.slice(1)).join(" ")
+    : me.email || "HR User";
+  const initials =
+    (words[0]?.[0] ?? "H").toUpperCase() + (words[1]?.[0] ?? words[0]?.[1] ?? "R").toUpperCase();
+  const roleKey = (me.role ?? "").toLowerCase();
+  const role = ROLE_LABELS[roleKey] ?? (me.role ? me.role[0].toUpperCase() + me.role.slice(1) : "Staff");
+  return { name, role, initials };
+}
 
 // Persistent left sidebar — the deep navy-blue spine of the console (desktop ≥1024).
 export function SideNav() {
   const pathname = usePathname();
   const router = useRouter();
   const { data: me } = useMe();
+  const identity = deriveIdentity(me);
 
   return (
     <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col overflow-hidden bg-sidebar text-sidebar-foreground lg:flex">
@@ -97,14 +125,19 @@ export function SideNav() {
             aria-hidden
             className="grid size-8 shrink-0 place-items-center rounded-full bg-sidebar-accent text-xs font-semibold uppercase text-sidebar-primary"
           >
-            {(me?.email ?? "HR").slice(0, 2)}
+            {identity.initials}
           </span>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-medium text-sidebar-foreground">
-              {me?.email ?? "Loading…"}
+            {/* Primary line: a clean human name derived from the email local-part,
+                so the spine never reads as a truncated "dev.superadmin@lo…" blob. */}
+            <p className="truncate text-xs font-semibold text-sidebar-foreground" title={me?.email ?? undefined}>
+              {identity.name}
             </p>
-            <p className="text-[0.625rem] uppercase tracking-wide text-sidebar-foreground/45">
-              {me?.role ?? "Staff"}
+            <p
+              className="truncate text-[0.625rem] uppercase tracking-wide text-sidebar-foreground/45"
+              title={me?.email ?? undefined}
+            >
+              {identity.role}
             </p>
           </div>
           <button

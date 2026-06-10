@@ -136,8 +136,17 @@ function SearchInner() {
                     ))}
                   {!isLoading && hits.length === 0 && (
                     <tr>
-                      <td colSpan={4} className="px-5 py-16 text-center text-muted-foreground">
-                        No candidates match “{q}”.
+                      <td colSpan={4} className="px-5 py-16 text-center">
+                        <span
+                          aria-hidden
+                          className="mx-auto mb-4 grid size-11 place-items-center rounded-2xl bg-brand-soft text-brand"
+                        >
+                          <SearchIcon className="size-5" strokeWidth={1.75} />
+                        </span>
+                        <p className="text-sm font-semibold text-foreground">No candidates match “{q}”</p>
+                        <p className="mx-auto mt-1 max-w-xs text-sm text-muted-foreground">
+                          Check the spelling, or try a province name instead of a full name.
+                        </p>
                       </td>
                     </tr>
                   )}

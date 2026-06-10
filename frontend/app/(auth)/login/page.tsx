@@ -98,19 +98,44 @@ export default function LoginPage() {
       </section>
 
       {/* Sign-in panel */}
-      <section className="relative flex items-center justify-center px-6 py-12">
+      <section className="relative flex items-center justify-center px-6 py-10 sm:py-12">
         <div className="w-full max-w-sm">
-          {/* Compact brand for mobile, where the left panel is hidden */}
-          <div className="mb-8 flex items-center gap-2.5 lg:hidden">
-            <span className="relative grid size-9 place-items-center rounded-lg bg-brand text-sm font-semibold text-brand-foreground">
-              HR
-              <span
-                aria-hidden
-                className="absolute -right-1 -top-1 size-2 rounded-full bg-brass"
-                style={{ boxShadow: "0 0 0 2px var(--background)" }}
-              />
-            </span>
-            <span className="text-base font-semibold tracking-tight">ATS Console</span>
+          {/* Mobile brand hero — a compact version of the desktop "front door" so
+              the brand holds at 390 instead of dropping a form into white space.
+              Navy panel, monogram, headline, and a single proof line. */}
+          <div className="relative mb-8 overflow-hidden rounded-2xl bg-sidebar p-6 text-sidebar-foreground lg:hidden">
+            <span aria-hidden className="absolute inset-x-0 top-0 h-px bg-sidebar-primary/40" />
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 opacity-[0.06]"
+              style={{
+                backgroundImage: "radial-gradient(oklch(100% 0 0 / 0.7) 0.7px, transparent 0.7px)",
+                backgroundSize: "7px 7px",
+              }}
+            />
+            <div className="relative flex items-center gap-2.5">
+              <span className="relative grid size-9 place-items-center rounded-lg bg-brand text-sm font-semibold text-brand-foreground">
+                HR
+                <span
+                  aria-hidden
+                  className="absolute -right-1 -top-1 size-2 rounded-full bg-brass"
+                  style={{ boxShadow: "0 0 0 2px var(--sidebar)" }}
+                />
+              </span>
+              <span className="flex flex-col leading-none">
+                <span className="text-sm font-semibold tracking-tight">ATS Console</span>
+                <span className="mt-1 text-[0.5625rem] font-medium uppercase tracking-[0.2em] text-brass">
+                  Recruitment Operations
+                </span>
+              </span>
+            </div>
+            <h2 className="relative mt-5 font-heading text-2xl font-semibold leading-[1.05] tracking-tight">
+              One pipeline, <span className="text-brass">every hire.</span>
+            </h2>
+            <p className="relative mt-3 flex items-center gap-2 text-xs text-sidebar-foreground/65">
+              <span className="dot-rule shrink-0 opacity-80" aria-hidden />
+              AI-assisted screening across 42 stores nationwide
+            </p>
           </div>
 
           <p className="eyebrow brass-underline inline-block">Welcome back</p>
