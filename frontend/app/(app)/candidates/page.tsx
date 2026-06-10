@@ -36,11 +36,11 @@ function CandidatesInner() {
   return (
     <div className="settle space-y-6">
       <PageHeader
-        eyebrow="Talent records"
+        eyebrow="People"
         title="Candidates"
         meta={
           <span className="tabular-nums">
-            {total} candidate{total === 1 ? "" : "s"} on file · the national roster
+            {total} candidate{total === 1 ? "" : "s"} on file · all stores
           </span>
         }
       />
@@ -49,7 +49,7 @@ function CandidatesInner() {
       <SummaryStrip
         stats={[
           { label: "On file", value: <span className="tabular-nums">{total}</span>, lead: true, accent: true },
-          { label: "Active / shortlisted", value: <span className="tabular-nums">{s.active}</span>, hint: "on this page" },
+          { label: "Active", value: <span className="tabular-nums">{s.active}</span>, hint: "on this page" },
           { label: "Provinces", value: <span className="tabular-nums">{s.provinces}</span>, hint: "represented here" },
           { label: "Sourcing channels", value: <span className="tabular-nums">{s.channels}</span>, hint: "in this view" },
         ]}
@@ -96,9 +96,11 @@ function CandidatesInner() {
                 <InitialChip name={c.full_name} size="lg" />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-semibold text-foreground">{c.full_name}</span>
-                  <span className="mt-0.5 block font-mono text-[0.6875rem] uppercase tracking-wide text-muted-foreground">
-                    {c.id.slice(0, 8)}
-                  </span>
+                  {c.subregion && (
+                    <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                      {c.subregion}
+                    </span>
+                  )}
                 </span>
                 <SourceChip channel={c.source_channel} />
               </div>
@@ -174,12 +176,11 @@ function CandidatesInner() {
                         <span className="block truncate font-semibold text-foreground">
                           {c.full_name}
                         </span>
-                        <span className="mt-0.5 flex items-center gap-2 font-mono text-[0.6875rem] uppercase tracking-wide text-muted-foreground">
-                          <span>{c.id.slice(0, 8)}</span>
-                          {c.subregion ? (
-                            <span className="hidden truncate sm:inline">· {c.subregion}</span>
-                          ) : null}
-                        </span>
+                        {c.subregion && (
+                          <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                            {c.subregion}
+                          </span>
+                        )}
                       </span>
                     </Link>
                   </td>

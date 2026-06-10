@@ -14,28 +14,24 @@ export default function DashboardPage() {
 
   return (
     <div className="settle space-y-8">
-      {/* Page masthead — editorial hero with the CP Axtra dot-cluster as
-          atmosphere and a brass keyline under the eyebrow. */}
-      <header className="relative overflow-hidden border-b border-hairline pb-7">
-        <div
-          className="dot-cluster pointer-events-none absolute right-0 top-1 hidden opacity-90 sm:block"
-          aria-hidden
-        />
+      {/* Page masthead — a calm title and one supporting line. One brass keyline
+          under the eyebrow is the single accent; no dot-cluster atmosphere. */}
+      <header className="border-b border-hairline pb-7">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="max-w-prose">
-            <p className="eyebrow brass-underline inline-block">Command center</p>
+            <p className="eyebrow brass-underline inline-block">Today</p>
             <h1 className="mt-4 font-heading text-4xl font-semibold leading-[1.02] tracking-tight sm:text-[2.75rem]">
               Overview
             </h1>
             <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-              Live read of the national recruitment pipeline — intake, AI screening, and onboarding.
+              A live read of recruitment across all stores — intake, screening, and onboarding.
             </p>
           </div>
           <Link
             href="/applications"
             className={buttonVariants({ size: "default", className: "h-10 gap-1.5 px-5 shadow-sm" })}
           >
-            Open ranked inbox
+            Open inbox
             <ArrowRight className="size-4" />
           </Link>
         </div>
@@ -52,8 +48,8 @@ export default function DashboardPage() {
           <section className="rounded-xl bg-card p-6 ring-1 ring-hairline">
             <header className="flex items-baseline justify-between">
               <div>
-                <p className="eyebrow">Operator focus</p>
-                <h2 className="mt-1 font-heading text-lg font-semibold tracking-tight">Where to act</h2>
+                <p className="eyebrow">Action</p>
+                <h2 className="mt-1 font-heading text-lg font-semibold tracking-tight">Needs your attention</h2>
               </div>
               {kpi && (
                 <span className="rounded-full bg-brass-soft px-2.5 py-1 text-[0.6875rem] font-semibold tabular-nums text-[color-mix(in_oklch,var(--brass)_70%,black)]">
@@ -65,39 +61,34 @@ export default function DashboardPage() {
               <QuickAction
                 href="/applications?status=scored"
                 icon={<Inbox className="size-4" />}
-                title="Review scored applications"
-                hint={kpi ? `${kpi.waiting} awaiting an operator` : "—"}
+                title="Review screened candidates"
+                hint={kpi ? `${kpi.waiting} waiting for you` : "—"}
               />
               <QuickAction
                 href="/applications?min_score=75"
                 icon={<ScanLine className="size-4" />}
-                title="Top AI matches"
-                hint="Score ≥ 75 — fast-track candidates"
+                title="Best-fit candidates"
+                hint="Score 75+ — fast-track these"
               />
               <QuickAction
                 href="/applications"
                 icon={<AlertTriangle className="size-4 text-brass" />}
-                title="Flagged for manual review"
-                hint="OCR / dedup edge cases"
+                title="Needs a human check"
+                hint="Unclear scans or possible duplicates"
               />
             </ul>
           </section>
 
           {kpi && (
             <section className="relative overflow-hidden rounded-xl bg-brand p-6 text-brand-foreground ring-1 ring-brand/15">
-              {/* Brass left keyline — matches the hero KPI's premium accent */}
+              {/* Brass left keyline — the single accent, matching the hero KPI */}
               <span
                 aria-hidden
                 className="absolute inset-y-6 left-0 w-[3px] rounded-full"
                 style={{ background: "var(--brass)" }}
               />
-              <span
-                aria-hidden
-                className="pointer-events-none absolute -right-10 -top-10 size-40 rounded-full opacity-25"
-                style={{ background: "radial-gradient(circle, var(--brass) 0%, transparent 70%)" }}
-              />
               <p className="pl-3 text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-brand-foreground/70">
-                Pass-through
+                Screening pass rate
               </p>
               {(() => {
                 const rate = kpi.applied > 0 ? Math.round((kpi.passed / kpi.applied) * 100) : 0;
@@ -118,8 +109,8 @@ export default function DashboardPage() {
                       </span>
                     </div>
                     <p className="mt-3 text-sm text-brand-foreground/80">
-                      of applicants clear the AI gate. Onboarding holds{" "}
-                      <span className="font-semibold tabular-nums text-brand-foreground">{kpi.onboarded}</span> this cycle.
+                      of applicants pass screening.{" "}
+                      <span className="font-semibold tabular-nums text-brand-foreground">{kpi.onboarded}</span> onboarded this cycle.
                     </p>
                   </div>
                 );
