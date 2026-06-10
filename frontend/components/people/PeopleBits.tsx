@@ -30,12 +30,13 @@ function tintFor(seed: string): (typeof CHIP_TINTS)[number] {
   return CHIP_TINTS[h % CHIP_TINTS.length];
 }
 
-export function InitialChip({ name }: { name: string }) {
+export function InitialChip({ name, size = "md" }: { name: string; size?: "sm" | "md" | "lg" }) {
   const tint = tintFor(name);
+  const dim = size === "lg" ? "size-11 text-sm" : size === "sm" ? "size-8 text-xs" : "size-9 text-[0.8125rem]";
   return (
     <span
       aria-hidden
-      className="grid size-9 shrink-0 place-items-center rounded-lg text-[0.8125rem] font-semibold tracking-tight"
+      className={`grid shrink-0 place-items-center rounded-lg font-semibold tracking-tight ${dim}`}
       style={{ backgroundColor: tint.bg, color: tint.fg }}
     >
       {initials(name)}
@@ -79,27 +80,72 @@ export function SourceChip({ channel }: { channel: string }) {
   );
 }
 
-// Semantic status pill — emerald for "available/active" states, clay for
-// rejected/dropped, neutral ink otherwise. Status drives color, not decoration.
-const POSITIVE = new Set(["available", "active", "hired", "shortlisted", "interview", "onboarded"]);
-const NEGATIVE = new Set(["rejected", "dropped", "withdrawn", "inactive"]);
+/* ──────────────────────────────────────────────────────────────────────────
+   Semantic pill system — ONE token-driven vocabulary shared everywhere a
+   status/outcome renders (Candidates, Inbox gate, application detail).
+     pass / positive  → CP Axtra blue   (strong, on-brand)
+     fail / negative  → warm clay-red   (genuine signal, AA on tint)
+     pending / brass  → brass-tinted    (awaiting an operator)
+     neutral          → quiet ink       (default, unremarkable states)
+   A leading dot reinforces the tone without relying on color alone.
+   ────────────────────────────────────────────────────────────────────────── */
 
-export function StatusPill({ status }: { status: string }) {
-  const key = (status ?? "").toLowerCase();
-  const tone = POSITIVE.has(key) ? "positive" : NEGATIVE.has(key) ? "negative" : "neutral";
-  const cls =
-    tone === "positive"
-      ? "bg-brand-soft text-brand"
-      : tone === "negative"
-        ? "bg-[oklch(95%_0.04_27)] text-[var(--destructive)]"
-        : "bg-secondary text-secondary-foreground";
-  const label = status ? status[0].toUpperCase() + status.slice(1) : "—";
+export type PillTone = "pass" | "fail" | "pending" | "neutral";
+
+const PILL_STYLE: Record<PillTone, { cls: string; dot: string }> = {
+  pass: { cls: "bg-brand-soft text-brand", dot: "var(--brand)" },
+  fail: {
+    cls: "bg-[oklch(95%_0.045_27)] text-[oklch(48%_0.18_27)]",
+    dot: "oklch(55% 0.2 27)",
+  },
+  pending: {
+    cls: "bg-brass-soft text-[color-mix(in_oklch,var(--brass)_72%,black)]",
+    dot: "var(--brass)",
+  },
+  neutral: { cls: "bg-secondary text-secondary-foreground", dot: "currentColor" },
+};
+
+export function Pill({
+  tone,
+  children,
+  showDot = true,
+}: {
+  tone: PillTone;
+  children: React.ReactNode;
+  showDot?: boolean;
+}) {
+  const s = PILL_STYLE[tone];
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${cls}`}>
-      {tone === "positive" && (
-        <span aria-hidden className="size-1.5 rounded-full bg-current opacity-80" />
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${s.cls}`}
+    >
+      {showDot && (
+        <span
+          aria-hidden
+          className="size-1.5 shrink-0 rounded-full"
+          style={{ background: s.dot, opacity: 0.85 }}
+        />
       )}
-      {label}
+      {children}
     </span>
   );
+}
+
+// Map a free-text candidate/application status onto a semantic tone.
+const POSITIVE = new Set(["available", "active", "hired", "shortlisted", "interview", "onboarded", "pass", "passed"]);
+const NEGATIVE = new Set(["rejected", "dropped", "withdrawn", "inactive", "failed", "fail"]);
+const PENDING = new Set(["pending", "scored", "parsed", "review", "waiting", "in_review"]);
+
+export function toneForStatus(status: string): PillTone {
+  const key = (status ?? "").toLowerCase();
+  if (POSITIVE.has(key)) return "pass";
+  if (NEGATIVE.has(key)) return "fail";
+  if (PENDING.has(key)) return "pending";
+  return "neutral";
+}
+
+export function StatusPill({ status }: { status: string }) {
+  const tone = toneForStatus(status);
+  const label = status ? status[0].toUpperCase() + status.slice(1) : "—";
+  return <Pill tone={tone}>{label}</Pill>;
 }

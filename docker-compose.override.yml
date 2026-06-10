@@ -1,0 +1,6 @@
+# Local demo override (NOT committed): allow the HR dashboard served on :3002 to
+# call the API (cross-origin CORS). Remove this file to return to defaults.
+services:
+  api:
+    environment:
+      CORS_ALLOW_ORIGINS: "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003"

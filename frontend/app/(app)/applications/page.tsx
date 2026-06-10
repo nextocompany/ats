@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
-import { Check, X, ChevronLeft, ChevronRight, Flag } from "lucide-react";
+import { Suspense, useMemo, useState } from "react";
+import { X, ChevronLeft, ChevronRight, Flag, SlidersHorizontal, Inbox as InboxIcon } from "lucide-react";
 
 import { BulkActionBar } from "@/components/bulk/BulkActionBar";
 import { ScoreBadge, ScoreRail } from "@/components/inbox/ScoreBadge";
+import { Pill, StatusPill } from "@/components/people/PeopleBits";
 import { PageHeader } from "@/components/shell/PageHeader";
-import { Badge } from "@/components/ui/badge";
+import { SummaryStrip } from "@/components/shell/SummaryStrip";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -55,6 +56,20 @@ function InboxInner() {
   const pages = Math.max(1, Math.ceil(total / LIMIT));
   const allChecked = items.length > 0 && selected.length === items.length;
 
+  // Page-level read of the visible queue — drives the summary strip so a
+  // one-row table still presents as a designed screening surface.
+  const queue = useMemo(() => {
+    const passed = items.filter((a) => a.must_have_passed === true).length;
+    const flagged = items.filter((a) => a.needs_manual_review).length;
+    const scores = items.map((a) => a.ai_score).filter((s): s is number => typeof s === "number");
+    const top = scores.length ? Math.round(Math.max(...scores)) : null;
+    return { passed, flagged, top };
+  }, [items]);
+
+  const activeFilters: { key: string; label: string }[] = [];
+  if (status) activeFilters.push({ key: "status", label: `Status · ${status[0].toUpperCase() + status.slice(1)}` });
+  if (minScore) activeFilters.push({ key: "min_score", label: `Score ≥ ${minScore}` });
+
   return (
     <div className="settle space-y-6">
       <PageHeader
@@ -97,13 +112,147 @@ function InboxInner() {
         }
       />
 
+      {/* Active filters — reflect URL state as removable chips, with a count read */}
+      {activeFilters.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+            <SlidersHorizontal className="size-3.5" /> Filtering
+          </span>
+          {activeFilters.map((f) => (
+            <button
+              key={f.key}
+              type="button"
+              onClick={() => setParam(f.key, "")}
+              className="group inline-flex items-center gap-1.5 rounded-full bg-brand-soft px-3 py-1 text-xs font-medium text-brand transition-colors hover:bg-brand hover:text-brand-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {f.label}
+              <X className="size-3 opacity-60 transition-opacity group-hover:opacity-100" />
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => router.replace("/applications")}
+            className="text-xs font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm px-1"
+          >
+            Clear all
+          </button>
+        </div>
+      )}
+
       {isError && (
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
           {error instanceof Error ? error.message : "Failed to load applications. Try again in a moment."}
         </div>
       )}
 
-      <div className="overflow-hidden rounded-xl bg-card ring-1 ring-hairline">
+      {/* Queue summary — the ranked inbox reads as a screening surface, not a
+          bare table, even when only one application matches the filters. */}
+      {!isError && (
+        <SummaryStrip
+          stats={[
+            { label: "In queue", value: <span className="tabular-nums">{total}</span>, lead: true, accent: true },
+            { label: "Passed AI gate", value: <span className="tabular-nums">{queue.passed}</span>, hint: "on this page" },
+            { label: "Flagged for review", value: <span className="tabular-nums">{queue.flagged}</span>, hint: "needs an operator" },
+            {
+              label: "Top match",
+              value: queue.top !== null ? <span className="tabular-nums">{queue.top}</span> : <span className="text-muted-foreground">—</span>,
+              hint: "best AI score here",
+            },
+          ]}
+        />
+      )}
+
+      {/* Mobile (<768px) — stacked card-rows. The desktop table's right-hand
+          columns (status, store, gate) would truncate off-screen at 390, so
+          below md each application becomes a two-line card: score + mono-id +
+          select on row 1, status + store + gate on row 2. No horizontal overflow. */}
+      <ul className="space-y-2.5 md:hidden">
+        {isLoading &&
+          Array.from({ length: 6 }).map((_, i) => (
+            <li key={i} className="rounded-xl bg-card p-4 ring-1 ring-hairline">
+              <Skeleton className="h-5 w-full" />
+            </li>
+          ))}
+        {!isLoading && items.length === 0 && (
+          <li className="rounded-xl bg-card px-5 py-16 text-center ring-1 ring-hairline">
+            <span
+              aria-hidden
+              className="mx-auto mb-5 grid size-12 place-items-center rounded-2xl bg-brand-soft text-brand"
+            >
+              <InboxIcon className="size-6" strokeWidth={1.75} />
+            </span>
+            <p className="text-base font-semibold text-foreground">
+              {activeFilters.length > 0 ? "No applications match these filters" : "The queue is clear"}
+            </p>
+            <p className="mx-auto mt-1.5 max-w-xs text-sm text-muted-foreground">
+              {activeFilters.length > 0
+                ? "Try widening the status or lowering the minimum score."
+                : "Newly scored applications land here, ranked by AI fit."}
+            </p>
+            {activeFilters.length > 0 && (
+              <Button variant="outline" size="sm" className="mt-5" onClick={() => router.replace("/applications")}>
+                Clear filters
+              </Button>
+            )}
+            <span className="dot-rule mx-auto mt-6 opacity-70" aria-hidden />
+          </li>
+        )}
+        {items.map((a) => (
+          <li
+            key={a.id}
+            className="rounded-xl bg-card ring-1 ring-hairline data-[sel=true]:bg-brand-soft/55 data-[sel=true]:ring-brand/30"
+            data-sel={selected.includes(a.id)}
+          >
+            <div className="flex items-start gap-3 p-4">
+              <span className="flex items-center pt-0.5">
+                <Checkbox
+                  checked={selected.includes(a.id)}
+                  aria-label={`Select ${a.id}`}
+                  onCheckedChange={(c) =>
+                    setSelected((s) => (c ? [...s, a.id] : s.filter((x) => x !== a.id)))
+                  }
+                />
+              </span>
+              <span className="inline-flex flex-col items-start pt-0.5">
+                <ScoreBadge score={a.ai_score} />
+                <ScoreRail score={a.ai_score} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <Link
+                    href={`/applications/${a.id}`}
+                    className="font-mono text-[0.8125rem] font-medium text-foreground underline-offset-2 hover:text-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                  >
+                    {a.id.slice(0, 8)}
+                  </Link>
+                  {a.needs_manual_review && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-brass-soft px-1.5 py-0.5 text-[10px] font-medium text-brass">
+                      <Flag className="size-2.5" /> review
+                    </span>
+                  )}
+                </div>
+                <div className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-hairline pt-2.5">
+                  <StatusPill status={a.status} />
+                  <span className="text-xs tabular-nums text-muted-foreground">
+                    Store {a.assigned_store_id ?? (a.talent_pool ? "· pool" : "—")}
+                  </span>
+                  <span className="ml-auto">
+                    {a.must_have_passed === null ? (
+                      <span className="text-xs text-muted-foreground">Gate —</span>
+                    ) : a.must_have_passed ? (
+                      <Pill tone="pass">Pass</Pill>
+                    ) : (
+                      <Pill tone="fail">Fail</Pill>
+                    )}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      <div className="hidden overflow-hidden rounded-xl bg-card ring-1 ring-hairline md:block">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
             <thead className="ledger-head sticky top-0 z-10 text-left">
@@ -135,11 +284,32 @@ function InboxInner() {
                 ))}
               {!isLoading && items.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-5 py-16 text-center">
-                    <p className="text-sm font-medium text-foreground">Nothing in the queue</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      No applications match these filters. Try widening the status or lowering the score.
+                  <td colSpan={6} className="px-5 py-20 text-center">
+                    <span
+                      aria-hidden
+                      className="mx-auto mb-5 grid size-12 place-items-center rounded-2xl bg-brand-soft text-brand"
+                    >
+                      <InboxIcon className="size-6" strokeWidth={1.75} />
+                    </span>
+                    <p className="text-base font-semibold text-foreground">
+                      {activeFilters.length > 0 ? "No applications match these filters" : "The queue is clear"}
                     </p>
+                    <p className="mx-auto mt-1.5 max-w-sm text-sm text-muted-foreground">
+                      {activeFilters.length > 0
+                        ? "Try widening the status or lowering the minimum score to see more candidates."
+                        : "Newly scored applications land here, ranked by AI fit. You're all caught up."}
+                    </p>
+                    {activeFilters.length > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-5"
+                        onClick={() => router.replace("/applications")}
+                      >
+                        Clear filters
+                      </Button>
+                    )}
+                    <span className="dot-rule mx-auto mt-6 opacity-70" aria-hidden />
                   </td>
                 </tr>
               )}
@@ -180,22 +350,18 @@ function InboxInner() {
                     )}
                   </td>
                   <td className="px-3 py-3.5">
-                    <Badge variant="secondary" className="capitalize">{a.status}</Badge>
+                    <StatusPill status={a.status} />
                   </td>
                   <td className="px-3 py-3.5 tabular-nums text-muted-foreground">
                     {a.assigned_store_id ?? (a.talent_pool ? "pool" : "—")}
                   </td>
                   <td className="py-3.5 pl-3 pr-5">
                     {a.must_have_passed === null ? (
-                      <span className="text-muted-foreground">—</span>
+                      <span className="text-xs text-muted-foreground">—</span>
                     ) : a.must_have_passed ? (
-                      <span className="inline-flex items-center gap-1 text-xs font-medium text-brand">
-                        <Check className="size-3.5" /> Pass
-                      </span>
+                      <Pill tone="pass">Pass</Pill>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-xs font-medium text-destructive">
-                        <X className="size-3.5" /> Fail
-                      </span>
+                      <Pill tone="fail">Fail</Pill>
                     )}
                   </td>
                 </tr>
