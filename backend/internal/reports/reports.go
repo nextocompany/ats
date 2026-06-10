@@ -71,6 +71,84 @@ func (r *Repo) KPI(ctx context.Context) (KPI, error) {
 	return k, nil
 }
 
+// StoreLoad is the review backlog at one store — applications awaiting an
+// operator, scoped to a store (or "Unassigned" before branch assignment).
+type StoreLoad struct {
+	StoreID   *int   `json:"store_id"`
+	StoreName string `json:"store_name"`
+	Waiting   int    `json:"waiting"`
+}
+
+// OpenRole is an open hiring need: total open headcount for a position across
+// stores, plus how many stores are recruiting for it.
+type OpenRole struct {
+	PositionID string `json:"position_id"`
+	Title      string `json:"title"`
+	Openings   int    `json:"openings"`
+	Stores     int    `json:"stores"`
+}
+
+// WaitingByStore returns stores with applications awaiting an operator (same
+// "waiting" definition as KPI), busiest first, capped at limit.
+func (r *Repo) WaitingByStore(ctx context.Context, limit int) ([]StoreLoad, error) {
+	const q = `
+		SELECT a.assigned_store_id,
+		       COALESCE(s.store_name, 'Unassigned') AS store_name,
+		       COUNT(*) AS waiting
+		FROM applications a
+		LEFT JOIN stores s ON s.store_no = a.assigned_store_id
+		WHERE a.status IN ('pending','parsed','scored')
+		GROUP BY a.assigned_store_id, s.store_name
+		ORDER BY waiting DESC, store_name
+		LIMIT $1`
+	rows, err := r.pool.Query(ctx, q, limit)
+	if err != nil {
+		return nil, fmt.Errorf("reports: waiting by store: %w", err)
+	}
+	defer rows.Close()
+
+	var out []StoreLoad
+	for rows.Next() {
+		var sl StoreLoad
+		if err := rows.Scan(&sl.StoreID, &sl.StoreName, &sl.Waiting); err != nil {
+			return nil, fmt.Errorf("reports: waiting by store scan: %w", err)
+		}
+		out = append(out, sl)
+	}
+	return out, rows.Err()
+}
+
+// OpenRoles returns positions with open vacancies, summing headcount across
+// stores, most openings first, capped at limit. Title prefers English, then Thai.
+func (r *Repo) OpenRoles(ctx context.Context, limit int) ([]OpenRole, error) {
+	const q = `
+		SELECT p.id::text,
+		       COALESCE(NULLIF(p.title_en,''), p.title_th, 'Unknown role') AS title,
+		       COALESCE(SUM(v.headcount), 0)::int AS openings,
+		       COUNT(DISTINCT v.store_id) AS stores
+		FROM vacancies v
+		JOIN positions p ON p.id = v.position_id
+		WHERE v.status = 'open'
+		GROUP BY p.id, p.title_en, p.title_th
+		ORDER BY openings DESC, title
+		LIMIT $1`
+	rows, err := r.pool.Query(ctx, q, limit)
+	if err != nil {
+		return nil, fmt.Errorf("reports: open roles: %w", err)
+	}
+	defer rows.Close()
+
+	var out []OpenRole
+	for rows.Next() {
+		var role OpenRole
+		if err := rows.Scan(&role.PositionID, &role.Title, &role.Openings, &role.Stores); err != nil {
+			return nil, fmt.Errorf("reports: open roles scan: %w", err)
+		}
+		out = append(out, role)
+	}
+	return out, rows.Err()
+}
+
 // Sources returns per-channel applied/hired counts and conversion.
 func (r *Repo) Sources(ctx context.Context) ([]Source, error) {
 	const q = `

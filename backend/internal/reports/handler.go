@@ -45,8 +45,21 @@ func RegisterRoutes(app *fiber.App, h *Handler) {
 	v1.Get("/funnel", h.Funnel)
 	v1.Get("/kpi", h.KPI)
 	v1.Get("/sources", h.Sources)
+	v1.Get("/by-store", h.WaitingByStore)
+	v1.Get("/open-roles", h.OpenRoles)
 	v1.Get("/exports", h.ListExports)
 	v1.Post("/exports", h.TriggerExport)
+}
+
+// operationsLimit caps the dashboard operational panels (top-N stores / roles).
+const operationsLimit = 8
+
+func clampLimit(c *fiber.Ctx) int {
+	n := c.QueryInt("limit", operationsLimit)
+	if n < 1 || n > 50 {
+		return operationsLimit
+	}
+	return n
 }
 
 // Funnel handles GET /api/v1/reports/funnel.
@@ -74,6 +87,24 @@ func (h *Handler) Sources(c *fiber.Ctx) error {
 		return err
 	}
 	return httpx.OK(c, s)
+}
+
+// WaitingByStore handles GET /api/v1/reports/by-store.
+func (h *Handler) WaitingByStore(c *fiber.Ctx) error {
+	items, err := h.repo.WaitingByStore(c.UserContext(), clampLimit(c))
+	if err != nil {
+		return err
+	}
+	return httpx.OK(c, items)
+}
+
+// OpenRoles handles GET /api/v1/reports/open-roles.
+func (h *Handler) OpenRoles(c *fiber.Ctx) error {
+	items, err := h.repo.OpenRoles(c.UserContext(), clampLimit(c))
+	if err != nil {
+		return err
+	}
+	return httpx.OK(c, items)
 }
 
 // exportView augments a stored export with short-lived signed download links.

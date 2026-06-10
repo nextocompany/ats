@@ -10,10 +10,12 @@ import type {
   Funnel,
   KPI,
   Me,
+  OpenRole,
   ReportExport,
   SearchFilter,
   SearchHit,
   Source,
+  StoreLoad,
   TimelineEntry,
 } from "./types";
 
@@ -89,6 +91,12 @@ export function useKpi() {
 }
 export function useSources() {
   return useQuery({ queryKey: ["sources"], queryFn: () => api.get<Source[]>("/api/v1/reports/sources").then((r) => r.data) });
+}
+export function useWaitingByStore() {
+  return useQuery({ queryKey: ["by-store"], queryFn: () => api.get<StoreLoad[]>("/api/v1/reports/by-store").then((r) => r.data) });
+}
+export function useOpenRoles() {
+  return useQuery({ queryKey: ["open-roles"], queryFn: () => api.get<OpenRole[]>("/api/v1/reports/open-roles").then((r) => r.data) });
 }
 
 export function useCandidateSearch(filter: SearchFilter) {

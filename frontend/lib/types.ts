@@ -80,6 +80,21 @@ export interface Source {
   conversion: number;
 }
 
+// StoreLoad: review backlog at one store (reports/by-store).
+export interface StoreLoad {
+  store_id: number | null;
+  store_name: string;
+  waiting: number;
+}
+
+// OpenRole: open hiring need by position (reports/open-roles).
+export interface OpenRole {
+  position_id: string;
+  title: string;
+  openings: number;
+  stores: number;
+}
+
 export interface Me {
   id: string;
   email: string;
