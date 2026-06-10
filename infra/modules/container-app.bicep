@@ -55,6 +55,9 @@ param minReplicas int = 1
 @minValue(1)
 param maxReplicas int = 3
 
+@description('KEDA scale rules (e.g. a Redis queue trigger). Empty = replica-count bounds only.')
+param scaleRules array = []
+
 @description('Plain (non-secret) environment variables as name/value pairs.')
 param envVars array = []
 
@@ -199,6 +202,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
       scale: {
         minReplicas: minReplicas
         maxReplicas: maxReplicas
+        rules: scaleRules
       }
     }
   }

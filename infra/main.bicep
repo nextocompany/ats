@@ -458,7 +458,20 @@ module apiApp 'modules/container-app.bicep' = {
   }
 }
 
-// Worker — internal ingress on :8081 (it binds WORKER_PORT), scale 1..3.
+// Worker queue autoscaling — a KEDA `redis` trigger on asynq's pending list
+// (`asynq:{default}:pending`) would scale the worker 0→N on queue depth. It is
+// NOT wired for the in-cluster Redis (`redisAsContainer`): KEDA runs outside the
+// app subnet and CANNOT reach an internal-only Container App — verified live as
+// `KEDAScalerFailed: connection to redis failed: ... connect: connection refused`.
+// A scaled-to-zero worker then never wakes and jobs stall forever, so the worker
+// MUST stay always-on (min 1) on that path. A managed Redis (public TLS endpoint)
+// IS KEDA-reachable; wiring a trigger there needs a password TriggerAuth and is
+// left as future work. The `scaleRules` module param is plumbed and ready for it.
+var workerScaleRules = []
+
+// Worker — internal ingress on :8081 (it binds WORKER_PORT). Always-on (min 1):
+// the queue is consumed by a long-running asynq server and there is no
+// KEDA-reachable trigger for the in-cluster Redis (see note above).
 module workerApp 'modules/container-app.bicep' = {
   name: 'app-worker'
   params: {
@@ -472,8 +485,9 @@ module workerApp 'modules/container-app.bicep' = {
     image: workerImage
     ingressMode: 'internal'
     targetPort: 8081
-    minReplicas: scaleToZero ? 0 : 1
+    minReplicas: 1
     maxReplicas: 3
+    scaleRules: workerScaleRules
     envVars: backendPlainEnv
     keyVaultSecrets: backendKeyVaultSecrets
     inlineSecrets: backendInlineSecrets
