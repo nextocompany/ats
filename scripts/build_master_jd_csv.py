@@ -28,12 +28,17 @@ DEFAULT_XLSX = (
 )
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "positions.master.csv")
 
-# Education keyword → ordinal. Order matters (check most-specific first).
+# Education keyword → ordinal. Each pattern is matched independently; min_education
+# takes the LOWEST ordinal present, because JDs phrase the requirement as a floor
+# ("X หรือสูงกว่า") or a range ("X ถึง Y" / "X หรือ Y") — the minimum acceptable is
+# the lower bound. Patterns are deliberately specific so อนุปริญญา (diploma, 2) is
+# NOT swallowed by a bare ปริญญา (would wrongly read as bachelor, 3); ประกาศนียบัตร-
+# วิชาชีพชั้นสูง (ปวส., 2) is distinguished from ประกาศนียบัตรวิชาชีพ (ปวช., 1).
 EDU_RULES = [
     (re.compile(r"ปริญญาโท|ป\.โท|master"), 4),
-    (re.compile(r"ปริญญาตรี|ป\.ตรี|ปริญญา|bachelor|ตรี"), 3),
-    (re.compile(r"ปวส|อนุปริญญา|diploma|ปวส\."), 2),
-    (re.compile(r"ปวช|ม\.6|ม\.ปลาย|มัธยมศึกษาตอนปลาย|มัธยม|high school|secondary"), 1),
+    (re.compile(r"ปริญญาตรี|ป\.ตรี|bachelor"), 3),
+    (re.compile(r"ปวส|ป\.ว\.ส|ประกาศนียบัตรวิชาชีพชั้นสูง|อนุปริญญา|diploma"), 2),
+    (re.compile(r"ปวช|ป\.ว\.ช|ประกาศนียบัตรวิชาชีพ(?!ชั้นสูง)|ม\.6|ม\.ปลาย|มัธยมศึกษาตอนปลาย|มัธยม|high school|secondary"), 1),
 ]
 # Level → fallback when the qualifications text names no education / experience.
 EDU_BY_LEVEL = {"manager": 3, "supervisor": 2, "officer": 1, "staff": 1}
@@ -72,10 +77,10 @@ def ps_code(title_en: str, used: set) -> str:
 
 
 def min_education(qual: str, level: str) -> int:
-    for pat, ord_ in EDU_RULES:
-        if pat.search(qual):
-            return ord_
-    return EDU_BY_LEVEL.get(level, 1)
+    # The minimum acceptable education = the lowest ordinal the JD mentions
+    # (a "bachelor OR vocational cert" line qualifies a cert holder).
+    found = [ord_ for pat, ord_ in EDU_RULES if pat.search(qual)]
+    return min(found) if found else EDU_BY_LEVEL.get(level, 1)
 
 
 def min_experience(qual: str, level: str) -> int:
