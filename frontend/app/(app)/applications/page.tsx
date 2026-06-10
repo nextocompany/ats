@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
-import { Check, X, ChevronLeft, ChevronRight, Flag } from "lucide-react";
+import { Check, X, ChevronLeft, ChevronRight, Flag, SlidersHorizontal } from "lucide-react";
 
 import { BulkActionBar } from "@/components/bulk/BulkActionBar";
 import { ScoreBadge, ScoreRail } from "@/components/inbox/ScoreBadge";
@@ -55,6 +55,10 @@ function InboxInner() {
   const pages = Math.max(1, Math.ceil(total / LIMIT));
   const allChecked = items.length > 0 && selected.length === items.length;
 
+  const activeFilters: { key: string; label: string }[] = [];
+  if (status) activeFilters.push({ key: "status", label: `Status · ${status[0].toUpperCase() + status.slice(1)}` });
+  if (minScore) activeFilters.push({ key: "min_score", label: `Score ≥ ${minScore}` });
+
   return (
     <div className="settle space-y-6">
       <PageHeader
@@ -97,6 +101,33 @@ function InboxInner() {
         }
       />
 
+      {/* Active filters — reflect URL state as removable chips, with a count read */}
+      {activeFilters.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+            <SlidersHorizontal className="size-3.5" /> Filtering
+          </span>
+          {activeFilters.map((f) => (
+            <button
+              key={f.key}
+              type="button"
+              onClick={() => setParam(f.key, "")}
+              className="group inline-flex items-center gap-1.5 rounded-full bg-brand-soft px-3 py-1 text-xs font-medium text-brand transition-colors hover:bg-brand hover:text-brand-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {f.label}
+              <X className="size-3 opacity-60 transition-opacity group-hover:opacity-100" />
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => router.replace("/applications")}
+            className="text-xs font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm px-1"
+          >
+            Clear all
+          </button>
+        </div>
+      )}
+
       {isError && (
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
           {error instanceof Error ? error.message : "Failed to load applications. Try again in a moment."}
@@ -135,11 +166,22 @@ function InboxInner() {
                 ))}
               {!isLoading && items.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-5 py-16 text-center">
-                    <p className="text-sm font-medium text-foreground">Nothing in the queue</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      No applications match these filters. Try widening the status or lowering the score.
+                  <td colSpan={6} className="px-5 py-20 text-center">
+                    <span className="dot-rule mx-auto mb-5 opacity-70" aria-hidden />
+                    <p className="text-base font-semibold text-foreground">Nothing in the queue</p>
+                    <p className="mx-auto mt-1.5 max-w-sm text-sm text-muted-foreground">
+                      No applications match these filters. Try widening the status or lowering the minimum score.
                     </p>
+                    {activeFilters.length > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-5"
+                        onClick={() => router.replace("/applications")}
+                      >
+                        Clear filters
+                      </Button>
+                    )}
                   </td>
                 </tr>
               )}

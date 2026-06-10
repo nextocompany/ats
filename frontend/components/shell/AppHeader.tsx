@@ -1,34 +1,55 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import { NAV } from "./nav-config";
 
 // Slim desktop context bar above the page — orients the operator without
 // duplicating the sidebar's navigation landmark. Hidden on mobile (MobileBar covers it).
+// A live ticking clock + brand pulse signal a console that's reading the pipeline now.
 export function AppHeader() {
   const pathname = usePathname();
   const active = NAV.find((n) => pathname.startsWith(n.href));
 
-  const now = new Date();
-  const stamp = now.toLocaleDateString("en-GB", {
+  const [now, setNow] = useState<Date | null>(null);
+  useEffect(() => {
+    setNow(new Date());
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const stamp = now?.toLocaleDateString("en-GB", {
     weekday: "short",
     day: "2-digit",
     month: "short",
   });
+  const time = now?.toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 
   return (
-    <div className="hidden h-16 items-center justify-between border-b border-hairline px-8 lg:flex">
-      <div className="flex items-baseline gap-2 text-sm">
+    <div className="sticky top-0 z-20 hidden h-16 items-center justify-between border-b border-hairline bg-background/80 px-8 backdrop-blur-md lg:flex">
+      <nav aria-label="Breadcrumb" className="flex items-baseline gap-2 text-sm">
         <span className="text-muted-foreground">Console</span>
-        <span className="text-muted-foreground/50">/</span>
+        <span className="text-muted-foreground/40">/</span>
         <span className="font-medium text-foreground">{active?.label ?? "Overview"}</span>
-      </div>
-      <div className="flex items-center gap-4">
-        <span className="flex items-center gap-2 text-xs text-muted-foreground tabular-nums">
-          <span className="inline-block size-1.5 rounded-full bg-brand" aria-hidden />
-          Live · {stamp}
+      </nav>
+      <div className="flex items-center gap-5">
+        <span className="hidden items-center gap-2 text-xs font-medium tabular-nums text-muted-foreground xl:flex">
+          {/* Pulsing brand dot — the console is live */}
+          <span className="relative flex size-2" aria-hidden>
+            <span className="absolute inline-flex size-full animate-ping rounded-full bg-brand opacity-60 motion-reduce:hidden" />
+            <span className="relative inline-flex size-2 rounded-full bg-brand" />
+          </span>
+          Live
         </span>
+        <span className="h-4 w-px bg-hairline" aria-hidden />
+        <time className="text-xs tabular-nums text-foreground/80" suppressHydrationWarning>
+          <span className="text-muted-foreground">{stamp ?? "—"}</span>
+          <span className="ml-2 font-semibold">{time ?? "··:··"}</span>
+        </time>
       </div>
     </div>
   );
