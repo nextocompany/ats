@@ -115,79 +115,10 @@ function activeAccount(instance: PublicClientApplicationType): AccountInfo | nul
   return instance.getActiveAccount() ?? instance.getAllAccounts()[0] ?? null;
 }
 
-// --- Self-healing re-authentication (token expiry / 401) -------------------
-//
-// When the Entra session lapses (ID token ~1h; silent refresh can fail when the
-// refresh token expires or third-party cookies are blocked), we bounce the user
-// through an interactive Microsoft login instead of stalling on 401s.
-
-// True once a redirect has been kicked off this page load (a redirect navigates
-// away and reloads the module, so this naturally resets).
-let redirecting = false;
-const REAUTH_GUARD_KEY = "hr_reauth_ts";
-const REAUTH_MIN_INTERVAL_MS = 60_000;
-
-// Cross-reload loop guard: if a token still fails right after re-login (e.g. a
-// valid sign-in the API rejects for a non-expiry reason), don't bounce again —
-// let the error surface instead of looping login↔401.
-function reauthThrottled(): boolean {
-  try {
-    return Date.now() - Number(sessionStorage.getItem(REAUTH_GUARD_KEY) ?? "0") < REAUTH_MIN_INTERVAL_MS;
-  } catch {
-    return false;
-  }
-}
-
-function markReauth() {
-  try {
-    sessionStorage.setItem(REAUTH_GUARD_KEY, String(Date.now()));
-  } catch {
-    /* sessionStorage unavailable — proceed without the cross-reload guard */
-  }
-}
-
-/** Clears the re-auth throttle after a healthy authenticated call. */
-function clearReauthThrottle() {
-  try {
-    sessionStorage.removeItem(REAUTH_GUARD_KEY);
-  } catch {
-    /* ignore */
-  }
-}
-
-// Kicks off an interactive Microsoft login (full-page redirect). Loop-safe:
-// no-ops if a redirect is already in flight or one fired in the last minute.
-async function reauthenticate(account: AccountInfo | null) {
-  if (redirecting || reauthThrottled()) return;
-  const instance = await getMsalInstance();
-  if (!instance) return;
-  redirecting = true;
-  markReauth();
-  try {
-    if (account) {
-      await instance.acquireTokenRedirect({ scopes: LOGIN_SCOPES, account });
-    } else {
-      await instance.loginRedirect({ scopes: LOGIN_SCOPES });
-    }
-  } catch {
-    // interaction_in_progress (a redirect is already happening) or a transient
-    // failure — let any in-flight redirect proceed.
-    redirecting = false;
-  }
-}
-
-/** Re-authenticate after the API rejects a request with 401 (Entra mode only). */
-export async function handleApiUnauthorized() {
-  if (!isEntraConfigured()) return;
-  const instance = await getMsalInstance();
-  await reauthenticate(instance ? activeAccount(instance) : null);
-}
-
 /**
  * Acquires an Entra ID token for the Bearer header. Returns null in DEV mode.
- * On any silent-acquisition failure (or a lapsed account) it kicks off an
- * interactive login redirect and returns null — the page reloads authenticated
- * rather than firing unauthenticated requests that stall on 401.
+ * On silent-acquisition failure that requires interaction, kicks off a redirect
+ * and returns null (the page will reload post-redirect).
  */
 export async function getIdToken(): Promise<string | null> {
   if (!isEntraConfigured()) return null;
@@ -195,24 +126,20 @@ export async function getIdToken(): Promise<string | null> {
   if (!instance) return null;
 
   const account = activeAccount(instance);
-  if (!account) {
-    // No signed-in account — start an interactive login instead of sending an
-    // unauthenticated request the API would 401.
-    await reauthenticate(null);
-    return null;
-  }
+  if (!account) return null;
 
   try {
     const result = await instance.acquireTokenSilent({
       scopes: LOGIN_SCOPES,
       account,
     });
-    clearReauthThrottle(); // healthy token — reset the loop guard
     return result.idToken;
-  } catch {
-    // Expired refresh token, interaction required, blocked silent iframe, … →
-    // bounce through an interactive login instead of stalling on 401s.
-    await reauthenticate(account);
-    return null;
+  } catch (err) {
+    const { InteractionRequiredAuthError } = await import("@azure/msal-browser");
+    if (err instanceof InteractionRequiredAuthError) {
+      await instance.acquireTokenRedirect({ scopes: LOGIN_SCOPES, account });
+      return null;
+    }
+    throw err;
   }
 }
