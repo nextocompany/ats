@@ -28,7 +28,7 @@ test("manifest is linked and served with the expected PWA fields", async ({ page
   expect(manifest.name).toBe("ร่วมงานกับเรา");
   expect(manifest.start_url).toBe("/jobs");
   expect(manifest.display).toBe("standalone");
-  expect(manifest.theme_color).toBe("#0f5132");
+  expect(manifest.theme_color).toBe("#0B47B8");
   expect(manifest.icons.length).toBeGreaterThanOrEqual(2);
   expect(manifest.icons.some((i) => i.purpose === "maskable")).toBe(true);
 });
