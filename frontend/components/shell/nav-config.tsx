@@ -22,7 +22,7 @@ export const NAV: NavItem[] = [
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
 ];
 
-// Brand lockup — emerald monogram + wordmark, shared portal identity.
+// Brand lockup — blue monogram + wordmark, shared portal identity.
 export function BrandMark({ tone = "light" }: { tone?: "light" | "dark" }) {
   const ink = tone === "dark" ? "text-sidebar-foreground" : "text-foreground";
   return (

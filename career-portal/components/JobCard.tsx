@@ -15,15 +15,15 @@ function levelLabel(level: string): string {
 
 // JobCard is a fully-tappable card linking to the position detail. Works as a
 // row on mobile and a grid cell on larger screens; the whole card is the touch
-// target (well over 44px). Clean-luxury: white surface, hairline border, a
-// refined emerald hover lift, and a gold corner accent on hover.
+// target (well over 44px). CP Axtra: white surface, hairline border, a
+// blue hover lift, and a yellow corner accent on hover.
 export function JobCard({ position }: { position: PublicPosition }) {
   return (
     <Link
       href={`/jobs/${position.id}`}
-      className="group relative flex h-full flex-col gap-4 overflow-hidden rounded-2xl border border-border bg-card p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-[0_12px_40px_-12px_oklch(44%_0.09_158/0.25)] active:translate-y-0 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none sm:p-6"
+      className="group relative flex h-full flex-col gap-4 overflow-hidden rounded-2xl border border-border bg-card p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-[0_12px_40px_-12px_oklch(46%_0.18_264/0.22)] active:translate-y-0 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none sm:p-6"
     >
-      {/* hairline gold top-accent revealed on hover */}
+      {/* hairline yellow top-accent revealed on hover */}
       <span
         aria-hidden="true"
         className="absolute inset-x-0 top-0 h-px scale-x-0 bg-gold transition-transform duration-300 group-hover:scale-x-100"

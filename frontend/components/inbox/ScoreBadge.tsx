@@ -3,7 +3,7 @@ interface ScoreBadgeProps {
 }
 
 /* AI score chip — semantic ramp tuned so the color reads as *fit*, not caution.
-   HIGH (≥75) → emerald (strong fit). MID (50–74) → quiet ink/neutral, so a
+   HIGH (≥75) → CP Axtra blue (strong fit). MID (50–74) → quiet ink/neutral, so a
    merely-average score never competes with the amber "review" flag. LOW (<50)
    → clay (weak fit). Amber/clay is reserved for genuine signal, never the mid band. */
 export function ScoreBadge({ score }: ScoreBadgeProps) {
@@ -14,7 +14,7 @@ export function ScoreBadge({ score }: ScoreBadgeProps) {
   const rounded = Math.round(score);
   const band: "high" | "mid" | "low" = score >= 75 ? "high" : score >= 50 ? "mid" : "low";
 
-  // HIGH: solid emerald fill. MID: neutral ink outline (no fill) — reads calm.
+  // HIGH: solid blue fill. MID: neutral ink outline (no fill) — reads calm.
   // LOW: clay fill — a true, sparing warning.
   const cls =
     band === "high"
