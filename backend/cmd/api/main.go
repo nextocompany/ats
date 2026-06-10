@@ -200,7 +200,18 @@ func main() {
 	// HR Dashboard API (Sprint 4a): ranked inbox, bulk, resume signed-URLs,
 	// candidate detail/timeline, analytics, PDPA, users/me.
 	activityLog := activity.New(pool)
-	applications.RegisterDashboardRoutes(app, applications.NewDashboardHandler(appRepo, blobClient, activityLog))
+	// Search indexer: no-op unless AI_SEARCH_PROVIDER=azure. Ensure the index
+	// exists at startup (best-effort — a transient Search outage must not block
+	// the api booting), and keep it fresh on bulk status changes.
+	searchIndexer := search.NewIndexer(cfg)
+	if cfg.UsesAzureSearch() {
+		if err := searchIndexer.EnsureIndex(ctx); err != nil {
+			log.Warn().Err(err).Msg("search: ensure index failed at startup (non-fatal)")
+		}
+	}
+	dashboardHandler := applications.NewDashboardHandler(appRepo, blobClient, activityLog)
+	dashboardHandler.SetIndexer(search.NewCandidateSync(pool, searchIndexer))
+	applications.RegisterDashboardRoutes(app, dashboardHandler)
 	// Candidate search (Sprint 5c) — registered BEFORE profiles so the static
 	// /candidates/search path takes precedence over /candidates/:id. Mock Postgres
 	// trigram by default; Azure AI Search behind config.

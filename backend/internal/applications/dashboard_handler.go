@@ -27,16 +27,35 @@ type ActivityWriter interface {
 	Record(ctx context.Context, action, entityType string, entityID uuid.UUID, newValue any) error
 }
 
+// CandidateIndexer re-syncs a candidate's search document after a status change.
+// No-op by default; the api injects the real (search-backed) one via SetIndexer.
+type CandidateIndexer interface {
+	Index(ctx context.Context, candidateID uuid.UUID) error
+}
+
+type noopReindexer struct{}
+
+func (noopReindexer) Index(context.Context, uuid.UUID) error { return nil }
+
 // DashboardHandler serves the HR inbox read/bulk/resume endpoints.
 type DashboardHandler struct {
 	apps     Repository
 	signer   ResumeSigner
 	activity ActivityWriter
+	indexer  CandidateIndexer
 }
 
 // NewDashboardHandler builds the dashboard handler.
 func NewDashboardHandler(apps Repository, signer ResumeSigner, act ActivityWriter) *DashboardHandler {
-	return &DashboardHandler{apps: apps, signer: signer, activity: act}
+	return &DashboardHandler{apps: apps, signer: signer, activity: act, indexer: noopReindexer{}}
+}
+
+// SetIndexer injects a search indexer (no-op by default) so bulk status changes
+// keep the search index fresh. Ignored for nil.
+func (h *DashboardHandler) SetIndexer(idx CandidateIndexer) {
+	if idx != nil {
+		h.indexer = idx
+	}
 }
 
 // RegisterDashboardRoutes mounts the inbox endpoints.
@@ -139,6 +158,10 @@ func (h *DashboardHandler) Bulk(c *fiber.Ctx) error {
 			continue
 		}
 		_ = h.activity.Record(c.UserContext(), activity.ActionBulkAction, "application", id, fiber.Map{"status": target})
+		// Keep the search index fresh — best-effort, never fails the bulk action.
+		if app, ferr := h.apps.FindByID(c.UserContext(), id); ferr == nil {
+			_ = h.indexer.Index(c.UserContext(), app.CandidateID)
+		}
 		updated++
 	}
 	return httpx.OK(c, fiber.Map{"updated": updated, "failed": failed, "status": target})
