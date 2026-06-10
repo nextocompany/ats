@@ -6,8 +6,8 @@ import { Suspense, useMemo, useState } from "react";
 import { X, ChevronLeft, ChevronRight, Flag, SlidersHorizontal, Inbox as InboxIcon } from "lucide-react";
 
 import { BulkActionBar } from "@/components/bulk/BulkActionBar";
-import { ScoreBadge, ScoreRail } from "@/components/inbox/ScoreBadge";
-import { Pill, StatusPill } from "@/components/people/PeopleBits";
+import { ScoreBadge, ScoreRail, FitLabel } from "@/components/inbox/ScoreBadge";
+import { InitialChip, Pill, StatusPill } from "@/components/people/PeopleBits";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { SummaryStrip } from "@/components/shell/SummaryStrip";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -22,9 +22,45 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { useApplications } from "@/lib/queries";
+import type { Application } from "@/lib/types";
 
 const STATUSES = ["", "pending", "parsed", "scored", "shortlisted", "interview", "hired", "rejected"];
 const LIMIT = 20;
+
+// Friendly relative time so "Applied" reads as recency, not an ISO timestamp.
+function appliedAgo(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "—";
+  const mins = Math.floor((Date.now() - then) / 60000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return `${days}d ago`;
+  if (days < 30) return `${Math.floor(days / 7)}w ago`;
+  return new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+}
+
+// Where this application would be placed — store name first, else talent pool,
+// else the candidate's province. Never a bare numeric store id.
+function placement(a: Application): string {
+  if (a.store_name) return a.store_name;
+  if (a.talent_pool) return "Talent pool";
+  if (a.candidate_province) return a.candidate_province;
+  return "—";
+}
+
+// The must-have screening gate, spoken plainly. "Gate / Pass / Fail" was
+// engineering jargon; HR reads whether a candidate meets the role's musts.
+function Requirements({ passed }: { passed: boolean | null }) {
+  if (passed === null) return <span className="text-xs text-muted-foreground">Pending</span>;
+  return passed ? (
+    <Pill tone="pass">Meets requirements</Pill>
+  ) : (
+    <Pill tone="fail">Missing requirements</Pill>
+  );
+}
 
 function InboxInner() {
   const params = useSearchParams();
@@ -68,16 +104,16 @@ function InboxInner() {
 
   const activeFilters: { key: string; label: string }[] = [];
   if (status) activeFilters.push({ key: "status", label: `Status · ${status[0].toUpperCase() + status.slice(1)}` });
-  if (minScore) activeFilters.push({ key: "min_score", label: `Score ≥ ${minScore}` });
+  if (minScore) activeFilters.push({ key: "min_score", label: `Fit ≥ ${minScore}` });
 
   return (
     <div className="settle space-y-6">
       <PageHeader
         eyebrow="Screening queue"
-        title="Ranked Inbox"
+        title="Candidate Inbox"
         meta={
           <span className="tabular-nums">
-            {total} application{total === 1 ? "" : "s"} · sorted by AI score
+            {total} candidate{total === 1 ? "" : "s"} · best fit first
           </span>
         }
         actions={
@@ -98,12 +134,13 @@ function InboxInner() {
               </Select>
             </label>
             <label className="flex flex-col gap-1 text-[0.6875rem] font-medium uppercase tracking-wide text-muted-foreground">
-              Min score
+              Min fit
               <Input
                 type="number"
                 min={0}
                 max={100}
                 defaultValue={minScore}
+                placeholder="0–100"
                 className="w-28"
                 onBlur={(e) => setParam("min_score", e.target.value)}
               />
@@ -141,31 +178,30 @@ function InboxInner() {
 
       {isError && (
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-          {error instanceof Error ? error.message : "Failed to load applications. Try again in a moment."}
+          {error instanceof Error ? error.message : "Failed to load candidates. Try again in a moment."}
         </div>
       )}
 
-      {/* Queue summary — the ranked inbox reads as a screening surface, not a
-          bare table, even when only one application matches the filters. */}
+      {/* Queue summary — plain-language reads of the visible page so the inbox
+          presents as a screening surface even at one row. */}
       {!isError && (
         <SummaryStrip
           stats={[
             { label: "In queue", value: <span className="tabular-nums">{total}</span>, lead: true, accent: true },
-            { label: "Passed AI gate", value: <span className="tabular-nums">{queue.passed}</span>, hint: "on this page" },
-            { label: "Flagged for review", value: <span className="tabular-nums">{queue.flagged}</span>, hint: "needs an operator" },
+            { label: "Meet requirements", value: <span className="tabular-nums">{queue.passed}</span>, hint: "on this page" },
+            { label: "Need a closer look", value: <span className="tabular-nums">{queue.flagged}</span>, hint: "flagged for you" },
             {
-              label: "Top match",
+              label: "Best fit",
               value: queue.top !== null ? <span className="tabular-nums">{queue.top}</span> : <span className="text-muted-foreground">—</span>,
-              hint: "best AI score here",
+              hint: "top score here",
             },
           ]}
         />
       )}
 
-      {/* Mobile (<768px) — stacked card-rows. The desktop table's right-hand
-          columns (status, store, gate) would truncate off-screen at 390, so
-          below md each application becomes a two-line card: score + mono-id +
-          select on row 1, status + store + gate on row 2. No horizontal overflow. */}
+      {/* Mobile (<768px) — stacked candidate cards. Each leads with the person
+          (avatar + name + role applied for), the fit on the right, then a
+          status/requirements/placement line. No horizontal overflow. */}
       <ul className="space-y-2.5 md:hidden">
         {isLoading &&
           Array.from({ length: 6 }).map((_, i) => (
@@ -173,88 +209,64 @@ function InboxInner() {
               <Skeleton className="h-5 w-full" />
             </li>
           ))}
-        {!isLoading && items.length === 0 && (
-          <li className="rounded-xl bg-card px-5 py-16 text-center ring-1 ring-hairline">
-            <span
-              aria-hidden
-              className="mx-auto mb-5 grid size-12 place-items-center rounded-2xl bg-brand-soft text-brand"
+        {!isLoading && items.length === 0 && <EmptyState filtered={activeFilters.length > 0} onClear={() => router.replace("/applications")} />}
+        {items.map((a) => {
+          const name = a.candidate_name?.trim() || "Unnamed candidate";
+          return (
+            <li
+              key={a.id}
+              className="rounded-xl bg-card ring-1 ring-hairline data-[sel=true]:bg-brand-soft/55 data-[sel=true]:ring-brand/30"
+              data-sel={selected.includes(a.id)}
             >
-              <InboxIcon className="size-6" strokeWidth={1.75} />
-            </span>
-            <p className="text-base font-semibold text-foreground">
-              {activeFilters.length > 0 ? "No applications match these filters" : "The queue is clear"}
-            </p>
-            <p className="mx-auto mt-1.5 max-w-xs text-sm text-muted-foreground">
-              {activeFilters.length > 0
-                ? "Try widening the status or lowering the minimum score."
-                : "Newly scored applications land here, ranked by AI fit."}
-            </p>
-            {activeFilters.length > 0 && (
-              <Button variant="outline" size="sm" className="mt-5" onClick={() => router.replace("/applications")}>
-                Clear filters
-              </Button>
-            )}
-            <span className="dot-rule mx-auto mt-6 opacity-70" aria-hidden />
-          </li>
-        )}
-        {items.map((a) => (
-          <li
-            key={a.id}
-            className="rounded-xl bg-card ring-1 ring-hairline data-[sel=true]:bg-brand-soft/55 data-[sel=true]:ring-brand/30"
-            data-sel={selected.includes(a.id)}
-          >
-            <div className="flex items-start gap-3 p-4">
-              <span className="flex items-center pt-0.5">
-                <Checkbox
-                  checked={selected.includes(a.id)}
-                  aria-label={`Select ${a.id}`}
-                  onCheckedChange={(c) =>
-                    setSelected((s) => (c ? [...s, a.id] : s.filter((x) => x !== a.id)))
-                  }
-                />
-              </span>
-              <span className="inline-flex flex-col items-start pt-0.5">
-                <ScoreBadge score={a.ai_score} />
-                <ScoreRail score={a.ai_score} />
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <Link
-                    href={`/applications/${a.id}`}
-                    className="font-mono text-[0.8125rem] font-medium text-foreground underline-offset-2 hover:text-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
-                  >
-                    {a.id.slice(0, 8)}
-                  </Link>
-                  {a.needs_manual_review && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-brass-soft px-1.5 py-0.5 text-[10px] font-medium text-brass">
-                      <Flag className="size-2.5" /> review
+              <div className="flex items-start gap-3 p-4">
+                <span className="flex items-center pt-1">
+                  <Checkbox
+                    checked={selected.includes(a.id)}
+                    aria-label={`Select ${name}`}
+                    onCheckedChange={(c) =>
+                      setSelected((s) => (c ? [...s, a.id] : s.filter((x) => x !== a.id)))
+                    }
+                  />
+                </span>
+                <InitialChip name={name} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <Link
+                        href={`/applications/${a.id}`}
+                        className="block truncate text-sm font-semibold text-foreground underline-offset-2 hover:text-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                      >
+                        {name}
+                      </Link>
+                      <p className="truncate text-xs text-muted-foreground">{a.position_title || "Role not set"}</p>
+                    </div>
+                    <span className="flex shrink-0 flex-col items-end gap-1">
+                      <ScoreBadge score={a.ai_score} />
+                      <FitLabel score={a.ai_score} />
                     </span>
-                  )}
-                </div>
-                <div className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-hairline pt-2.5">
-                  <StatusPill status={a.status} />
-                  <span className="text-xs tabular-nums text-muted-foreground">
-                    Store {a.assigned_store_id ?? (a.talent_pool ? "· pool" : "—")}
-                  </span>
-                  <span className="ml-auto">
-                    {a.must_have_passed === null ? (
-                      <span className="text-xs text-muted-foreground">Gate —</span>
-                    ) : a.must_have_passed ? (
-                      <Pill tone="pass">Pass</Pill>
-                    ) : (
-                      <Pill tone="fail">Fail</Pill>
+                  </div>
+                  <div className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-hairline pt-2.5">
+                    <StatusPill status={a.status} />
+                    <Requirements passed={a.must_have_passed} />
+                    {a.needs_manual_review && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-brass-soft px-1.5 py-0.5 text-[10px] font-medium text-brass">
+                        <Flag className="size-2.5" /> review
+                      </span>
                     )}
-                  </span>
+                    <span className="ml-auto truncate text-xs text-muted-foreground">
+                      {placement(a)} · {appliedAgo(a.created_at)}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
-          </li>
-        ))}
+            </li>
+          );
+        })}
       </ul>
 
       <div className="hidden overflow-hidden rounded-xl bg-card ring-1 ring-hairline md:block">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-sm">
+          <table className="w-full min-w-[820px] text-sm">
             <thead className="ledger-head sticky top-0 z-10 text-left">
               <tr>
                 <th className="w-10 py-3 pl-5 pr-0">
@@ -266,106 +278,94 @@ function InboxInner() {
                     />
                   </span>
                 </th>
-                <th className="w-16 px-3 py-3">Score</th>
-                <th className="px-3 py-3">Application</th>
+                <th className="w-36 px-3 py-3">Fit</th>
+                <th className="px-3 py-3">Candidate</th>
+                <th className="w-40 px-3 py-3">Placement</th>
+                <th className="w-24 px-3 py-3">Applied</th>
                 <th className="w-28 px-3 py-3">Status</th>
-                <th className="w-24 px-3 py-3">Store</th>
-                <th className="w-24 py-3 pl-3 pr-5">Gate</th>
+                <th className="w-36 py-3 pl-3 pr-5">Requirements</th>
               </tr>
             </thead>
             <tbody>
               {isLoading &&
                 Array.from({ length: 8 }).map((_, i) => (
                   <tr key={i} className="border-b border-hairline last:border-0">
-                    <td className="px-5 py-3.5" colSpan={6}>
+                    <td className="px-5 py-3.5" colSpan={7}>
                       <Skeleton className="h-5 w-full" />
                     </td>
                   </tr>
                 ))}
               {!isLoading && items.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-5 py-20 text-center">
-                    <span
-                      aria-hidden
-                      className="mx-auto mb-5 grid size-12 place-items-center rounded-2xl bg-brand-soft text-brand"
-                    >
-                      <InboxIcon className="size-6" strokeWidth={1.75} />
-                    </span>
-                    <p className="text-base font-semibold text-foreground">
-                      {activeFilters.length > 0 ? "No applications match these filters" : "The queue is clear"}
-                    </p>
-                    <p className="mx-auto mt-1.5 max-w-sm text-sm text-muted-foreground">
-                      {activeFilters.length > 0
-                        ? "Try widening the status or lowering the minimum score to see more candidates."
-                        : "Newly scored applications land here, ranked by AI fit. You're all caught up."}
-                    </p>
-                    {activeFilters.length > 0 && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="mt-5"
-                        onClick={() => router.replace("/applications")}
-                      >
-                        Clear filters
-                      </Button>
-                    )}
-                    <span className="dot-rule mx-auto mt-6 opacity-70" aria-hidden />
+                  <td colSpan={7} className="px-5 py-20 text-center">
+                    <EmptyStateBody filtered={activeFilters.length > 0} onClear={() => router.replace("/applications")} />
                   </td>
                 </tr>
               )}
-              {items.map((a) => (
-                <tr
-                  key={a.id}
-                  className="ledger-row group border-b border-hairline last:border-0 data-[sel=true]:bg-brand-soft/55"
-                  data-sel={selected.includes(a.id)}
-                >
-                  <td className="py-3.5 pl-5 pr-0">
-                    <span className="flex items-center">
-                      <Checkbox
-                        checked={selected.includes(a.id)}
-                        aria-label={`Select ${a.id}`}
-                        onCheckedChange={(c) =>
-                          setSelected((s) => (c ? [...s, a.id] : s.filter((x) => x !== a.id)))
-                        }
-                      />
-                    </span>
-                  </td>
-                  <td className="px-3 py-3.5">
-                    <span className="inline-flex flex-col items-start">
-                      <ScoreBadge score={a.ai_score} />
-                      <ScoreRail score={a.ai_score} />
-                    </span>
-                  </td>
-                  <td className="px-3 py-3.5">
-                    <Link
-                      href={`/applications/${a.id}`}
-                      className="font-mono text-[0.8125rem] font-medium text-foreground underline-offset-2 hover:text-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
-                    >
-                      {a.id.slice(0, 8)}
-                    </Link>
-                    {a.needs_manual_review && (
-                      <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-brass-soft px-1.5 py-0.5 align-middle text-[10px] font-medium text-brass">
-                        <Flag className="size-2.5" /> review
+              {items.map((a) => {
+                const name = a.candidate_name?.trim() || "Unnamed candidate";
+                return (
+                  <tr
+                    key={a.id}
+                    className="ledger-row group border-b border-hairline last:border-0 data-[sel=true]:bg-brand-soft/55"
+                    data-sel={selected.includes(a.id)}
+                  >
+                    <td className="py-3.5 pl-5 pr-0">
+                      <span className="flex items-center">
+                        <Checkbox
+                          checked={selected.includes(a.id)}
+                          aria-label={`Select ${name}`}
+                          onCheckedChange={(c) =>
+                            setSelected((s) => (c ? [...s, a.id] : s.filter((x) => x !== a.id)))
+                          }
+                        />
                       </span>
-                    )}
-                  </td>
-                  <td className="px-3 py-3.5">
-                    <StatusPill status={a.status} />
-                  </td>
-                  <td className="px-3 py-3.5 tabular-nums text-muted-foreground">
-                    {a.assigned_store_id ?? (a.talent_pool ? "pool" : "—")}
-                  </td>
-                  <td className="py-3.5 pl-3 pr-5">
-                    {a.must_have_passed === null ? (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    ) : a.must_have_passed ? (
-                      <Pill tone="pass">Pass</Pill>
-                    ) : (
-                      <Pill tone="fail">Fail</Pill>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-3 py-3.5">
+                      <div className="flex items-center gap-2">
+                        <ScoreBadge score={a.ai_score} />
+                        <FitLabel score={a.ai_score} />
+                      </div>
+                      <ScoreRail score={a.ai_score} />
+                    </td>
+                    <td className="px-3 py-3.5">
+                      <div className="flex items-center gap-3">
+                        <InitialChip name={name} size="sm" />
+                        <div className="min-w-0">
+                          <span className="flex items-center gap-2">
+                            <Link
+                              href={`/applications/${a.id}`}
+                              className="truncate font-medium text-foreground underline-offset-2 hover:text-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                            >
+                              {name}
+                            </Link>
+                            {a.needs_manual_review && (
+                              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-brass-soft px-1.5 py-0.5 text-[10px] font-medium text-brass">
+                                <Flag className="size-2.5" /> review
+                              </span>
+                            )}
+                          </span>
+                          <p className="truncate text-xs text-muted-foreground">{a.position_title || "Role not set"}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-3 py-3.5 text-muted-foreground">
+                      <span className="block max-w-[9rem] truncate" title={placement(a)}>
+                        {placement(a)}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3.5 text-muted-foreground" title={new Date(a.created_at).toLocaleString()}>
+                      {appliedAgo(a.created_at)}
+                    </td>
+                    <td className="px-3 py-3.5">
+                      <StatusPill status={a.status} />
+                    </td>
+                    <td className="py-3.5 pl-3 pr-5">
+                      <Requirements passed={a.must_have_passed} />
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -375,6 +375,42 @@ function InboxInner() {
 
       <BulkActionBar selected={selected} onDone={() => setSelected([])} />
     </div>
+  );
+}
+
+// Empty-state body shared by the mobile list item and the desktop table cell.
+function EmptyStateBody({ filtered, onClear }: { filtered: boolean; onClear: () => void }) {
+  return (
+    <>
+      <span
+        aria-hidden
+        className="mx-auto mb-5 grid size-12 place-items-center rounded-2xl bg-brand-soft text-brand"
+      >
+        <InboxIcon className="size-6" strokeWidth={1.75} />
+      </span>
+      <p className="text-base font-semibold text-foreground">
+        {filtered ? "No candidates match these filters" : "The queue is clear"}
+      </p>
+      <p className="mx-auto mt-1.5 max-w-sm text-sm text-muted-foreground">
+        {filtered
+          ? "Try widening the status or lowering the minimum fit to see more candidates."
+          : "Newly screened candidates land here, ranked by AI fit. You're all caught up."}
+      </p>
+      {filtered && (
+        <Button variant="outline" size="sm" className="mt-5" onClick={onClear}>
+          Clear filters
+        </Button>
+      )}
+      <span className="dot-rule mx-auto mt-6 opacity-70" aria-hidden />
+    </>
+  );
+}
+
+function EmptyState({ filtered, onClear }: { filtered: boolean; onClear: () => void }) {
+  return (
+    <li className="rounded-xl bg-card px-5 py-16 text-center ring-1 ring-hairline">
+      <EmptyStateBody filtered={filtered} onClear={onClear} />
+    </li>
   );
 }
 

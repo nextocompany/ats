@@ -39,6 +39,14 @@ type Application struct {
 	TalentPool      bool      `json:"talent_pool"`
 	DedupState      string    `json:"dedup_state"`
 	CreatedAt       time.Time `json:"created_at"`
+	// Display fields — human-readable joins populated by the inbox List query so
+	// the UI can lead with a person (name + role + store) instead of a UUID.
+	// omitempty keeps single-record responses (Get/Intake) unchanged.
+	CandidateName     string `json:"candidate_name,omitempty"`
+	CandidateProvince string `json:"candidate_province,omitempty"`
+	SourceChannel     string `json:"source_channel,omitempty"`
+	PositionTitle     string `json:"position_title,omitempty"`
+	StoreName         string `json:"store_name,omitempty"`
 }
 
 // Score carries scoring results in a repository-friendly (pre-serialized) form,

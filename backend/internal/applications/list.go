@@ -51,6 +51,22 @@ const appColumns = `
 	ai_score, must_have_passed, assigned_store_id,
 	COALESCE(talent_pool,false), COALESCE(dedup_state,''), created_at`
 
+// listColumns is appColumns qualified to the applications table, plus the
+// human-readable joins the inbox renders (candidate, position, store). The
+// order MUST match the Scan in List. Position title prefers English, falling
+// back to Thai (NULLIF guards empty strings stored as non-null).
+const listColumns = `
+	applications.id, applications.candidate_id, applications.position_id, applications.status,
+	COALESCE(applications.raw_file_blob_url,''), COALESCE(applications.raw_file_type,''),
+	COALESCE(applications.ocr_text_blob_url,''), COALESCE(applications.parsed_profile_blob_url,''),
+	applications.ocr_confidence, COALESCE(applications.needs_manual_review,false),
+	COALESCE(applications.queue_task_id,''), applications.parsed_at,
+	applications.ai_score, applications.must_have_passed, applications.assigned_store_id,
+	COALESCE(applications.talent_pool,false), COALESCE(applications.dedup_state,''), applications.created_at,
+	COALESCE(candidates.full_name,''), COALESCE(candidates.province,''), COALESCE(candidates.source_channel,''),
+	COALESCE(NULLIF(positions.title_en,''), positions.title_th, ''),
+	COALESCE(stores.store_name,'')`
+
 // List returns a ranked (ai_score desc), filtered, role-scoped, paginated page
 // of applications plus the total count for pagination metadata.
 func (r *pgRepository) List(ctx context.Context, f ListFilter, scope rbac.Scope) ([]Application, int, error) {
@@ -62,24 +78,28 @@ func (r *pgRepository) List(ctx context.Context, f ListFilter, scope rbac.Scope)
 		return fmt.Sprintf("$%d", len(args))
 	}
 
+	// Columns are qualified with `applications.` so the same WHERE clause is
+	// valid for both the join-free COUNT query and the joined data query below
+	// (candidates/positions also expose status/created_at, which would be
+	// ambiguous once joined).
 	var conds []string
 	if f.Status != "" {
-		conds = append(conds, "status = "+add(f.Status))
+		conds = append(conds, "applications.status = "+add(f.Status))
 	}
 	if f.MinScore != nil {
-		conds = append(conds, "ai_score >= "+add(*f.MinScore))
+		conds = append(conds, "applications.ai_score >= "+add(*f.MinScore))
 	}
 	if f.StoreID != nil {
-		conds = append(conds, "assigned_store_id = "+add(*f.StoreID))
+		conds = append(conds, "applications.assigned_store_id = "+add(*f.StoreID))
 	}
 	if f.SourceChannel != "" {
-		conds = append(conds, "candidate_id IN (SELECT id FROM candidates WHERE source_channel = "+add(f.SourceChannel)+")")
+		conds = append(conds, "applications.candidate_id IN (SELECT id FROM candidates WHERE source_channel = "+add(f.SourceChannel)+")")
 	}
 	if f.From != nil {
-		conds = append(conds, "created_at >= "+add(*f.From))
+		conds = append(conds, "applications.created_at >= "+add(*f.From))
 	}
 	if f.To != nil {
-		conds = append(conds, "created_at <= "+add(*f.To))
+		conds = append(conds, "applications.created_at <= "+add(*f.To))
 	}
 	if sc, scArgs := scope.ApplicationsClause(len(args) + 1); sc != "" {
 		conds = append(conds, sc)
@@ -98,8 +118,15 @@ func (r *pgRepository) List(ctx context.Context, f ListFilter, scope rbac.Scope)
 
 	limitPH := add(f.Limit)
 	offsetPH := add((f.Page - 1) * f.Limit)
-	q := "SELECT " + appColumns + " FROM applications " + where +
-		" ORDER BY ai_score DESC NULLS LAST, created_at DESC LIMIT " + limitPH + " OFFSET " + offsetPH
+	// Human-readable joins for the inbox: candidate name/province/source,
+	// position title (English preferred, Thai fallback), and store name.
+	q := "SELECT " + listColumns + `
+		FROM applications
+		LEFT JOIN candidates ON candidates.id = applications.candidate_id
+		LEFT JOIN positions ON positions.id = applications.position_id
+		LEFT JOIN stores ON stores.store_no = applications.assigned_store_id
+		` + where +
+		" ORDER BY applications.ai_score DESC NULLS LAST, applications.created_at DESC LIMIT " + limitPH + " OFFSET " + offsetPH
 
 	rows, err := r.pool.Query(ctx, q, args...)
 	if err != nil {
@@ -115,6 +142,7 @@ func (r *pgRepository) List(ctx context.Context, f ListFilter, scope rbac.Scope)
 			&a.RawFileBlobURL, &a.RawFileType, &a.OCRTextBlobURL, &a.ParsedProfileBlobURL,
 			&a.OCRConfidence, &a.NeedsManualReview, &a.QueueTaskID, &a.ParsedAt,
 			&a.AIScore, &a.MustHavePassed, &a.AssignedStoreID, &a.TalentPool, &a.DedupState, &a.CreatedAt,
+			&a.CandidateName, &a.CandidateProvince, &a.SourceChannel, &a.PositionTitle, &a.StoreName,
 		); err != nil {
 			return nil, 0, fmt.Errorf("applications: list scan: %w", err)
 		}
