@@ -144,8 +144,42 @@ export function toneForStatus(status: string): PillTone {
   return "neutral";
 }
 
+// Plain-language status words — the single source of truth so every list
+// surface (Inbox, Candidates, Search) speaks the same vocabulary instead of
+// echoing the raw pipeline status ("scored", "parsed"). Unknown values fall
+// back to a capitalized form, preserving prior behavior.
+const STATUS_LABELS: Record<string, string> = {
+  // application pipeline
+  pending: "Awaiting screening",
+  parsed: "Profile ready",
+  scored: "Screened",
+  passed: "Passed screening",
+  shortlisted: "Shortlisted",
+  interview: "Interview",
+  hired: "Hired",
+  rejected: "Not selected",
+  failed: "Could not process",
+  // review / waiting states (cover every value toneForStatus recognizes so no
+  // raw token like "in_review" ever reaches the UI)
+  review: "Under review",
+  in_review: "Under review",
+  waiting: "Awaiting review",
+  // candidate record states
+  available: "Available",
+  active: "Active",
+  onboarded: "Onboarded",
+  inactive: "Inactive",
+  dropped: "Withdrawn",
+  withdrawn: "Withdrawn",
+};
+
+export function statusLabel(status: string): string {
+  const key = (status ?? "").toLowerCase();
+  if (!key) return "—";
+  return STATUS_LABELS[key] ?? status[0].toUpperCase() + status.slice(1);
+}
+
 export function StatusPill({ status }: { status: string }) {
   const tone = toneForStatus(status);
-  const label = status ? status[0].toUpperCase() + status.slice(1) : "—";
-  return <Pill tone={tone}>{label}</Pill>;
+  return <Pill tone={tone}>{statusLabel(status)}</Pill>;
 }

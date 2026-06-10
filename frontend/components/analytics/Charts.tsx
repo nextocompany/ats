@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 
 import type { Funnel, KPI, Source } from "@/lib/types";
 
@@ -15,7 +15,6 @@ interface Metric {
   label: string;
   value: number;
   hint: string;
-  delta?: number;
 }
 
 export function KpiCards({
@@ -31,9 +30,9 @@ export function KpiCards({
   const onboardRate = kpi.passed > 0 ? Math.round((kpi.onboarded / kpi.passed) * 100) : 0;
 
   const supporting: Metric[] = [
-    { label: "Passed AI gate", value: kpi.passed, hint: `${passRate}% of applied`, delta: passRate },
-    { label: "Onboarded", value: kpi.onboarded, hint: `${onboardRate}% of passed`, delta: onboardRate },
-    { label: "Awaiting review", value: kpi.waiting, hint: "needs an operator" },
+    { label: "Passed screening", value: kpi.passed, hint: `${passRate}% of applied` },
+    { label: "Onboarded", value: kpi.onboarded, hint: `${onboardRate}% of passed` },
+    { label: "Waiting for you", value: kpi.waiting, hint: "awaiting your review" },
   ];
 
   if (variant === "reporting") {
@@ -54,13 +53,6 @@ export function KpiCards({
           aria-hidden
           className="absolute inset-y-6 left-0 w-[3px] rounded-full"
           style={{ background: "var(--brass)" }}
-        />
-        {/* Disciplined flat keyline mark — a quiet brass corner tick, no soft glow.
-            Inset matches the panel padding so the tick sits a consistent gutter in. */}
-        <span
-          aria-hidden
-          className="pointer-events-none absolute right-4 top-6 size-3 border-r border-t opacity-50 sm:right-5"
-          style={{ borderColor: "var(--brass)" }}
         />
         <p className="pl-3.5 text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-brand-foreground/70">
           Total applications
@@ -86,24 +78,7 @@ export function KpiCards({
               <span className="block text-3xl font-semibold tabular-nums leading-none tracking-tight text-foreground">
                 {fmt.format(m.value)}
               </span>
-              <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-                {typeof m.delta === "number" && (
-                  <span
-                    className={`inline-flex items-center gap-0.5 font-medium ${
-                      m.delta >= 50 ? "text-brand" : "text-muted-foreground"
-                    }`}
-                  >
-                    {m.delta >= 50 ? (
-                      <ArrowUpRight className="size-3.5" />
-                    ) : (
-                      <ArrowDownRight className="size-3.5" />
-                    )}
-                    {m.delta}%
-                  </span>
-                )}
-                <span>{typeof m.delta === "number" ? "" : m.hint}</span>
-                {typeof m.delta === "number" && <span className="text-muted-foreground/70">conversion</span>}
-              </div>
+              <p className="mt-2 text-xs text-muted-foreground">{m.hint}</p>
             </div>
           </div>
         ))}
@@ -154,7 +129,7 @@ function KpiStrip({ kpi, supporting }: { kpi: KPI; supporting: Metric[] }) {
               />
             </span>
             <span className="text-xs font-medium tabular-nums text-muted-foreground">
-              {passRate}% clear the AI gate
+              {passRate}% clear screening
             </span>
           </div>
         </div>
@@ -192,7 +167,7 @@ function KpiStrip({ kpi, supporting }: { kpi: KPI; supporting: Metric[] }) {
 
 const FUNNEL_STAGES = [
   { key: "applied", label: "Applied" },
-  { key: "passed_ai", label: "Passed AI" },
+  { key: "passed_ai", label: "Passed screening" },
   { key: "reviewed", label: "Reviewed" },
   { key: "hired", label: "Hired" },
 ] as const;
@@ -212,23 +187,19 @@ const FUNNEL_SHADES = [
   "oklch(72% 0.155 86)", // Hired — brass
 ] as const;
 
-// Width taper: even when raw stage values are close, the funnel must visibly
-// narrow stage-to-stage. We blend the honest proportional width with a fixed
-// descending ceiling so the silhouette always reads as a funnel.
-const FUNNEL_TAPER = [100, 78, 56, 36] as const;
-
 export function FunnelChart({ funnel }: { funnel: Funnel }) {
   // Applied is the top of funnel and the proportional reference.
   const max = Math.max(funnel.applied, 1);
   const endToEnd = max > 0 ? Math.round((funnel.hired / max) * 100) : 0;
 
-  const widthFor = (value: number, stageIndex: number) => {
-    const proportional = Math.min(100, Math.max((value / max) * 100, FUNNEL_MIN_WIDTH));
-    const ceiling = FUNNEL_TAPER[stageIndex];
-    // Take the smaller of the honest proportion and the taper ceiling, but never
-    // below the floor — guarantees a monotonic narrowing silhouette.
-    return Math.max(FUNNEL_MIN_WIDTH, Math.min(proportional, ceiling));
-  };
+  // Honest widths: each band is its real share of Applied (floored so a tiny
+  // stage stays labelable), then clamped to never exceed the stage above it —
+  // so the silhouette narrows monotonically AND the width means something.
+  const widths = FUNNEL_STAGES.reduce<number[]>((acc, stage, i) => {
+    const honest = Math.min(100, Math.max((funnel[stage.key] / max) * 100, FUNNEL_MIN_WIDTH));
+    acc.push(i === 0 ? honest : Math.min(honest, acc[i - 1]));
+    return acc;
+  }, []);
 
   return (
     <section className="rounded-xl bg-card p-6 ring-1 ring-hairline">
@@ -249,9 +220,9 @@ export function FunnelChart({ funnel }: { funnel: Funnel }) {
       <ol className="flex flex-col">
         {FUNNEL_STAGES.map((stage, i) => {
           const value = funnel[stage.key];
-          const widthPct = widthFor(value, i);
+          const widthPct = widths[i];
           const prev = i > 0 ? funnel[FUNNEL_STAGES[i - 1].key] : value;
-          const prevWidthPct = i > 0 ? widthFor(prev, i - 1) : widthPct;
+          const prevWidthPct = i > 0 ? widths[i - 1] : widthPct;
           const step = prev > 0 ? Math.round((value / prev) * 100) : 100;
           const isHired = i === FUNNEL_STAGES.length - 1;
           // Deliberate blue → brass ramp down the stages (see FUNNEL_SHADES).
