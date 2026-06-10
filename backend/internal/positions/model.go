@@ -19,13 +19,15 @@ type MustHave struct {
 
 // Position maps the positions table (fields used in scoring).
 type Position struct {
-	ID          uuid.UUID `json:"id"`
-	TitleTH     string    `json:"title_th"`
-	TitleEN     string    `json:"title_en"`
-	Level       string    `json:"level"`
-	MustHave    MustHave  `json:"must_have"`
-	Keywords    []string  `json:"keywords"`
-	FormatTypes []string  `json:"format_types"`
+	ID               uuid.UUID `json:"id"`
+	TitleTH          string    `json:"title_th"`
+	TitleEN          string    `json:"title_en"`
+	Level            string    `json:"level"`
+	MustHave         MustHave  `json:"must_have"`
+	Keywords         []string  `json:"keywords"`
+	FormatTypes      []string  `json:"format_types"`
+	Responsibilities string    `json:"responsibilities"`
+	Qualifications   string    `json:"qualifications"`
 }
 
 // PublicPosition is the safe projection exposed on the public Career API.
@@ -59,7 +61,8 @@ func (r *pgRepository) FindByID(ctx context.Context, id uuid.UUID) (*Position, e
 	const q = `
 		SELECT id, title_th, COALESCE(title_en,''), COALESCE(level,''),
 		       COALESCE(must_have_criteria, '{}'::jsonb),
-		       COALESCE(keywords, '{}'), COALESCE(format_types, '{}')
+		       COALESCE(keywords, '{}'), COALESCE(format_types, '{}'),
+		       COALESCE(responsibilities, ''), COALESCE(qualifications, '')
 		FROM positions WHERE id = $1`
 	var (
 		p           Position
@@ -67,6 +70,7 @@ func (r *pgRepository) FindByID(ctx context.Context, id uuid.UUID) (*Position, e
 	)
 	if err := r.pool.QueryRow(ctx, q, id).Scan(
 		&p.ID, &p.TitleTH, &p.TitleEN, &p.Level, &mustHaveRaw, &p.Keywords, &p.FormatTypes,
+		&p.Responsibilities, &p.Qualifications,
 	); err != nil {
 		return nil, fmt.Errorf("positions: find by id: %w", err)
 	}
@@ -82,7 +86,8 @@ func (r *pgRepository) FindByPSCode(ctx context.Context, code string) (*Position
 	const q = `
 		SELECT id, title_th, COALESCE(title_en,''), COALESCE(level,''),
 		       COALESCE(must_have_criteria, '{}'::jsonb),
-		       COALESCE(keywords, '{}'), COALESCE(format_types, '{}')
+		       COALESCE(keywords, '{}'), COALESCE(format_types, '{}'),
+		       COALESCE(responsibilities, ''), COALESCE(qualifications, '')
 		FROM positions WHERE ps_position_code = $1`
 	var (
 		p           Position
@@ -90,6 +95,7 @@ func (r *pgRepository) FindByPSCode(ctx context.Context, code string) (*Position
 	)
 	if err := r.pool.QueryRow(ctx, q, code).Scan(
 		&p.ID, &p.TitleTH, &p.TitleEN, &p.Level, &mustHaveRaw, &p.Keywords, &p.FormatTypes,
+		&p.Responsibilities, &p.Qualifications,
 	); err != nil {
 		return nil, fmt.Errorf("positions: find by ps code: %w", err)
 	}

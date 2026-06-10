@@ -175,9 +175,12 @@ func (pr *Processor) run(ctx context.Context, p queue.ProcessApplicationPayload,
 		return fmt.Errorf("pipeline: load candidate: %w", err)
 	}
 	jd := scoring.JD{
+		Title:               pos.TitleTH,
 		MinEducationLevel:   pos.MustHave.MinEducationLevel,
 		MinExperienceMonths: pos.MustHave.MinExperienceMonths,
 		Keywords:            pos.Keywords,
+		Responsibilities:    pos.Responsibilities,
+		Qualifications:      pos.Qualifications,
 	}
 
 	// Step 4 — Score (location signal first so it folds into the total).

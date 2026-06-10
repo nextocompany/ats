@@ -17,9 +17,10 @@ import (
 const openAIAPIVersion = "2024-08-01-preview"
 
 const scoringSystemPrompt = `You are an HR screening assistant for Thai retail. Given a candidate profile ` +
-	`and a job's keywords, return a strict JSON object: {"skills_score":<0-20 int>,` +
+	`and a job description (responsibilities + qualifications), return a strict JSON object: {"skills_score":<0-20 int>,` +
 	`"strengths":["3 short Thai bullet points"],"red_flags":["..."],"suggested_positions":["..."]}. ` +
-	`Score skills_score on semantic match between the candidate's skills/experience and the keywords. ` +
+	`Score skills_score on how well the candidate's skills and experience match the job description. ` +
+	`Ground strengths and red_flags in the specific responsibilities and qualifications. ` +
 	`Respond with JSON only.`
 
 // azureLLM evaluates the qualitative scoring part via Azure OpenAI.
@@ -66,7 +67,7 @@ type llmJSON struct {
 
 func (a azureLLM) evaluate(ctx context.Context, p ai.Profile, jd JD) (LLMPart, error) {
 	profileJSON, _ := json.Marshal(p)
-	user := fmt.Sprintf("Job keywords: %s\n\nCandidate profile:\n%s", strings.Join(jd.Keywords, ", "), string(profileJSON))
+	user := fmt.Sprintf("Job description:\n%s\n\nCandidate profile:\n%s", jd.promptText(), string(profileJSON))
 
 	body, err := json.Marshal(chatRequest{
 		Messages: []chatMessage{

@@ -63,7 +63,7 @@ type geminiResponse struct {
 
 func (g geminiLLM) evaluate(ctx context.Context, p ai.Profile, jd JD) (LLMPart, error) {
 	profileJSON, _ := json.Marshal(p)
-	user := fmt.Sprintf("Job keywords: %s\n\nCandidate profile:\n%s", strings.Join(jd.Keywords, ", "), string(profileJSON))
+	user := fmt.Sprintf("Job description:\n%s\n\nCandidate profile:\n%s", jd.promptText(), string(profileJSON))
 
 	body, err := json.Marshal(geminiRequest{
 		SystemInstruction: &geminiContent{Parts: []geminiPart{{Text: scoringSystemPrompt}}},
