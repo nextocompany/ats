@@ -221,8 +221,8 @@ export function FunnelChart({ funnel }: { funnel: Funnel }) {
           const prevWidthPct = i > 0 ? widthFor(prev) : widthPct;
           const step = prev > 0 ? Math.round((value / prev) * 100) : 100;
           const isHired = i === FUNNEL_STAGES.length - 1;
-          // Emerald tonal ramp deepening toward the point of the funnel.
-          const shade = `oklch(${42 - i * 2.4}% ${0.088 - i * 0.006} 162)`;
+          // Blue tonal ramp deepening toward the point of the funnel.
+          const shade = `oklch(${48 - i * 2.4}% ${0.18 - i * 0.012} 264)`;
 
           return (
             <li key={stage.key}>
@@ -350,7 +350,7 @@ export function SourcesChart({ sources }: { sources: Source[] }) {
             const conv = Math.round(s.conversion * 100);
             const isBest = s.conversion === bestConv && bestConv > 0;
             // Match the funnel's tonal step so the two charts share a ramp.
-            const shade = `oklch(${40.5 - i * 1.4}% ${0.085 - i * 0.004} 162)`;
+            const shade = `oklch(${46 - i * 1.4}% ${0.18 - i * 0.008} 264)`;
             return (
               <li key={s.channel}>
                 <div className="mb-1.5 flex items-baseline justify-between text-sm">

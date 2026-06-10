@@ -6,14 +6,19 @@ import { cn } from "@/lib/utils";
 
 // Hero is the landing's opening statement: a large display headline, supporting
 // copy, dual CTA, and a decorative atmosphere panel (pure CSS/SVG — no imagery
-// dependency). Clean-luxury: dramatic scale, generous whitespace, restrained color.
+// dependency). CP Axtra: dramatic scale, generous whitespace, blue + yellow + dots.
 export function Hero() {
   return (
     <section className="relative overflow-hidden border-b border-border/60">
-      {/* soft emerald atmosphere wash */}
+      {/* soft blue atmosphere wash */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(120%_90%_at_85%_-10%,var(--brand-soft),transparent_55%)]"
+      />
+      {/* CP Axtra dot signature — scattered in the corner of the hero */}
+      <div
+        aria-hidden="true"
+        className="dot-cluster pointer-events-none absolute right-5 top-6 hidden opacity-90 sm:block lg:right-10 lg:top-10"
       />
       <Container className="grid items-center gap-12 py-16 sm:py-24 lg:grid-cols-12 lg:py-32">
         <div className="reveal space-y-7 lg:col-span-7">
@@ -43,13 +48,13 @@ export function Hero() {
           </div>
         </div>
 
-        {/* Atmosphere panel — layered cards, gold hairline, geometric depth. */}
+        {/* Atmosphere panel — layered cards, dot rule, geometric depth. */}
         <div className="reveal relative hidden lg:col-span-5 lg:block" aria-hidden="true">
           <div className="relative mx-auto aspect-[4/5] w-full max-w-sm">
             <div className="absolute inset-0 translate-x-6 translate-y-6 rounded-3xl border border-border bg-secondary/50" />
-            <div className="absolute inset-0 rounded-3xl border border-border bg-card shadow-[0_30px_80px_-30px_oklch(44%_0.09_158/0.35)]">
+            <div className="absolute inset-0 rounded-3xl border border-border bg-card shadow-[0_30px_80px_-30px_oklch(46%_0.18_264/0.3)]">
               <div className="flex h-full flex-col justify-between p-8">
-                <div className="h-px w-16 bg-gold" />
+                <div className="dot-rule" />
                 <div className="space-y-4">
                   <div className="size-12 rounded-2xl bg-accent/10" />
                   <div className="h-3 w-3/4 rounded-full bg-muted" />

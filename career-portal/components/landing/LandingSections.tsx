@@ -88,7 +88,12 @@ export function LandingSections() {
           <div className="relative overflow-hidden rounded-3xl bg-primary px-8 py-14 text-center sm:px-16 sm:py-20">
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute inset-0 bg-[radial-gradient(100%_120%_at_50%_-20%,oklch(44%_0.09_158/0.35),transparent_60%)]"
+              className="pointer-events-none absolute inset-0 bg-[radial-gradient(100%_120%_at_50%_-20%,oklch(62%_0.14_252/0.5),transparent_60%)]"
+            />
+            {/* CP Axtra dot signature on the blue band */}
+            <div
+              aria-hidden="true"
+              className="dot-cluster pointer-events-none absolute left-6 top-6 opacity-80 sm:left-10 sm:top-10"
             />
             <div className="relative space-y-6">
               <h2 className="text-[length:var(--text-display)] font-bold tracking-tight text-primary-foreground">

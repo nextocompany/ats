@@ -12,7 +12,7 @@ export default function LoginPage() {
 
   return (
     <main className="grid min-h-dvh lg:grid-cols-[1.1fr_1fr]">
-      {/* Brand panel — the emerald "front door" of the enterprise */}
+      {/* Brand panel — the CP Axtra blue "front door" of the enterprise */}
       <section className="relative hidden flex-col justify-between overflow-hidden bg-sidebar p-12 text-sidebar-foreground lg:flex">
         <div
           aria-hidden
@@ -42,6 +42,7 @@ export default function LoginPage() {
         </div>
 
         <div className="relative max-w-md">
+          <div className="dot-cluster mb-5" aria-hidden />
           <p className="eyebrow">National recruitment platform</p>
           <h2 className="mt-3 font-heading text-[2.5rem] font-semibold leading-[1.05] tracking-tight">
             One pipeline,

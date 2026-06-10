@@ -3,7 +3,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { Hero } from "@/components/landing/Hero";
 import { LandingSections } from "@/components/landing/LandingSections";
 
-// The portal landing page — a proper marketing-grade home (clean luxury). The
+// The portal landing page — a proper marketing-grade home (CP Axtra brand). The
 // jobs list lives at /jobs (also the PWA start_url).
 export default function Home() {
   return (

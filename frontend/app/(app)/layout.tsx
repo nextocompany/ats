@@ -3,7 +3,7 @@ import { SideNav } from "@/components/shell/SideNav";
 import { MobileBar } from "@/components/shell/MobileBar";
 
 // Shared chrome for all authenticated dashboard routes.
-// Desktop ≥1024: persistent emerald sidebar + slim context bar.
+// Desktop ≥1024: persistent navy-blue sidebar + slim context bar.
 // Below 1024: top bar + slide-in drawer.
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (

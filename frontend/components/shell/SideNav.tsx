@@ -8,7 +8,7 @@ import { signOut } from "@/lib/auth";
 import { useMe } from "@/lib/queries";
 import { NAV, BrandMark } from "./nav-config";
 
-// Persistent left sidebar — the deep-emerald spine of the console (desktop ≥1024).
+// Persistent left sidebar — the deep navy-blue spine of the console (desktop ≥1024).
 export function SideNav() {
   const pathname = usePathname();
   const router = useRouter();

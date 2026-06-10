@@ -6,14 +6,14 @@ import { Store, Globe, Megaphone, UserPlus, Building2, type LucideIcon } from "l
    an initial chip, a labeled source chip, and a semantic status pill.
    ────────────────────────────────────────────────────────────────────────── */
 
-// Deterministic warm-ink/emerald tint per name so the roster reads as a set of
-// distinct people, not seven identical gray rows. Tints stay within the system
-// palette (no rainbow) — emerald, brass, ink, clay washes only.
+// Deterministic tint per name so the roster reads as a set of distinct people,
+// not seven identical gray rows. Tints are drawn from the CP Axtra dot palette —
+// blue, yellow, coral, teal washes — a friendly multicolour spread, never harsh.
 const CHIP_TINTS = [
   { bg: "var(--brand-soft)", fg: "var(--brand)" },
-  { bg: "var(--brass-soft)", fg: "color-mix(in oklch, var(--brass) 78%, black)" },
-  { bg: "oklch(94% 0.012 75)", fg: "oklch(34% 0.012 75)" },
-  { bg: "oklch(94% 0.03 200)", fg: "oklch(40% 0.06 220)" },
+  { bg: "var(--brass-soft)", fg: "color-mix(in oklch, var(--brass) 70%, black)" },
+  { bg: "oklch(95% 0.04 18)", fg: "oklch(48% 0.16 22)" },
+  { bg: "oklch(95% 0.04 200)", fg: "oklch(44% 0.1 215)" },
 ] as const;
 
 function initials(name: string): string {
