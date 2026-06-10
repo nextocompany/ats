@@ -3,7 +3,12 @@
 // endpoints directly.
 package ai
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+	"strconv"
+	"strings"
+)
 
 // Personal holds the candidate's personal fields (F02 schema).
 type Personal struct {
@@ -45,6 +50,61 @@ type Profile struct {
 	Skills          []string     `json:"skills"`
 	Languages       []Language   `json:"languages"`
 	DesiredPosition string       `json:"desired_position"`
+}
+
+// looseInt coerces a JSON value an LLM may emit as a number, a quoted string
+// ("25"), an empty string, or null into an int. Non-numeric values yield 0.
+func looseInt(raw json.RawMessage) int {
+	s := strings.Trim(strings.TrimSpace(string(raw)), `"`)
+	if s == "" || s == "null" {
+		return 0
+	}
+	if f, err := strconv.ParseFloat(s, 64); err == nil {
+		return int(f)
+	}
+	return 0
+}
+
+// UnmarshalJSON tolerates age arriving as a string/empty/null (LLM output drift).
+func (p *Personal) UnmarshalJSON(b []byte) error {
+	type alias Personal
+	aux := struct {
+		Age json.RawMessage `json:"age"`
+		*alias
+	}{alias: (*alias)(p)}
+	if err := json.Unmarshal(b, &aux); err != nil {
+		return err
+	}
+	p.Age = looseInt(aux.Age)
+	return nil
+}
+
+// UnmarshalJSON tolerates duration_months arriving as a string/empty/null.
+func (e *Experience) UnmarshalJSON(b []byte) error {
+	type alias Experience
+	aux := struct {
+		DurationMonths json.RawMessage `json:"duration_months"`
+		*alias
+	}{alias: (*alias)(e)}
+	if err := json.Unmarshal(b, &aux); err != nil {
+		return err
+	}
+	e.DurationMonths = looseInt(aux.DurationMonths)
+	return nil
+}
+
+// UnmarshalJSON tolerates year arriving as a string/empty/null.
+func (e *Education) UnmarshalJSON(b []byte) error {
+	type alias Education
+	aux := struct {
+		Year json.RawMessage `json:"year"`
+		*alias
+	}{alias: (*alias)(e)}
+	if err := json.Unmarshal(b, &aux); err != nil {
+		return err
+	}
+	e.Year = looseInt(aux.Year)
+	return nil
 }
 
 // Validate enforces the minimum required shape before persistence.
