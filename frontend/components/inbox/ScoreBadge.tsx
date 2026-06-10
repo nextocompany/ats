@@ -2,6 +2,32 @@ interface ScoreBadgeProps {
   score: number | null;
 }
 
+/* Plain-language fit tier — the same 75 / 50 thresholds the badge uses, but
+   spoken as words an HR reader understands without knowing the 0–100 scale.
+   Shared so the inbox, candidates, and search all say "fit" the same way. */
+export function fitTier(
+  score: number | null | undefined,
+): { label: string; band: "high" | "mid" | "low" } | null {
+  if (score === null || score === undefined) return null;
+  const band: "high" | "mid" | "low" = score >= 75 ? "high" : score >= 50 ? "mid" : "low";
+  const label = band === "high" ? "Strong fit" : band === "mid" ? "Possible fit" : "Weak fit";
+  return { label, band };
+}
+
+/* Word label that pairs with the numeric ScoreBadge — colour-matched to the
+   badge band so "82 · Strong fit" reads as one unit. */
+export function FitLabel({ score }: ScoreBadgeProps) {
+  const tier = fitTier(score);
+  if (!tier) return <span className="text-xs text-muted-foreground">Not scored yet</span>;
+  const color =
+    tier.band === "high"
+      ? "text-[var(--score-high)]"
+      : tier.band === "low"
+        ? "text-[var(--score-low)]"
+        : "text-muted-foreground";
+  return <span className={`text-xs font-medium ${color}`}>{tier.label}</span>;
+}
+
 /* AI score chip — semantic ramp tuned so the color reads as *fit*, not caution.
    HIGH (≥75) → CP Axtra blue (strong fit). MID (50–74) → quiet ink/neutral, so a
    merely-average score never competes with the amber "review" flag. LOW (<50)

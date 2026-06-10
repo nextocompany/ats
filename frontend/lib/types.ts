@@ -30,6 +30,13 @@ export interface Application {
   parsed_profile_blob_url: string;
   parsed_at: string | null;
   created_at: string;
+  // Human-readable joins from the inbox list endpoint (omitted on single-record
+  // responses). The inbox leads with these so a row reads as a person, not a UUID.
+  candidate_name?: string;
+  candidate_province?: string;
+  source_channel?: string;
+  position_title?: string;
+  store_name?: string;
 }
 
 export interface Candidate {
