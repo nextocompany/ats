@@ -21,7 +21,7 @@ test("login page renders without a session", async ({ browser }) => {
 
 test("ranked inbox loads and is responsive", async ({ page }) => {
   await page.goto("/applications");
-  await expect(page.getByRole("heading", { name: "Ranked Inbox" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Candidate Inbox" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Main navigation" })).toBeVisible();
   for (const width of BREAKPOINTS) {
     await page.setViewportSize({ width, height: 900 });
@@ -31,7 +31,7 @@ test("ranked inbox loads and is responsive", async ({ page }) => {
 
 test("inbox → detail shows resume pane + AI panel", async ({ page }) => {
   await page.goto("/applications?status=scored");
-  await expect(page.getByRole("heading", { name: "Ranked Inbox" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Candidate Inbox" })).toBeVisible();
   const firstLink = page.locator('a[href^="/applications/"]').first();
   if (await firstLink.count()) {
     await firstLink.click();
