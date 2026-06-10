@@ -21,12 +21,15 @@ const csp = [
   "default-src 'self'",
   scriptSrc,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  // Azure Blob: source-document previews load the resume directly from a
+  // short-lived SAS URL on <account>.blob.core.windows.net (iframe + any <img>).
+  "img-src 'self' data: blob: https://*.blob.core.windows.net",
   "font-src 'self'",
   // Entra SSO: MSAL talks to Microsoft login over connect-src, and its silent
   // token acquisition renders a hidden login.microsoftonline.com iframe.
   `connect-src 'self' ${apiOrigin} https://login.microsoftonline.com`,
-  "frame-src https://login.microsoftonline.com",
+  // frame-src: MSAL login iframe + the resume preview iframe (Azure Blob SAS).
+  "frame-src https://login.microsoftonline.com https://*.blob.core.windows.net",
   "frame-ancestors 'none'",
   "object-src 'none'",
   "base-uri 'self'",
