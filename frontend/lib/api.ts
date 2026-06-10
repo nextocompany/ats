@@ -4,7 +4,7 @@
 // (aud = our client ID) as `Authorization: Bearer <idToken>`, which the Go API
 // validates via OIDC discovery.
 import type { Envelope, Meta } from "./types";
-import { getIdToken, isEntraConfigured } from "./auth";
+import { getIdToken, handleApiUnauthorized, isEntraConfigured } from "./auth";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
@@ -40,6 +40,12 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     throw new ApiError(`Unexpected response (${res.status})`, res.status);
   }
   if (!res.ok || !env.success) {
+    // A 401 means the bearer token was missing/expired/rejected — kick off an
+    // interactive re-login (loop-guarded) so the session self-heals instead of
+    // leaving every call stuck on 401.
+    if (res.status === 401 && isEntraConfigured()) {
+      void handleApiUnauthorized();
+    }
     throw new ApiError(env?.error ?? `Request failed (${res.status})`, res.status);
   }
   return { data: env.data, meta: env.meta };
