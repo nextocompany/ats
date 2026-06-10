@@ -35,7 +35,7 @@ Region for Azure OpenAI / Document Intelligence. Model availability differs by
 region; southeastasia is the default but may need to change (e.g. to a region
 with gpt-4o capacity) — verify model availability before deploying.
 ''')
-param aiLocation string = 'southeastasia'
+param aiLocation string = 'eastus'
 
 @description('Resource name prefix.')
 param resourcePrefix string = 'hrats'
@@ -47,10 +47,10 @@ param environmentName string = 'prod'
 param imageTag string = 'latest'
 
 @description('Azure OpenAI model deployment name (read by the app as AZURE_OPENAI_DEPLOYMENT).')
-param openAiDeploymentName string = 'gpt-4o'
+param openAiDeploymentName string = 'gpt-4o-mini'
 
 @description('Azure OpenAI model name.')
-param openAiModelName string = 'gpt-4o'
+param openAiModelName string = 'gpt-4o-mini'
 
 @description('Postgres administrator login.')
 param postgresAdminLogin string = 'hratsadmin'

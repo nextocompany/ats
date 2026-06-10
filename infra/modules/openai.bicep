@@ -15,7 +15,7 @@ param deploymentName string = 'gpt-4o'
 param modelName string = 'gpt-4o'
 
 @description('Model version. Leave empty to let Azure pick the default for the model.')
-param modelVersion string = '2024-08-06'
+param modelVersion string = '2024-07-18'
 
 @description('Deployment capacity (TPM in thousands).')
 param capacity int = 10
@@ -38,7 +38,7 @@ resource deployment 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01
   parent: openai
   name: deploymentName
   sku: {
-    name: 'Standard'
+    name: 'GlobalStandard'
     capacity: capacity
   }
   properties: {
