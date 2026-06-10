@@ -2,6 +2,7 @@ package scoring
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/nexto/hr-ats/internal/ai"
@@ -69,6 +70,47 @@ func TestScore_Clamp(t *testing.T) {
 	}
 	if res.Total > 100 || res.Breakdown.Location > 20 || res.Breakdown.Skills > 20 {
 		t.Errorf("expected clamping, got %+v total=%d", res.Breakdown, res.Total)
+	}
+}
+
+func TestJD_PromptText(t *testing.T) {
+	tests := []struct {
+		name     string
+		jd       JD
+		contains []string
+		absent   []string
+	}{
+		{
+			name: "full Master JD prose",
+			jd: JD{
+				Title:            "ผู้จัดการแผนกเนื้อสัตว์",
+				Responsibilities: "• บริหารจัดการแผนกเนื้อสัตว์",
+				Qualifications:   "• ปริญญาตรี",
+				Keywords:         []string{"butchery", "meat"},
+			},
+			contains: []string{"Position: ผู้จัดการแผนกเนื้อสัตว์", "Responsibilities:", "บริหารจัดการแผนกเนื้อสัตว์", "Qualifications:", "Keywords: butchery, meat"},
+		},
+		{
+			name:     "keyword-only fallback (pre-Master-JD position)",
+			jd:       JD{Keywords: []string{"cashier", "POS"}},
+			contains: []string{"Keywords: cashier, POS"},
+			absent:   []string{"Responsibilities:", "Qualifications:", "Position:"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.jd.promptText()
+			for _, want := range tt.contains {
+				if !strings.Contains(got, want) {
+					t.Errorf("promptText() missing %q\n--- got ---\n%s", want, got)
+				}
+			}
+			for _, no := range tt.absent {
+				if strings.Contains(got, no) {
+					t.Errorf("promptText() should not contain %q\n--- got ---\n%s", no, got)
+				}
+			}
+		})
 	}
 }
 

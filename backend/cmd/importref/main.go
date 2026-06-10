@@ -144,13 +144,17 @@ func importPositions(ctx context.Context, pool *pgxpool.Pool, path string) (int,
 			keywords = strings.Split(row["keywords"], "|")
 		}
 
+		// responsibilities + qualifications carry the Master JD prose the scorer
+		// compares against. Optional columns — stored NULL when a CSV omits them.
 		const q = `
-			INSERT INTO positions (title_th, title_en, level, ps_position_code, must_have_criteria, keywords, is_active)
-			VALUES ($1,$2,$3,$4,$5::jsonb,$6,TRUE)
+			INSERT INTO positions (title_th, title_en, level, ps_position_code, must_have_criteria, keywords, responsibilities, qualifications, is_active)
+			VALUES ($1,$2,$3,$4,$5::jsonb,$6,NULLIF($7,''),NULLIF($8,''),TRUE)
 			ON CONFLICT (ps_position_code) WHERE ps_position_code IS NOT NULL DO UPDATE SET
 				title_th=EXCLUDED.title_th, title_en=EXCLUDED.title_en, level=EXCLUDED.level,
-				must_have_criteria=EXCLUDED.must_have_criteria, keywords=EXCLUDED.keywords, is_active=TRUE`
-		if _, err := pool.Exec(ctx, q, row["title_th"], row["title_en"], row["level"], code, mustHave, keywords); err != nil {
+				must_have_criteria=EXCLUDED.must_have_criteria, keywords=EXCLUDED.keywords,
+				responsibilities=EXCLUDED.responsibilities, qualifications=EXCLUDED.qualifications, is_active=TRUE`
+		if _, err := pool.Exec(ctx, q, row["title_th"], row["title_en"], row["level"], code, mustHave, keywords,
+			row["responsibilities"], row["qualifications"]); err != nil {
 			return n, fmt.Errorf("upsert position %q: %w", code, err)
 		}
 		n++
