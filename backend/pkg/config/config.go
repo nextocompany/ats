@@ -22,7 +22,8 @@ type Config struct {
 	BlobContainer  string
 	JWTSecret      string
 
-	// AIProvider selects the OCR/parse implementation: "mock" (default) or "azure".
+	// AIProvider selects the OCR/parse implementation: "mock" (default), "azure",
+	// or "gemini" (Google Gemini REST API, free-tier friendly).
 	AIProvider string
 
 	// Azure AI settings — required only when AIProvider == "azure".
@@ -31,6 +32,10 @@ type Config struct {
 	AzureOpenAIDeployment string
 	AzureDocIntelEndpoint string
 	AzureDocIntelKey      string
+
+	// Gemini AI settings — required only when AIProvider == "gemini".
+	GeminiAPIKey string
+	GeminiModel  string
 
 	// AISearchProvider selects candidate search: "mock" (Postgres trigram, default)
 	// or "azure" (Azure AI Search query). Required Azure fields gate on "azure".
@@ -98,8 +103,9 @@ type Config struct {
 
 // Provider values selecting real (vs mock) integrations.
 const (
-	AIProviderAzure = "azure"
-	ProviderReal    = "real"
+	AIProviderAzure  = "azure"
+	AIProviderGemini = "gemini"
+	ProviderReal     = "real"
 )
 
 // Load reads configuration from the environment and returns a populated Config.
@@ -121,6 +127,9 @@ func Load() (*Config, error) {
 		AzureOpenAIDeployment: getenv("AZURE_OPENAI_DEPLOYMENT", "hr-screening-gpt4o"),
 		AzureDocIntelEndpoint: os.Getenv("AZURE_DOC_INTEL_ENDPOINT"),
 		AzureDocIntelKey:      os.Getenv("AZURE_DOC_INTEL_KEY"),
+
+		GeminiAPIKey: os.Getenv("GEMINI_API_KEY"),
+		GeminiModel:  getenv("GEMINI_MODEL", "gemini-2.0-flash"),
 
 		AuthProvider:    getenv("AUTH_PROVIDER", "mock"),
 		AzureADTenantID: os.Getenv("AZURE_AD_TENANT_ID"),
@@ -179,7 +188,7 @@ func Load() (*Config, error) {
 		val     string
 		allowed []string
 	}{
-		{"AI_PROVIDER", c.AIProvider, []string{"mock", AIProviderAzure}},
+		{"AI_PROVIDER", c.AIProvider, []string{"mock", AIProviderAzure, AIProviderGemini}},
 		{"AI_SEARCH_PROVIDER", c.AISearchProvider, []string{"mock", AIProviderAzure}},
 		{"AUTH_PROVIDER", c.AuthProvider, []string{"mock", ProviderReal}},
 		{"PS_PROVIDER", c.PSProvider, []string{"mock", ProviderReal}},
@@ -198,6 +207,9 @@ func Load() (*Config, error) {
 		if c.AzureDocIntelEndpoint == "" || c.AzureDocIntelKey == "" {
 			return nil, fmt.Errorf("config: AZURE_DOC_INTEL_ENDPOINT and AZURE_DOC_INTEL_KEY are required when AI_PROVIDER=azure")
 		}
+	}
+	if c.UsesGeminiAI() && c.GeminiAPIKey == "" {
+		return nil, fmt.Errorf("config: GEMINI_API_KEY is required when AI_PROVIDER=gemini")
 	}
 	if c.UsesRealPeopleSoft() {
 		if c.PSIBBaseURL == "" || c.PSIBTokenURL == "" || c.PSIBClientID == "" || c.PSIBClientSecret == "" {
@@ -272,6 +284,12 @@ func (c *Config) TrustedProxyList() []string {
 // UsesAzureAI reports whether real Azure AI clients should be constructed.
 func (c *Config) UsesAzureAI() bool {
 	return c.AIProvider == AIProviderAzure
+}
+
+// UsesGeminiAI reports whether the Google Gemini AI clients (OCR, parser, LLM
+// scorer) should be constructed. Selected by AI_PROVIDER=gemini.
+func (c *Config) UsesGeminiAI() bool {
+	return c.AIProvider == AIProviderGemini
 }
 
 // UsesAzureSearch reports whether the real Azure AI Search client should be used

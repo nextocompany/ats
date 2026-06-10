@@ -33,6 +33,9 @@ type compositeScorer struct {
 
 // NewScorer selects the LLM backend by config (mock by default, no Azure keys).
 func NewScorer(cfg *config.Config) Scorer {
+	if cfg.UsesGeminiAI() {
+		return compositeScorer{llm: newGeminiLLM(cfg)}
+	}
 	if cfg.UsesAzureAI() {
 		return compositeScorer{llm: newAzureLLM(cfg)}
 	}

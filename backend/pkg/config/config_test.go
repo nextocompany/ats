@@ -149,6 +149,49 @@ func TestLoad_AzureWithKeys(t *testing.T) {
 	}
 }
 
+func TestLoad_GeminiRequiresKey(t *testing.T) {
+	// Arrange: gemini provider selected but no API key present.
+	t.Setenv("DB_URL", "postgres://localhost/db")
+	t.Setenv("REDIS_URL", "redis://localhost:6379")
+	t.Setenv("AZURE_BLOB_CONNECTION_STRING", "conn")
+	t.Setenv("AI_PROVIDER", "gemini")
+	t.Setenv("GEMINI_API_KEY", "")
+
+	// Act
+	_, err := Load()
+
+	// Assert
+	if err == nil {
+		t.Fatal("expected error when AI_PROVIDER=gemini without GEMINI_API_KEY")
+	}
+}
+
+func TestLoad_GeminiWithKey(t *testing.T) {
+	// Arrange: gemini provider with API key requires no Azure vars.
+	t.Setenv("DB_URL", "postgres://localhost/db")
+	t.Setenv("REDIS_URL", "redis://localhost:6379")
+	t.Setenv("AZURE_BLOB_CONNECTION_STRING", "conn")
+	t.Setenv("AI_PROVIDER", "gemini")
+	t.Setenv("GEMINI_API_KEY", "gk")
+
+	// Act
+	c, err := Load()
+
+	// Assert
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !c.UsesGeminiAI() {
+		t.Error("expected UsesGeminiAI true when AI_PROVIDER=gemini")
+	}
+	if c.UsesAzureAI() {
+		t.Error("expected UsesAzureAI false when AI_PROVIDER=gemini")
+	}
+	if c.GeminiModel != "gemini-2.0-flash" {
+		t.Errorf("expected default GeminiModel gemini-2.0-flash, got %q", c.GeminiModel)
+	}
+}
+
 func TestLoad_RetentionDefaults(t *testing.T) {
 	t.Setenv("DB_URL", "postgres://localhost/db")
 	t.Setenv("REDIS_URL", "redis://localhost:6379")
