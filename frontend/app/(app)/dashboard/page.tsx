@@ -3,14 +3,16 @@
 import Link from "next/link";
 import { ArrowRight, Inbox, AlertTriangle, ScanLine } from "lucide-react";
 
-import { FunnelChart, KpiCards } from "@/components/analytics/Charts";
+import { KpiCards } from "@/components/analytics/Charts";
+import { WaitingByStore, OpenRoles } from "@/components/analytics/Operations";
 import { buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useFunnel, useKpi } from "@/lib/queries";
+import { useKpi, useOpenRoles, useWaitingByStore } from "@/lib/queries";
 
 export default function DashboardPage() {
   const { data: kpi } = useKpi();
-  const { data: funnel } = useFunnel();
+  const { data: byStore } = useWaitingByStore();
+  const { data: openRoles } = useOpenRoles();
 
   return (
     <div className="settle space-y-8">
@@ -40,11 +42,15 @@ export default function DashboardPage() {
       {/* KPI band */}
       {kpi ? <KpiCards kpi={kpi} /> : <Skeleton className="h-36 w-full rounded-xl" />}
 
-      {/* Funnel + operator quick-actions, asymmetric Swiss grid */}
-      <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
-        {funnel ? <FunnelChart funnel={funnel} /> : <Skeleton className="h-80 w-full rounded-xl" />}
+      {/* Operational breakdown — the dashboard's centerpiece: where to act,
+          by store and by role, instead of an aggregate vanity funnel. */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {byStore ? <WaitingByStore data={byStore} /> : <Skeleton className="h-72 w-full rounded-xl" />}
+        {openRoles ? <OpenRoles data={openRoles} /> : <Skeleton className="h-72 w-full rounded-xl" />}
+      </div>
 
-        <aside className="flex flex-col gap-6">
+      {/* Quick actions + screening pass rate */}
+      <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
           <section className="rounded-xl bg-card p-6 ring-1 ring-hairline">
             <header className="flex items-baseline justify-between">
               <div>
@@ -117,7 +123,6 @@ export default function DashboardPage() {
               })()}
             </section>
           )}
-        </aside>
       </div>
     </div>
   );
