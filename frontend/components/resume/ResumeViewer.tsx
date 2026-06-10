@@ -19,7 +19,11 @@ export function ResumeViewer({ applicationId }: { applicationId: string }) {
   }
   return (
     <div className="overflow-hidden rounded-xl bg-card ring-1 ring-hairline">
-      <iframe title="resume" src={url} className="h-[70vh] w-full bg-white" sandbox="allow-same-origin allow-scripts" />
+      {/* No `sandbox`: Chrome refuses to render PDFs inside a sandboxed iframe
+          ("This page has been blocked by Chrome"). The document is cross-origin
+          (a short-lived Azure Blob SAS URL), so same-origin policy already keeps
+          it isolated from the dashboard. */}
+      <iframe title="resume" src={url} className="h-[70vh] w-full bg-white" referrerPolicy="no-referrer" />
       <a
         href={url}
         target="_blank"
