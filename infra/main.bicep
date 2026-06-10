@@ -85,7 +85,8 @@ param azureAdClientId string = ''
 @description('Provision Azure OpenAI + Document Intelligence. Set false on subscriptions without OpenAI access (e.g. MPN/credit) — backend then runs AI_PROVIDER=mock.')
 param deployAi bool = true
 
-@description('Scale stateless apps (api/worker/portal/dashboard) to 0 when idle to conserve credit. Scheduler always stays at 1 replica.')
+@description('DORMANT: every app is now pinned to minReplicas=1 for reliability — a cold scale-from-zero broke the public API/portal (failed first request) and silently stalled the worker queue. Kept for CD/runbook compatibility; flipping it has no effect until an app re-references it.')
+#disable-next-line no-unused-params
 param scaleToZero bool = false
 
 @description('When false, deploy without creating role assignments (for Contributor-only subscriptions): ACR admin-user pull + inline Container App secrets instead of managed identity + Key Vault. Set false on MPN/credit subs.')
@@ -536,7 +537,8 @@ module portalApp 'modules/container-app.bicep' = {
     image: portalImage
     ingressMode: 'external'
     targetPort: 3000
-    minReplicas: scaleToZero ? 0 : 1
+    // Always-on: avoid a cold first paint for candidates landing on the portal.
+    minReplicas: 1
     maxReplicas: 3
     envVars: [
       { name: 'NODE_ENV', value: 'production' }
@@ -558,7 +560,8 @@ module dashboardApp 'modules/container-app.bicep' = {
     image: dashboardImage
     ingressMode: 'external'
     targetPort: 3000
-    minReplicas: scaleToZero ? 0 : 1
+    // Always-on: avoid a cold first paint for HR users opening the console.
+    minReplicas: 1
     maxReplicas: 3
     envVars: [
       { name: 'NODE_ENV', value: 'production' }
