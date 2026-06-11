@@ -16,5 +16,5 @@ export function middleware(req: NextRequest) {
 
 export const config = {
   // Protect everything except the login page, Next internals, and static assets.
-  matcher: ["/((?!login|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!login|_next/static|_next/image|favicon.ico|icon.svg|apple-icon.png).*)"],
 };
