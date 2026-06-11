@@ -39,6 +39,14 @@ type Application struct {
 	TalentPool      bool      `json:"talent_pool"`
 	DedupState      string    `json:"dedup_state"`
 	CreatedAt       time.Time `json:"created_at"`
+	// Score explainability — the per-dimension breakdown and the LLM's
+	// qualitative output, surfaced on the candidate detail view so HR can see
+	// where a score came from. Populated by FindByID; omitempty keeps inbox list
+	// rows (which never select these) and unscored applications lean.
+	AIScoreBreakdown     *ScoreBreakdown `json:"ai_score_breakdown,omitempty"`
+	AISummary            string          `json:"ai_summary,omitempty"`
+	AIRedFlags           string          `json:"ai_red_flags,omitempty"`
+	AISuggestedPositions []string        `json:"ai_suggested_positions,omitempty"`
 	// Display fields — human-readable joins populated by the inbox List query so
 	// the UI can lead with a person (name + role + store) instead of a UUID.
 	// omitempty keeps single-record responses (Get/Intake) unchanged.
@@ -47,6 +55,18 @@ type Application struct {
 	SourceChannel     string `json:"source_channel,omitempty"`
 	PositionTitle     string `json:"position_title,omitempty"`
 	StoreName         string `json:"store_name,omitempty"`
+}
+
+// ScoreBreakdown is the per-dimension score read back for the detail view. The
+// JSON keys mirror what scoring.Breakdown writes into ai_score_breakdown, so the
+// stored JSONB unmarshals straight into this struct. Max points: experience 30,
+// skills 20 (LLM), education 10, language 10, location 20.
+type ScoreBreakdown struct {
+	Experience int `json:"experience"`
+	Skills     int `json:"skills"`
+	Education  int `json:"education"`
+	Language   int `json:"language"`
+	Location   int `json:"location"`
 }
 
 // Score carries scoring results in a repository-friendly (pre-serialized) form,

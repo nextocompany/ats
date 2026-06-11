@@ -6,6 +6,7 @@ import type { Application } from "@/lib/types";
 import { useSetStatus } from "@/lib/queries";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ScoreBreakdown } from "@/components/resume/ScoreBreakdown";
 
 const NEXT_ACTIONS: { label: string; value: string; variant?: "secondary" | "destructive" }[] = [
   { label: "Shortlist", value: "shortlisted", variant: "secondary" },
@@ -75,6 +76,14 @@ export function AiSummaryPanel({ app }: { app: Application }) {
         )}
         {app.dedup_state && app.dedup_state !== "none" && <Badge variant="outline">dedup: {app.dedup_state}</Badge>}
       </div>
+
+      {app.ai_score_breakdown && (
+        <ScoreBreakdown
+          breakdown={app.ai_score_breakdown}
+          summary={app.ai_summary}
+          redFlags={app.ai_red_flags}
+        />
+      )}
 
       <div className="h-px bg-hairline" />
 

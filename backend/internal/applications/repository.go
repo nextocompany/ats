@@ -2,6 +2,7 @@ package applications
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -62,17 +63,32 @@ func (r *pgRepository) FindByID(ctx context.Context, id uuid.UUID) (*Application
 		       ocr_confidence, COALESCE(needs_manual_review,false),
 		       COALESCE(queue_task_id,''), parsed_at,
 		       ai_score, must_have_passed, assigned_store_id,
-		       COALESCE(talent_pool,false), COALESCE(dedup_state,''), created_at
+		       COALESCE(talent_pool,false), COALESCE(dedup_state,''), created_at,
+		       ai_score_breakdown, COALESCE(ai_summary,''), COALESCE(ai_red_flags,''),
+		       ai_suggested_positions
 		FROM applications WHERE id = $1`
 	var a Application
+	var breakdownRaw, suggestedRaw []byte
 	err := r.pool.QueryRow(ctx, q, id).Scan(
 		&a.ID, &a.CandidateID, &a.PositionID, &a.Status,
 		&a.RawFileBlobURL, &a.RawFileType, &a.OCRTextBlobURL, &a.ParsedProfileBlobURL,
 		&a.OCRConfidence, &a.NeedsManualReview, &a.QueueTaskID, &a.ParsedAt,
 		&a.AIScore, &a.MustHavePassed, &a.AssignedStoreID, &a.TalentPool, &a.DedupState, &a.CreatedAt,
+		&breakdownRaw, &a.AISummary, &a.AIRedFlags, &suggestedRaw,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("applications: find by id: %w", err)
+	}
+	// Explainability JSONB columns are NULL until the application is scored;
+	// unmarshal only when present so an unscored record stays clean.
+	if len(breakdownRaw) > 0 {
+		var bd ScoreBreakdown
+		if jsonErr := json.Unmarshal(breakdownRaw, &bd); jsonErr == nil {
+			a.AIScoreBreakdown = &bd
+		}
+	}
+	if len(suggestedRaw) > 0 {
+		_ = json.Unmarshal(suggestedRaw, &a.AISuggestedPositions)
 	}
 	return &a, nil
 }
