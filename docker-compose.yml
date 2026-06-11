@@ -52,6 +52,10 @@ services:
       REDIS_URL: redis://redis:6379
       AZURE_BLOB_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;"
       AZURE_BLOB_CONTAINER: resumes
+      # The API reaches Azurite at the Docker-internal host azurite:10000, but the
+      # browser can't resolve that. Signed resume URLs are path-based SAS, so the
+      # browser-facing host is rewritten to localhost. Local dev only.
+      BLOB_PUBLIC_ENDPOINT: http://localhost:10000/devstoreaccount1
       JWT_SECRET: ${JWT_SECRET:-dev-only-change-me}
       REPORT_RECIPIENTS: ${REPORT_RECIPIENTS:-}
     ports:

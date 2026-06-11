@@ -13,6 +13,17 @@ export interface Envelope<T> {
   meta?: Meta;
 }
 
+// ScoreBreakdown is the per-dimension AI score (mirrors the Go
+// applications.ScoreBreakdown). Max points: experience 30, skills 20 (LLM),
+// education 10, language 10, location 20 → 100 total.
+export interface ScoreBreakdown {
+  experience: number;
+  skills: number;
+  education: number;
+  language: number;
+  location: number;
+}
+
 export interface Application {
   id: string;
   candidate_id: string;
@@ -30,6 +41,13 @@ export interface Application {
   parsed_profile_blob_url: string;
   parsed_at: string | null;
   created_at: string;
+  // Score explainability (single-record detail responses only). Present once the
+  // application is scored; the detail panel renders the per-dimension breakdown
+  // plus the LLM's strengths/red flags.
+  ai_score_breakdown?: ScoreBreakdown | null;
+  ai_summary?: string;
+  ai_red_flags?: string;
+  ai_suggested_positions?: string[] | null;
   // Human-readable joins from the inbox list endpoint (omitted on single-record
   // responses). The inbox leads with these so a row reads as a person, not a UUID.
   candidate_name?: string;

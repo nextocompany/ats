@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -15,10 +16,27 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/sas"
 )
 
+// sasServiceVersion pins the SAS signing version. The SDK otherwise defaults to
+// its newest service version, which Azurite (local dev) cannot validate →
+// "Server failed to authenticate the request" (403). 2021-08-06 is supported by
+// both Azurite and real Azure, so resume links work everywhere.
+const sasServiceVersion = "2021-08-06"
+
 // Client wraps the azblob client together with the working container name.
 type Client struct {
 	client    *azblob.Client
 	container string
+	// cred is the shared-key credential parsed from the connection string, used
+	// to sign SAS URLs with a pinned version. Nil when the connection string has
+	// no account key (e.g. managed-identity auth) — SignedURL then falls back to
+	// the SDK default.
+	cred *azblob.SharedKeyCredential
+	// publicBase, when set (BLOB_PUBLIC_ENDPOINT), replaces the internal service
+	// endpoint in signed URLs. Local dev needs this: the API reaches Azurite at
+	// http://azurite:10000 (a Docker-internal host the browser cannot resolve),
+	// but the SAS is path-based, so the browser-facing link can point at
+	// http://localhost:10000 instead. Unset in production → no rewrite.
+	publicBase string
 }
 
 // Connect builds a client from the connection string and ensures the container
@@ -28,11 +46,39 @@ func Connect(ctx context.Context, connString, containerName string) (*Client, er
 	if err != nil {
 		return nil, fmt.Errorf("blob: client: %w", err)
 	}
-	bc := &Client{client: c, container: containerName}
+	bc := &Client{
+		client:     c,
+		container:  containerName,
+		publicBase: strings.TrimRight(os.Getenv("BLOB_PUBLIC_ENDPOINT"), "/"),
+	}
+	// Best-effort: derive a shared-key credential for version-pinned SAS signing.
+	if name, key := parseAccount(connString); name != "" && key != "" {
+		if cred, credErr := azblob.NewSharedKeyCredential(name, key); credErr == nil {
+			bc.cred = cred
+		}
+	}
 	if err := bc.ensureContainer(ctx); err != nil {
 		return nil, err
 	}
 	return bc, nil
+}
+
+// parseAccount extracts AccountName and AccountKey from a storage connection
+// string (Key=Value;Key=Value;...). Returns empty strings when absent.
+func parseAccount(connString string) (name, key string) {
+	for _, part := range strings.Split(connString, ";") {
+		kv := strings.SplitN(part, "=", 2)
+		if len(kv) != 2 {
+			continue
+		}
+		switch strings.TrimSpace(kv[0]) {
+		case "AccountName":
+			name = strings.TrimSpace(kv[1])
+		case "AccountKey":
+			key = strings.TrimSpace(kv[1])
+		}
+	}
+	return name, key
 }
 
 // ensureContainer creates the container, treating "already exists" as success.
@@ -67,14 +113,48 @@ func (c *Client) Upload(ctx context.Context, name string, data []byte, contentTy
 	return strings.TrimRight(c.client.ServiceClient().URL(), "/") + "/" + c.container + "/" + name, nil
 }
 
-// SignedURL returns a short-lived, read-only SAS URL for the named blob.
+// SignedURL returns a short-lived, read-only SAS URL for the named blob. When a
+// shared-key credential is available it signs with a pinned SAS version (so the
+// link validates against Azurite as well as real Azure); otherwise it falls back
+// to the SDK default.
 func (c *Client) SignedURL(name string, ttl time.Duration) (string, error) {
 	bc := c.client.ServiceClient().NewContainerClient(c.container).NewBlobClient(name)
-	url, err := bc.GetSASURL(sas.BlobPermissions{Read: true}, time.Now().Add(ttl), nil)
+	if c.cred == nil {
+		url, err := bc.GetSASURL(sas.BlobPermissions{Read: true}, time.Now().Add(ttl), nil)
+		if err != nil {
+			return "", fmt.Errorf("blob: signed url for %q: %w", name, err)
+		}
+		return c.toPublic(url), nil
+	}
+
+	now := time.Now().UTC()
+	vals := sas.BlobSignatureValues{
+		Version:       sasServiceVersion,
+		Protocol:      sas.ProtocolHTTPSandHTTP,
+		StartTime:     now.Add(-5 * time.Minute),
+		ExpiryTime:    now.Add(ttl),
+		Permissions:   (&sas.BlobPermissions{Read: true}).String(),
+		ContainerName: c.container,
+		BlobName:      name,
+	}
+	qp, err := vals.SignWithSharedKey(c.cred)
 	if err != nil {
 		return "", fmt.Errorf("blob: signed url for %q: %w", name, err)
 	}
-	return url, nil
+	return c.toPublic(bc.URL()) + "?" + qp.Encode(), nil
+}
+
+// toPublic rewrites the internal service endpoint to the browser-facing one when
+// BLOB_PUBLIC_ENDPOINT is configured (local dev). No-op in production.
+func (c *Client) toPublic(rawURL string) string {
+	if c.publicBase == "" {
+		return rawURL
+	}
+	internal := strings.TrimRight(c.client.ServiceClient().URL(), "/")
+	if strings.HasPrefix(rawURL, internal) {
+		return c.publicBase + strings.TrimPrefix(rawURL, internal)
+	}
+	return rawURL
 }
 
 // SignedURLForStored derives the blob key from a previously stored full URL and

@@ -55,7 +55,10 @@ FROM (VALUES
   ('9900000000014', 'Cashier',          50, 69.0, '{"experience":19,"skills":15,"education":8,"language":8,"location":14}', 'ประสบการณ์บริการลูกค้า ร้านสะดวกซื้อ 1.5 ปี', NULL, TRUE, 'scored',      FALSE, 0.87, FALSE)
 ) AS d(id_card, title_en, store_no, ai_score, breakdown, summary, red_flags, passed, status, talent_pool, ocr, manual_review)
 JOIN candidates c ON c.id_card = d.id_card
-JOIN positions p ON p.title_en = d.title_en
+-- One position per title_en. Prod has duplicate title_en rows (70 positions / 65
+-- distinct titles); a plain JOIN would emit two applications per duplicated title.
+JOIN (SELECT DISTINCT ON (title_en) id, title_en FROM positions ORDER BY title_en, id) p
+  ON p.title_en = d.title_en
 WHERE NOT EXISTS (
   SELECT 1 FROM applications a WHERE a.candidate_id = c.id AND a.position_id = p.id
 );
