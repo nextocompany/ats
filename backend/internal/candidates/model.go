@@ -20,7 +20,10 @@ type Candidate struct {
 	DateOfBirth   *time.Time `json:"date_of_birth"`
 	SourceChannel string     `json:"source_channel"`
 	Status        string     `json:"status"`
-	CreatedAt     time.Time  `json:"created_at"`
+	// LineUserID is the verified LINE `sub` (from the LIFF id-token), captured at
+	// apply time so real LINE push has a valid recipient. Empty for legacy/demo.
+	LineUserID string    `json:"line_user_id,omitempty"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 // ProfileFields are the parsed values written back after CV parsing.
