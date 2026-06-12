@@ -77,7 +77,8 @@ func (h *Handler) Apply(c *fiber.Ctx) error {
 	if idToken == "" {
 		idToken = c.FormValue("line_id_token")
 	}
-	if _, err := h.verifier.Verify(c.UserContext(), idToken); err != nil {
+	lineUser, err := h.verifier.Verify(c.UserContext(), idToken)
+	if err != nil {
 		return fiber.NewError(fiber.StatusUnauthorized, "LINE authentication required")
 	}
 
@@ -127,6 +128,7 @@ func (h *Handler) Apply(c *fiber.Ctx) error {
 		IDCard:        c.FormValue("id_card"),
 		Province:      c.FormValue("province"),
 		SourceChannel: "career_portal",
+		LineUserID:    lineUser.Subject,
 		PositionID:    positionID,
 		FileName:      fileHeader.Filename,
 		FileType:      fileType,

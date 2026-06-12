@@ -22,6 +22,10 @@ COPY . .
 # Public API origin baked into the client bundle at build time.
 ARG NEXT_PUBLIC_API_URL=http://localhost:8080
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+# LIFF id (slice 2.3) — compile-time baked. Unset → portal uses the dev LINE
+# stub; set → real LIFF login.
+ARG NEXT_PUBLIC_LIFF_ID
+ENV NEXT_PUBLIC_LIFF_ID=${NEXT_PUBLIC_LIFF_ID}
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm build
 

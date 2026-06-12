@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",
+    "@line/liff": "^2.29.0",
     "@serwist/next": "^9.5.11",
     "@tanstack/react-query": "^5.100.14",
     "class-variance-authority": "^0.7.1",

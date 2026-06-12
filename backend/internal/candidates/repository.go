@@ -46,13 +46,13 @@ func nullable(s string) *string {
 
 func (r *pgRepository) Create(ctx context.Context, c Candidate) (Candidate, error) {
 	const q = `
-		INSERT INTO candidates (full_name, phone, email, id_card, address, province, subregion, date_of_birth, source_channel, status)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, COALESCE(NULLIF($10,''), 'available'))
+		INSERT INTO candidates (full_name, phone, email, id_card, address, province, subregion, date_of_birth, source_channel, status, line_user_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, COALESCE(NULLIF($10,''), 'available'), $11)
 		RETURNING id, created_at`
 	err := r.pool.QueryRow(ctx, q,
 		c.FullName, nullable(c.Phone), nullable(c.Email), nullable(c.IDCard),
 		nullable(c.Address), nullable(c.Province), nullable(c.Subregion),
-		c.DateOfBirth, nullable(c.SourceChannel), c.Status,
+		c.DateOfBirth, nullable(c.SourceChannel), c.Status, nullable(c.LineUserID),
 	).Scan(&c.ID, &c.CreatedAt)
 	if err != nil {
 		return Candidate{}, fmt.Errorf("candidates: create: %w", err)
@@ -64,13 +64,13 @@ func (r *pgRepository) FindByID(ctx context.Context, id uuid.UUID) (*Candidate, 
 	const q = `
 		SELECT id, full_name, COALESCE(phone,''), COALESCE(email,''), COALESCE(id_card,''),
 		       COALESCE(address,''), COALESCE(province,''), COALESCE(subregion,''),
-		       date_of_birth, COALESCE(source_channel,''), status, created_at
+		       date_of_birth, COALESCE(source_channel,''), status, COALESCE(line_user_id,''), created_at
 		FROM candidates WHERE id = $1`
 	var c Candidate
 	err := r.pool.QueryRow(ctx, q, id).Scan(
 		&c.ID, &c.FullName, &c.Phone, &c.Email, &c.IDCard,
 		&c.Address, &c.Province, &c.Subregion, &c.DateOfBirth,
-		&c.SourceChannel, &c.Status, &c.CreatedAt,
+		&c.SourceChannel, &c.Status, &c.LineUserID, &c.CreatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("candidates: find by id: %w", err)
