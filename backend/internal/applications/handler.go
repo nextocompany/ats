@@ -8,6 +8,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
 
+	"github.com/nexto/hr-ats/internal/candidates"
+	"github.com/nexto/hr-ats/internal/notify"
 	"github.com/nexto/hr-ats/pkg/httpx"
 )
 
@@ -29,10 +31,17 @@ type HiredSyncer interface {
 
 // Handler serves the intake and status endpoints.
 type Handler struct {
-	svc       *Service
-	apps      Repository
-	inspector JobInspector
-	hired     HiredSyncer
+	svc        *Service
+	apps       Repository
+	inspector  JobInspector
+	hired      HiredSyncer
+	notifyDeps statusNotifyDeps
+}
+
+// SetNotifier wires best-effort candidate notifications on status changes. Unset
+// → no notifications (CI/local/tests). Mirrors DashboardHandler.SetIndexer.
+func (h *Handler) SetNotifier(n notify.Notifier, cands candidates.Repository, portalBaseURL string) {
+	h.notifyDeps = statusNotifyDeps{notifier: n, cands: cands, portalBaseURL: portalBaseURL}
 }
 
 // NewHandler builds the applications handler.
@@ -166,11 +175,13 @@ func (h *Handler) UpdateStatus(c *fiber.Ctx) error {
 				return err
 			}
 		}
+		h.notifyDeps.notifyStatusChange(c.UserContext(), h.apps, id, StatusHired)
 		return httpx.OK(c, fiber.Map{"id": id, "status": StatusHired})
 	}
 
 	if err := h.apps.SetStatus(c.UserContext(), id, req.Status); err != nil {
 		return err
 	}
+	h.notifyDeps.notifyStatusChange(c.UserContext(), h.apps, id, req.Status)
 	return httpx.OK(c, fiber.Map{"id": id, "status": req.Status})
 }

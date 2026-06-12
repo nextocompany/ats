@@ -78,15 +78,15 @@ func (s *Service) Reengage(ctx context.Context, positionID uuid.UUID) (int, erro
 	return sent, nil
 }
 
-// pickChannel prefers email, then LINE via phone as the recipient handle. (Real
-// LINE push needs a stored LINE user id — a deploy-time enhancement; mock logs.)
-// Returns ("", "") when the candidate has no usable contact channel.
+// pickChannel prefers a real LINE push (requires the stored LINE user id), then
+// falls back to email. Phone is NOT a valid LINE recipient, so it is no longer
+// used as a handle. Returns ("", "") when the candidate has no usable channel.
 func pickChannel(t Target) (channel, recipient string) {
+	if t.LineUserID != "" {
+		return notify.ChannelLINE, t.LineUserID
+	}
 	if t.Email != "" {
 		return notify.ChannelEmail, t.Email
-	}
-	if t.Phone != "" {
-		return notify.ChannelLINE, t.Phone
 	}
 	return "", ""
 }
