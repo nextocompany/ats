@@ -169,9 +169,15 @@ func main() {
 	lineVerifier := auth.NewVerifier(cfg)
 	reengageTrigger := reengage.NewTrigger(queueClient)
 
-	// Intake + status routes (status PATCH triggers PS sync on hired).
+	// Shared outbound notifier (mock by default; LINE push / email when real).
+	notifier := notify.NewNotifier(cfg)
+
+	// Intake + status routes (status PATCH triggers PS sync on hired). Status
+	// changes send a best-effort candidate notification (slice 2.3).
 	intakeSvc := applications.NewService(candidateRepo, appRepo, blobClient, queueClient)
-	applications.RegisterRoutes(app, applications.NewHandler(intakeSvc, appRepo, inspector, psService))
+	intakeHandler := applications.NewHandler(intakeSvc, appRepo, inspector, psService)
+	intakeHandler.SetNotifier(notifier, candidateRepo, cfg.PortalBaseURL)
+	applications.RegisterRoutes(app, intakeHandler)
 
 	// PeopleSoft integration (Direction A webhooks + Direction B sync). Vacancy
 	// open fires candidate re-engagement (Sprint 5a).
@@ -211,6 +217,7 @@ func main() {
 	}
 	dashboardHandler := applications.NewDashboardHandler(appRepo, blobClient, activityLog)
 	dashboardHandler.SetIndexer(search.NewCandidateSync(pool, searchIndexer))
+	dashboardHandler.SetNotifier(notifier, candidateRepo, cfg.PortalBaseURL)
 	applications.RegisterDashboardRoutes(app, dashboardHandler)
 	// Candidate search (Sprint 5c) — registered BEFORE profiles so the static
 	// /candidates/search path takes precedence over /candidates/:id. Mock Postgres
@@ -220,7 +227,7 @@ func main() {
 	// Analytics + report exports (Sprint 5b): on-demand export rides the same
 	// export service the scheduler/worker use; delivery via the notify seam.
 	reportRepo := reports.New(pool)
-	reportExporter := reports.NewExportService(reportRepo, blobClient, notify.NewNotifier(cfg), cfg.ReportRecipientList())
+	reportExporter := reports.NewExportService(reportRepo, blobClient, notifier, cfg.ReportRecipientList())
 	reports.RegisterRoutes(app, reports.NewHandler(reportRepo, reportExporter, blobClient))
 	pdpa.RegisterRoutes(app, pdpa.NewHandler(pdpaRepo))
 	users.RegisterRoutes(app, users.NewHandler())

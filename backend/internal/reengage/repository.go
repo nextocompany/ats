@@ -20,6 +20,7 @@ type Target struct {
 	Phone       string
 	Email       string
 	Province    string
+	LineUserID  string // verified LINE `sub` — the only valid LINE push recipient
 }
 
 // Repo is the re-engagement data-access contract (accept-interface in the service).
@@ -41,7 +42,7 @@ func (r *pgRepo) MatchingCandidates(ctx context.Context, positionID uuid.UUID) (
 	// Talent-pool or rejected applicants for this position, excluding merged
 	// duplicates and anyone already re-engaged for it.
 	const q = `
-		SELECT DISTINCT c.id, c.full_name, COALESCE(c.phone,''), COALESCE(c.email,''), COALESCE(c.province,'')
+		SELECT DISTINCT c.id, c.full_name, COALESCE(c.phone,''), COALESCE(c.email,''), COALESCE(c.province,''), COALESCE(c.line_user_id,'')
 		FROM candidates c
 		JOIN applications a ON a.candidate_id = c.id
 		WHERE a.position_id = $1
@@ -60,7 +61,7 @@ func (r *pgRepo) MatchingCandidates(ctx context.Context, positionID uuid.UUID) (
 	var out []Target
 	for rows.Next() {
 		var t Target
-		if err := rows.Scan(&t.CandidateID, &t.FullName, &t.Phone, &t.Email, &t.Province); err != nil {
+		if err := rows.Scan(&t.CandidateID, &t.FullName, &t.Phone, &t.Email, &t.Province, &t.LineUserID); err != nil {
 			return nil, fmt.Errorf("reengage: scan target: %w", err)
 		}
 		out = append(out, t)

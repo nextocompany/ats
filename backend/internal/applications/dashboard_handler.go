@@ -9,7 +9,9 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/nexto/hr-ats/internal/activity"
+	"github.com/nexto/hr-ats/internal/candidates"
 	"github.com/nexto/hr-ats/internal/middleware"
+	"github.com/nexto/hr-ats/internal/notify"
 	"github.com/nexto/hr-ats/internal/rbac"
 	"github.com/nexto/hr-ats/pkg/httpx"
 )
@@ -39,10 +41,11 @@ func (noopReindexer) Index(context.Context, uuid.UUID) error { return nil }
 
 // DashboardHandler serves the HR inbox read/bulk/resume endpoints.
 type DashboardHandler struct {
-	apps     Repository
-	signer   ResumeSigner
-	activity ActivityWriter
-	indexer  CandidateIndexer
+	apps       Repository
+	signer     ResumeSigner
+	activity   ActivityWriter
+	indexer    CandidateIndexer
+	notifyDeps statusNotifyDeps
 }
 
 // NewDashboardHandler builds the dashboard handler.
@@ -56,6 +59,12 @@ func (h *DashboardHandler) SetIndexer(idx CandidateIndexer) {
 	if idx != nil {
 		h.indexer = idx
 	}
+}
+
+// SetNotifier wires best-effort candidate notifications on bulk status changes.
+// Unset → no notifications. Mirrors SetIndexer.
+func (h *DashboardHandler) SetNotifier(n notify.Notifier, cands candidates.Repository, portalBaseURL string) {
+	h.notifyDeps = statusNotifyDeps{notifier: n, cands: cands, portalBaseURL: portalBaseURL}
 }
 
 // RegisterDashboardRoutes mounts the inbox endpoints.
@@ -162,6 +171,8 @@ func (h *DashboardHandler) Bulk(c *fiber.Ctx) error {
 		if app, ferr := h.apps.FindByID(c.UserContext(), id); ferr == nil {
 			_ = h.indexer.Index(c.UserContext(), app.CandidateID)
 		}
+		// Notify the candidate — best-effort, never fails the bulk action.
+		h.notifyDeps.notifyStatusChange(c.UserContext(), h.apps, id, target)
 		updated++
 	}
 	return httpx.OK(c, fiber.Map{"updated": updated, "failed": failed, "status": target})

@@ -10,8 +10,10 @@ import (
 	"github.com/google/uuid"
 )
 
-// TestReengageFlow: a rejected applicant + manual re-engage trigger → a
-// reengagement_contacts row (worker processes the async job, mock-notify).
+// TestReengageFlow: a rejected applicant with a LINE handle + manual re-engage
+// trigger → a reengagement_contacts row (worker processes the async job,
+// mock-notify). The candidate needs a line_user_id (or email) to be reachable —
+// phone alone is not a valid LINE push recipient (slice 2.3).
 func TestReengageFlow(t *testing.T) {
 	waitHealthy(t)
 	pool := mustPool(t)
@@ -20,7 +22,7 @@ func TestReengageFlow(t *testing.T) {
 
 	var candID uuid.UUID
 	if err := pool.QueryRow(ctx,
-		`INSERT INTO candidates (full_name, phone, source_channel, status) VALUES ('รีเอนเกจ E2E','0899999999','career_portal','available') RETURNING id`).
+		`INSERT INTO candidates (full_name, phone, line_user_id, source_channel, status) VALUES ('รีเอนเกจ E2E','0899999999','U-e2e-reengage','career_portal','available') RETURNING id`).
 		Scan(&candID); err != nil {
 		t.Fatalf("seed candidate: %v", err)
 	}
