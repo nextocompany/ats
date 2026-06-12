@@ -23,10 +23,18 @@ export function isLiffConfigured(): boolean {
 export async function getIdToken(): Promise<string> {
   if (!isLiffConfigured()) return DEV_STUB_TOKEN;
   const { default: liff } = await import("@line/liff");
-  await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID! });
+  try {
+    await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID! });
+  } catch (e) {
+    throw new Error(
+      `LIFF init failed (liffId=${process.env.NEXT_PUBLIC_LIFF_ID}): ${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
   if (!liff.isLoggedIn()) {
-    liff.login();
-    return ""; // login() redirects; nothing to return on this pass
+    // Redirect to LINE login, returning to THIS page (the apply step) — not the
+    // LIFF app's default endpoint. The browser navigates away; nothing resolves.
+    liff.login({ redirectUri: window.location.href });
+    return "";
   }
   return liff.getIDToken() ?? "";
 }

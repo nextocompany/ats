@@ -16,12 +16,21 @@ interface LineLoginButtonProps {
 // shows a confirmed state so the candidate knows they can submit.
 export function LineLoginButton({ onToken, connected }: LineLoginButtonProps) {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleLogin() {
     setLoading(true);
+    setError(null);
     try {
       const token = await getIdToken();
-      onToken(token);
+      // An empty token means LIFF is redirecting to LINE login — the page is
+      // navigating away, so leave the button as-is.
+      if (token) onToken(token);
+    } catch (e) {
+      // Surface the real failure instead of silently doing nothing.
+      setError(e instanceof Error ? e.message : "LINE login failed");
+      // eslint-disable-next-line no-console
+      console.error("LINE login error:", e);
     } finally {
       setLoading(false);
     }
@@ -42,14 +51,21 @@ export function LineLoginButton({ onToken, connected }: LineLoginButtonProps) {
   }
 
   return (
-    <Button
-      type="button"
-      size="tap"
-      onClick={handleLogin}
-      disabled={loading}
-      className="w-full bg-[oklch(64%_0.16_150)] text-white hover:bg-[oklch(60%_0.16_150)]"
-    >
-      {loading ? "กำลังเชื่อมต่อ…" : "เข้าสู่ระบบด้วย LINE"}
-    </Button>
+    <div className="space-y-2">
+      <Button
+        type="button"
+        size="tap"
+        onClick={handleLogin}
+        disabled={loading}
+        className="w-full bg-[oklch(64%_0.16_150)] text-white hover:bg-[oklch(60%_0.16_150)]"
+      >
+        {loading ? "กำลังเชื่อมต่อ…" : "เข้าสู่ระบบด้วย LINE"}
+      </Button>
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          เชื่อมต่อ LINE ไม่สำเร็จ: {error}
+        </p>
+      )}
+    </div>
   );
 }
