@@ -3,7 +3,7 @@
 import { toast } from "sonner";
 
 import type { Application } from "@/lib/types";
-import { useSetStatus } from "@/lib/queries";
+import { useInviteInterview, useSetStatus } from "@/lib/queries";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScoreBreakdown } from "@/components/resume/ScoreBreakdown";
@@ -17,12 +17,19 @@ const NEXT_ACTIONS: { label: string; value: string; variant?: "secondary" | "des
 
 export function AiSummaryPanel({ app }: { app: Application }) {
   const setStatus = useSetStatus(app.id);
+  const inviteInterview = useInviteInterview(app.id);
 
   const act = (value: string, label: string) =>
     setStatus.mutate(value, {
       onSuccess: () =>
         toast.success(value === "hired" ? "Hired — pushed to PeopleSoft" : `Status: ${label}`),
       onError: (e) => toast.error(e instanceof Error ? e.message : "Update failed"),
+    });
+
+  const sendInterview = () =>
+    inviteInterview.mutate(undefined, {
+      onSuccess: () => toast.success("AI interview invite sent"),
+      onError: (e) => toast.error(e instanceof Error ? e.message : "Could not send interview"),
     });
 
   const score = app.ai_score;
@@ -105,6 +112,21 @@ export function AiSummaryPanel({ app }: { app: Application }) {
             </Button>
           ))}
         </div>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={inviteInterview.isPending}
+          onClick={sendInterview}
+          className="mt-2 w-full"
+        >
+          {inviteInterview.isPending ? (
+            "Sending…"
+          ) : (
+            <>
+              <span aria-hidden="true">▶</span> Send AI interview
+            </>
+          )}
+        </Button>
       </div>
 
       <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2.5 border-t border-hairline pt-5 text-xs">

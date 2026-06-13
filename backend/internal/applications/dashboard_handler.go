@@ -184,6 +184,11 @@ func (h *DashboardHandler) Resume(c *fiber.Ctx) error {
 	if err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "invalid application id")
 	}
+	if ok, serr := h.apps.ExistsInScope(c.UserContext(), id, scopeFrom(c)); serr != nil {
+		return serr
+	} else if !ok {
+		return fiber.NewError(fiber.StatusNotFound, "application not found")
+	}
 	app, err := h.apps.FindByID(c.UserContext(), id)
 	if err != nil {
 		return fiber.NewError(fiber.StatusNotFound, "application not found")

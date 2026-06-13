@@ -2,12 +2,14 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { api, buildQuery } from "./api";
+import { api, ApiError, buildQuery } from "./api";
 import type {
   Application,
   ApplicationFilter,
   Candidate,
   Funnel,
+  InterviewInviteResult,
+  InterviewView,
   KPI,
   Me,
   OpenRole,
@@ -134,6 +136,35 @@ export function useSetStatus(id: string) {
       qc.invalidateQueries({ queryKey: ["application", id] });
       qc.invalidateQueries({ queryKey: ["applications"] });
     },
+  });
+}
+
+// useInterview loads the AI pre-interview session for an application. A 404 (no
+// interview yet) resolves to null rather than an error so the panel can render a
+// neutral "not invited" state.
+export function useInterview(id: string) {
+  return useQuery({
+    queryKey: ["interview-session", id],
+    queryFn: async () => {
+      try {
+        return (await api.get<InterviewView>(`/api/v1/applications/${id}/interview`)).data;
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 404) return null;
+        throw e;
+      }
+    },
+    enabled: !!id,
+    retry: false,
+  });
+}
+
+// useInviteInterview triggers (or re-fetches, idempotently) the AI pre-interview
+// for an application and refreshes the interview view.
+export function useInviteInterview(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<InterviewInviteResult>(`/api/v1/applications/${id}/interview`).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["interview-session", id] }),
   });
 }
 

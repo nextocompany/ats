@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
 import { AiSummaryPanel } from "@/components/resume/AiSummaryPanel";
+import { InterviewPanel } from "@/components/resume/InterviewPanel";
 import { ResumeViewer } from "@/components/resume/ResumeViewer";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useApplication } from "@/lib/queries";
@@ -43,6 +44,7 @@ export default function ApplicationDetailPage() {
             className="h-fit rounded-xl bg-card p-6 ring-1 ring-hairline lg:sticky lg:top-6"
           >
             <AiSummaryPanel app={app} />
+            <InterviewPanel applicationId={app.id} />
           </aside>
         </div>
       )}

@@ -77,6 +77,49 @@ export interface TimelineEntry {
   created_at: string;
 }
 
+// --- AI pre-interview (slice 2.5) ---
+
+export interface InterviewTurn {
+  role: "assistant" | "user";
+  content: string;
+  ts?: string;
+}
+
+// InterviewSession mirrors the backend interview.Session JSON. Evaluation fields
+// are null/empty until status === "completed".
+export interface InterviewSession {
+  id: string;
+  application_id: string;
+  access_token: string;
+  status: string;
+  conversation: InterviewTurn[];
+  turn_count: number;
+  interview_score: number | null;
+  recommendation: string;
+  strengths: string[] | null;
+  concerns: string[] | null;
+  summary: string;
+  invited_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  expires_at: string;
+  created_at: string;
+}
+
+// GET /api/v1/applications/:id/interview
+export interface InterviewView {
+  session: InterviewSession;
+  interview_url: string;
+}
+
+// POST /api/v1/applications/:id/interview
+export interface InterviewInviteResult {
+  id: string;
+  status: string;
+  access_token: string;
+  interview_url: string;
+}
+
 export interface Funnel {
   applied: number;
   passed_ai: number;

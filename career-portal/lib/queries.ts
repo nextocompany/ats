@@ -3,7 +3,14 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 
 import { api } from "./api";
-import type { ApplyInput, ApplyResult, ApplicationStatus, PositionDetail, PublicPosition } from "./types";
+import type {
+  ApplyInput,
+  ApplyResult,
+  ApplicationStatus,
+  InterviewSessionState,
+  PositionDetail,
+  PublicPosition,
+} from "./types";
 
 export function usePublicPositions() {
   return useQuery({
@@ -54,5 +61,31 @@ export function useStatus(token: string) {
       api.get<ApplicationStatus>(`/api/v1/public/status/${encodeURIComponent(token)}`).then((r) => r.data),
     enabled: !!token,
     retry: false,
+  });
+}
+
+// useInterviewSession loads (and on first open, seeds) the AI pre-interview chat
+// for the given access token.
+export function useInterviewSession(token: string) {
+  return useQuery({
+    queryKey: ["interview", token],
+    queryFn: () =>
+      api.get<InterviewSessionState>(`/api/v1/public/interview/${encodeURIComponent(token)}`).then((r) => r.data),
+    enabled: !!token,
+    retry: false,
+    // The local chat state is authoritative once seeded; avoid focus refetches
+    // that would be discarded anyway.
+    staleTime: Infinity,
+  });
+}
+
+// useInterviewRespond submits the candidate's answer and returns the updated
+// conversation (next AI question, or the completed state).
+export function useInterviewRespond(token: string) {
+  return useMutation<InterviewSessionState, Error, string>({
+    mutationFn: (content) =>
+      api
+        .post<InterviewSessionState>(`/api/v1/public/interview/${encodeURIComponent(token)}/message`, { content })
+        .then((r) => r.data),
   });
 }
