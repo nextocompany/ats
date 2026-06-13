@@ -2,6 +2,7 @@ package candidateauth
 
 import (
 	"context"
+	"crypto/subtle"
 	"errors"
 	"fmt"
 	"time"
@@ -265,25 +266,71 @@ func (r *pgRepository) CreateOTP(ctx context.Context, email, codeHash string, ex
 	return nil
 }
 
+// maxOTPAttempts is the per-challenge failed-verify cap. After this many wrong
+// guesses the newest live challenge is locked (consumed), so a 6-digit code can be
+// guessed at most maxOTPAttempts times before the attacker must request a new code
+// (which is IP-rate-limited at /email/start). This is the brute-force throttle.
+const maxOTPAttempts = 5
+
 func (r *pgRepository) ConsumeOTP(ctx context.Context, email, codeHash string) error {
-	// Mark the newest live challenge consumed; RETURNING id tells us one matched.
-	const q = `
-		UPDATE email_otps SET consumed_at = NOW(), attempts = attempts + 1
-		WHERE id = (
-			SELECT id FROM email_otps
-			WHERE email = $1 AND code_hash = $2 AND consumed_at IS NULL AND expires_at > NOW()
-			ORDER BY created_at DESC LIMIT 1
-		)
-		RETURNING id`
-	var id uuid.UUID
-	err := r.pool.QueryRow(ctx, q, email, codeHash).Scan(&id)
+	// Lock the newest live challenge for this email and count EVERY verify attempt
+	// (success or failure) against it — the previous version only counted matches,
+	// so failures were never throttled. Done in a tx with FOR UPDATE to serialise
+	// concurrent guesses.
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("candidateauth: consume otp begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var (
+		id         uuid.UUID
+		storedHash string
+		attempts   int
+	)
+	const sel = `
+		SELECT id, code_hash, attempts FROM email_otps
+		WHERE email = $1 AND consumed_at IS NULL AND expires_at > NOW()
+		ORDER BY created_at DESC LIMIT 1
+		FOR UPDATE`
+	err = tx.QueryRow(ctx, sel, email).Scan(&id, &storedHash, &attempts)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return ErrOTPInvalid
+		return ErrOTPInvalid // no live challenge (none/expired/already consumed)
 	}
 	if err != nil {
-		return fmt.Errorf("candidateauth: consume otp: %w", err)
+		return fmt.Errorf("candidateauth: consume otp select: %w", err)
 	}
-	return nil
+
+	// Too many failed guesses → lock the challenge out, force a fresh code.
+	if attempts >= maxOTPAttempts {
+		if _, err := tx.Exec(ctx, `UPDATE email_otps SET consumed_at = NOW() WHERE id = $1`, id); err != nil {
+			return fmt.Errorf("candidateauth: consume otp lock: %w", err)
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return fmt.Errorf("candidateauth: consume otp commit: %w", err)
+		}
+		return ErrOTPInvalid
+	}
+
+	match := subtle.ConstantTimeCompare([]byte(storedHash), []byte(codeHash)) == 1
+	if match {
+		if _, err := tx.Exec(ctx, `UPDATE email_otps SET consumed_at = NOW(), attempts = attempts + 1 WHERE id = $1`, id); err != nil {
+			return fmt.Errorf("candidateauth: consume otp success: %w", err)
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return fmt.Errorf("candidateauth: consume otp commit: %w", err)
+		}
+		return nil
+	}
+
+	// Wrong code: count the failed attempt, keep the challenge live until the cap.
+	if _, err := tx.Exec(ctx, `UPDATE email_otps SET attempts = attempts + 1 WHERE id = $1`, id); err != nil {
+		return fmt.Errorf("candidateauth: consume otp fail: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("candidateauth: consume otp commit: %w", err)
+	}
+	return ErrOTPInvalid
 }
 
 func isUnique(err error) bool {
