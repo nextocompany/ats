@@ -25,6 +25,7 @@ func realHandler() *Handler {
 		channelSecret: "secret",
 		callbackURL:   "https://api.example.com/api/v1/public/line/callback",
 		portalBaseURL: "https://portal.example.com",
+		botPrompt:     "aggressive",
 		real:          true,
 	}
 }
@@ -63,7 +64,7 @@ func TestLogin_Real_RedirectsToLineWithState(t *testing.T) {
 		t.Fatalf("want 302, got %d", resp.StatusCode)
 	}
 	location := resp.Header.Get("Location")
-	for _, want := range []string{authorizeURL, "client_id=2010375490", "scope=openid+profile", "response_type=code", "state="} {
+	for _, want := range []string{authorizeURL, "client_id=2010375490", "scope=openid+profile", "response_type=code", "state=", "bot_prompt=aggressive"} {
 		if !strings.Contains(location, want) {
 			t.Fatalf("authorize URL missing %q: %s", want, location)
 		}

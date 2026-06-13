@@ -74,6 +74,11 @@ type Config struct {
 	// the one registered on the LINE Login channel.
 	LINEChannelSecret    string
 	LINELoginCallbackURL string
+	// LINELoginBotPrompt asks LINE to offer "add the Official Account as a friend"
+	// during login ("aggressive" = dedicated screen, "normal" = inline option, ""
+	// = off). Requires the Login channel to be linked to the Messaging API channel
+	// in the LINE console; ignored by LINE otherwise.
+	LINELoginBotPrompt string
 
 	// Notifications (re-engagement, report delivery) — "mock" (default) or "real".
 	NotifyProvider  string
@@ -163,6 +168,7 @@ func Load() (*Config, error) {
 		LINEChannelID:        os.Getenv("LINE_CHANNEL_ID"),
 		LINEChannelSecret:    os.Getenv("LINE_CHANNEL_SECRET"),
 		LINELoginCallbackURL: os.Getenv("LINE_LOGIN_CALLBACK_URL"),
+		LINELoginBotPrompt:   getenv("LINE_LOGIN_BOT_PROMPT", "aggressive"),
 
 		NotifyProvider:  getenv("NOTIFY_PROVIDER", "mock"),
 		NotifyLINEToken: os.Getenv("NOTIFY_LINE_TOKEN"),

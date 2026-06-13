@@ -42,6 +42,7 @@ type Handler struct {
 	channelSecret string
 	callbackURL   string
 	portalBaseURL string
+	botPrompt     string
 	real          bool
 	secureCookie  bool
 	http          *http.Client
@@ -54,6 +55,7 @@ func NewHandler(cfg *config.Config) *Handler {
 		channelSecret: cfg.LINEChannelSecret,
 		callbackURL:   cfg.LINELoginCallbackURL,
 		portalBaseURL: strings.TrimRight(cfg.PortalBaseURL, "/"),
+		botPrompt:     cfg.LINELoginBotPrompt,
 		real:          cfg.UsesRealLINE(),
 		secureCookie:  !cfg.IsDevelopment(),
 		http:          &http.Client{Timeout: 10 * time.Second},
@@ -96,6 +98,12 @@ func (h *Handler) Login(c *fiber.Ctx) error {
 		"redirect_uri":  {h.callbackURL},
 		"state":         {state},
 		"scope":         {"openid profile"},
+	}
+	// Prompt the candidate to add the linked Official Account as a friend during
+	// login, so status/interview LINE pushes can actually reach them. Requires the
+	// channels to be linked in the LINE console; LINE ignores it otherwise.
+	if h.botPrompt != "" {
+		q.Set("bot_prompt", h.botPrompt)
 	}
 	return c.Redirect(authorizeURL+"?"+q.Encode(), fiber.StatusFound)
 }
