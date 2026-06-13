@@ -163,3 +163,43 @@ func ParseRetentionSweepPayload(body []byte) (RetentionSweepPayload, error) {
 	}
 	return p, nil
 }
+
+// TypeAuthCleanup is the asynq task type for the candidate-membership auth
+// cleanup: delete expired/consumed email_otps and expired/revoked
+// candidate_sessions so those tables don't grow unbounded.
+const TypeAuthCleanup = "auth:cleanup"
+
+// AuthCleanupPayload is the job body for an auth cleanup. Batch is optional; the
+// handler derives the default from config when zero.
+type AuthCleanupPayload struct {
+	Batch int `json:"batch"` // max rows per delete batch; 0 → config default
+}
+
+// authCleanupUniqueTTL dedups overlapping cleanup enqueues during a rolling deploy.
+const authCleanupUniqueTTL = 1 * time.Hour
+
+// NewAuthCleanupTask builds the auth-cleanup task with retry/timeout policy and
+// enqueue-scoped uniqueness.
+func NewAuthCleanupTask(p AuthCleanupPayload) (*asynq.Task, error) {
+	body, err := json.Marshal(p)
+	if err != nil {
+		return nil, fmt.Errorf("queue: marshal payload: %w", err)
+	}
+	return asynq.NewTask(
+		TypeAuthCleanup,
+		body,
+		asynq.MaxRetry(taskMaxRetry),
+		asynq.Timeout(taskTimeout),
+		asynq.Retention(taskRetention),
+		asynq.Unique(authCleanupUniqueTTL),
+	), nil
+}
+
+// ParseAuthCleanupPayload decodes an auth-cleanup task body.
+func ParseAuthCleanupPayload(body []byte) (AuthCleanupPayload, error) {
+	var p AuthCleanupPayload
+	if err := json.Unmarshal(body, &p); err != nil {
+		return p, fmt.Errorf("queue: unmarshal payload: %w", err)
+	}
+	return p, nil
+}

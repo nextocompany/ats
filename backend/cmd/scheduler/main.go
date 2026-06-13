@@ -59,6 +59,22 @@ func main() {
 		log.Info().Msg("scheduler: retention sweep disabled (RETENTION_SWEEP_ENABLED=false)")
 	}
 
+	// Auth cleanup (candidate membership): purge expired OTP/session rows. Benign
+	// housekeeping → enabled by default (only removes already-dead auth artifacts).
+	if cfg.AuthCleanupEnabled {
+		cleanupTask, err := queue.NewAuthCleanupTask(queue.AuthCleanupPayload{})
+		if err != nil {
+			log.Fatal().Err(err).Msg("build auth cleanup task failed")
+		}
+		cleanupID, err := scheduler.Register(cfg.AuthCleanupCron, cleanupTask)
+		if err != nil {
+			log.Fatal().Err(err).Str("cron", cfg.AuthCleanupCron).Msg("register auth cleanup failed")
+		}
+		log.Info().Str("cron", cfg.AuthCleanupCron).Str("entry_id", cleanupID).Msg("scheduler: auth:cleanup registered")
+	} else {
+		log.Info().Msg("scheduler: auth cleanup disabled (AUTH_CLEANUP_ENABLED=false)")
+	}
+
 	if err := scheduler.Run(); err != nil {
 		log.Fatal().Err(err).Msg("scheduler error")
 	}

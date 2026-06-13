@@ -125,6 +125,14 @@ type Config struct {
 	RetentionSweepCron    string
 	RetentionSweepBatch   int
 
+	// Auth cleanup (candidate membership): delete expired/consumed email_otps and
+	// expired/revoked candidate_sessions on the scheduler's cadence. Unlike the
+	// retention sweep this is benign housekeeping (it only removes already-dead
+	// auth artifacts, never user data), so it defaults ENABLED.
+	AuthCleanupEnabled bool
+	AuthCleanupCron    string
+	AuthCleanupBatch   int
+
 	// Public API rate limit (Sprint 7): max requests per IP per minute on
 	// /api/v1/public/*. Enforced cluster-wide via the Redis-backed store.
 	RateLimitPublicMax int
@@ -220,6 +228,10 @@ func Load() (*Config, error) {
 		RetentionDays:         getenvInt("RETENTION_DAYS", 365),
 		RetentionSweepCron:    getenv("RETENTION_SWEEP_CRON", "30 3 * * *"), // daily 03:30
 		RetentionSweepBatch:   getenvInt("RETENTION_SWEEP_BATCH", 500),
+
+		AuthCleanupEnabled: getenvBool("AUTH_CLEANUP_ENABLED", true),
+		AuthCleanupCron:    getenv("AUTH_CLEANUP_CRON", "15 3 * * *"), // daily 03:15 (offset from retention)
+		AuthCleanupBatch:   getenvInt("AUTH_CLEANUP_BATCH", 500),
 
 		RateLimitPublicMax: getenvInt("RATE_LIMIT_PUBLIC_MAX", 30),
 
