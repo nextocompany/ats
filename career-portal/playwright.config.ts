@@ -2,9 +2,22 @@ import { defineConfig } from "@playwright/test";
 
 // The portal runs at :3001; the Go API + stack must be up (make up/migrate/seed)
 // for the apply/status flows. Tests target mobile viewports (primary in-LINE sizes).
+//
+// Membership E2E prerequisites (signup/login/account-first apply):
+//  - Run the PROD build (`pnpm build && pnpm start`, as CI does) — `next dev` uses
+//    eval() for HMR which the app CSP (no 'unsafe-eval') blocks, so dev never hydrates.
+//  - Start with the membership tables empty (TRUNCATE candidate_accounts,
+//    candidate_sessions, email_otps) — the mock LINE/Google identities are
+//    deterministic, so stale account state breaks the "fresh signup" assertions.
+//  - Give the API headroom on RATE_LIMIT_PUBLIC_MAX (the suite bursts >30 req/min
+//    from one IP) and include the portal origin in CORS_ALLOW_ORIGINS + PORTAL_BASE_URL.
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: false,
+  // Serial across files too: the membership flows share deterministic mock
+  // identities (LINE/Google always resolve to the same account), so concurrent
+  // workers would collide on that shared account state.
+  workers: 1,
   retries: process.env.CI ? 1 : 0,
   reporter: [["list"]],
   use: {

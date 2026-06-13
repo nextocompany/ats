@@ -24,17 +24,26 @@ test("email signup advances to the OTP code step", async ({ page }) => {
   await expect(page.getByLabel("รหัสยืนยัน")).toBeVisible();
 });
 
-test("LINE mock signup logs in and continues to profile setup", async ({ page }, testInfo) => {
+test("LINE mock signup logs the candidate in", async ({ page }, testInfo) => {
   await page.goto("/signup");
   await page.getByRole("button", { name: /ด้วย LINE/ }).click();
-  // Back on /signup, now authenticated → step 1 (profile).
-  await expect(page.getByRole("heading", { name: "กรอกข้อมูลเบื้องต้น" })).toBeVisible();
-  await expect(page.getByLabel(/ชื่อ-นามสกุล/)).toBeVisible();
+  // Logged in → the provider chooser is gone: either the profile step (new account)
+  // or redirected to the jobs list (already-set-up account). Robust to mock-account
+  // reuse across runs (the mock LINE identity is deterministic).
+  await expect(
+    page
+      .getByRole("heading", { name: "กรอกข้อมูลเบื้องต้น" })
+      .or(page.getByRole("heading", { name: "ตำแหน่งงานที่เปิดรับ" })),
+  ).toBeVisible();
   await page.screenshot({ path: `${SCREEN_DIR}/signup-profile-${testInfo.project.name}.png`, fullPage: true });
 });
 
-test("Google mock signup logs in and continues to profile setup", async ({ page }) => {
+test("Google mock signup logs the candidate in", async ({ page }) => {
   await page.goto("/signup");
   await page.getByRole("button", { name: /ด้วย Google/ }).click();
-  await expect(page.getByRole("heading", { name: "กรอกข้อมูลเบื้องต้น" })).toBeVisible();
+  await expect(
+    page
+      .getByRole("heading", { name: "กรอกข้อมูลเบื้องต้น" })
+      .or(page.getByRole("heading", { name: "ตำแหน่งงานที่เปิดรับ" })),
+  ).toBeVisible();
 });

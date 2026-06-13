@@ -21,45 +21,48 @@ test("status page accepts a token and shows a not-found message for an unknown o
   await page.screenshot({ path: `${SCREEN_DIR}/status-${testInfo.project.name}.png`, fullPage: true });
 });
 
-test("account-first apply returns a status token, which resolves on the status page", async ({ page }, testInfo) => {
+test("full account-first flow: signup → quick-apply → status", async ({ page }, testInfo) => {
   await page.goto("/jobs");
   await expect(page.getByRole("heading", { name: "ตำแหน่งงานที่เปิดรับ" })).toBeVisible();
 
-  // The list and apply flow need seeded open positions. Skip gracefully if none.
-  const firstJob = page.locator("ul li a").first();
+  // The apply flow needs seeded open positions. Skip gracefully if none.
+  // Match real job-detail links (/jobs/<id>), not the nav/footer "/jobs" link.
+  const firstJob = page.locator('a[href^="/jobs/"]').first();
   if ((await firstJob.count()) === 0) {
     test.skip(true, "no seeded open positions — run make up/migrate-up/seed first");
   }
-  await firstJob.click();
+  const href = await firstJob.getAttribute("href");
 
-  // Detail → apply. Unauthenticated, so the page redirects to /login.
-  await page.getByRole("link", { name: "สมัครงาน" }).click();
-  await expect(page.getByRole("heading", { name: "เข้าสู่ระบบ" })).toBeVisible();
-
-  // LINE mock login → backend creates an account + session cookie → bounce back
-  // to the apply page (now account-first).
+  // 1) Sign up fully via LINE: login → profile (+ PDPA consent) → save resume.
+  await page.goto("/signup");
   await page.getByRole("button", { name: /ด้วย LINE/ }).click();
-
-  // Fresh account has no saved resume → use the edit/upload path.
-  await expect(page.getByRole("heading", { name: /สมัครตำแหน่ง|สมัครงาน/ })).toBeVisible();
-  await page.getByRole("button", { name: /กรอกข้อมูล|แก้ไขข้อมูล/ }).click();
-
+  await expect(page.getByRole("heading", { name: "กรอกข้อมูลเบื้องต้น" })).toBeVisible();
   await page.getByLabel(/ชื่อ-นามสกุล/).fill("ทดสอบ ระบบ");
+  await page.getByRole("checkbox").check(); // PDPA consent (required to proceed)
+  await page.getByRole("button", { name: "ถัดไป" }).click();
   await page.getByLabel(/อัปโหลดเรซูเม่/).setInputFiles({
     name: "resume.pdf",
     mimeType: "application/pdf",
     buffer: Buffer.from("%PDF-1.4 test resume"),
   });
-  await page.screenshot({ path: `${SCREEN_DIR}/apply-form-${testInfo.project.name}.png`, fullPage: true });
-  await page.getByRole("button", { name: "ส่งใบสมัคร" }).click();
+  await page.getByRole("button", { name: "เสร็จสิ้นการสมัคร" }).click();
+  // Wait for the upload to finish + signup to complete (redirects to /jobs) before
+  // navigating away — otherwise the resume POST is aborted mid-flight.
+  await page.waitForURL(/\/jobs(\?|$)/, { timeout: 15_000 });
 
-  // Success — a status token is shown.
+  // 2) Account-first apply with the saved resume (one tap).
+  await page.goto(`${href}/apply`);
+  const quickBtn = page.getByRole("button", { name: "สมัครด้วยเรซูเม่ที่บันทึกไว้" });
+  await expect(quickBtn).toBeVisible();
+  await page.screenshot({ path: `${SCREEN_DIR}/apply-review-${testInfo.project.name}.png`, fullPage: true });
+  await quickBtn.click();
+
+  // 3) Success — a status token is shown and resolves on the status page.
   await expect(page.getByRole("heading", { name: "ส่งใบสมัครเรียบร้อยแล้ว" })).toBeVisible();
   const token = (await page.locator("#status-token").textContent())?.trim() ?? "";
   expect(token.length).toBeGreaterThan(0);
   await page.screenshot({ path: `${SCREEN_DIR}/apply-success-${testInfo.project.name}.png`, fullPage: true });
 
-  // The token resolves on the status page.
   await page.goto(`/status?token=${encodeURIComponent(token)}`);
   await expect(page.getByText(/วันที่สมัคร/)).toBeVisible();
 });
