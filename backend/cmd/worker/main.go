@@ -16,6 +16,7 @@ import (
 	"github.com/nexto/hr-ats/internal/ai"
 	"github.com/nexto/hr-ats/internal/applications"
 	"github.com/nexto/hr-ats/internal/branch"
+	"github.com/nexto/hr-ats/internal/candidateauth"
 	"github.com/nexto/hr-ats/internal/candidates"
 	"github.com/nexto/hr-ats/internal/dedup"
 	"github.com/nexto/hr-ats/internal/health"
@@ -143,14 +144,18 @@ func main() {
 	// Retention sweep (Sprint 7): anonymize expired candidate PII.
 	retentionSvc := pdpa.NewRetentionService(pool, blobClient, activity.New(pool), cfg.RetentionDays)
 
+	// Auth cleanup (candidate membership): purge expired OTP/session rows.
+	authCleanupSvc := candidateauth.NewCleanupService(pool)
+
 	srv := asynq.NewServer(redisOpt, asynq.Config{Concurrency: workerConcurrency})
 	mux := asynq.NewServeMux()
 	mux.HandleFunc(queue.TypeProcessApplication, processor.HandleProcessApplication)
 	mux.HandleFunc(queue.TypeReengageVacancy, reengageSvc.HandleReengageVacancy)
 	mux.HandleFunc(queue.TypeExportReport, exportSvc.HandleExportReport)
 	mux.HandleFunc(queue.TypeRetentionSweep, retentionSvc.HandleRetentionSweep)
+	mux.HandleFunc(queue.TypeAuthCleanup, authCleanupSvc.HandleAuthCleanup)
 
-	log.Info().Str("provider", cfg.AIProvider).Msg("worker started; consuming process_application + vacancy:reengage + report:export + retention:sweep")
+	log.Info().Str("provider", cfg.AIProvider).Msg("worker started; consuming process_application + vacancy:reengage + report:export + retention:sweep + auth:cleanup")
 	if err := srv.Run(mux); err != nil {
 		log.Fatal().Err(err).Msg("asynq server error")
 	}

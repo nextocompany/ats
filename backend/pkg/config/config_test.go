@@ -51,6 +51,35 @@ func TestLoad_Defaults(t *testing.T) {
 	if c.UsesAzureAI() {
 		t.Error("expected UsesAzureAI false by default")
 	}
+	// Auth cleanup is benign housekeeping → ENABLED by default (unlike retention).
+	if !c.AuthCleanupEnabled {
+		t.Error("expected AuthCleanupEnabled true by default")
+	}
+	if c.AuthCleanupCron != "15 3 * * *" {
+		t.Errorf("expected default AuthCleanupCron '15 3 * * *', got %q", c.AuthCleanupCron)
+	}
+	if c.AuthCleanupBatch != 500 {
+		t.Errorf("expected default AuthCleanupBatch 500, got %d", c.AuthCleanupBatch)
+	}
+}
+
+func TestLoad_AuthCleanupDisableParsed(t *testing.T) {
+	t.Setenv("DB_URL", "postgres://localhost/db")
+	t.Setenv("REDIS_URL", "redis://localhost:6379")
+	t.Setenv("AZURE_BLOB_CONNECTION_STRING", "conn")
+	t.Setenv("AUTH_CLEANUP_ENABLED", "false")
+	t.Setenv("AUTH_CLEANUP_BATCH", "50")
+
+	c, err := Load()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if c.AuthCleanupEnabled {
+		t.Error("expected AuthCleanupEnabled false when AUTH_CLEANUP_ENABLED=false")
+	}
+	if c.AuthCleanupBatch != 50 {
+		t.Errorf("expected AuthCleanupBatch 50, got %d", c.AuthCleanupBatch)
+	}
 }
 
 func TestLoad_AzureRequiresKeys(t *testing.T) {
