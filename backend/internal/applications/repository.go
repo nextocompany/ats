@@ -31,6 +31,11 @@ type Repository interface {
 	SetPSSynced(ctx context.Context, id uuid.UUID) error
 	SetPublicToken(ctx context.Context, id uuid.UUID, token string) error
 	FindByPublicToken(ctx context.Context, token string) (*Application, error)
+	// ExistsInScope reports whether the application is visible to the given RBAC
+	// scope. Reuses the same scoping clause as the list endpoints (handles
+	// all/subregion/store), so per-record authorization stays consistent with
+	// list visibility.
+	ExistsInScope(ctx context.Context, id uuid.UUID, scope rbac.Scope) (bool, error)
 }
 
 type pgRepository struct {
@@ -224,4 +229,20 @@ func (r *pgRepository) FindByPublicToken(ctx context.Context, token string) (*Ap
 		return nil, fmt.Errorf("applications: find by public token: %w", err)
 	}
 	return &a, nil
+}
+
+func (r *pgRepository) ExistsInScope(ctx context.Context, id uuid.UUID, scope rbac.Scope) (bool, error) {
+	clause, args := scope.ApplicationsClause(2) // $1 is the id
+	q := "SELECT EXISTS(SELECT 1 FROM applications WHERE id = $1"
+	allArgs := []any{id}
+	if clause != "" {
+		q += " AND " + clause
+		allArgs = append(allArgs, args...)
+	}
+	q += ")"
+	var ok bool
+	if err := r.pool.QueryRow(ctx, q, allArgs...).Scan(&ok); err != nil {
+		return false, fmt.Errorf("applications: exists in scope: %w", err)
+	}
+	return ok, nil
 }

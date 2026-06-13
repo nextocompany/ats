@@ -43,6 +43,21 @@ export interface ApplicationStatus {
   position?: string;
 }
 
+// --- AI pre-interview (slice 2.5) ---
+
+// One message in the interview chat. role mirrors the chat-completion roles.
+export interface InterviewTurn {
+  role: "assistant" | "user";
+  content: string;
+}
+
+// Candidate-facing interview state returned by the public interview endpoints.
+export interface InterviewSessionState {
+  status: string;
+  turns: InterviewTurn[];
+  done: boolean;
+}
+
 // Fields posted as multipart/form-data to /apply (resume is a File).
 export interface ApplyInput {
   positionId: string;

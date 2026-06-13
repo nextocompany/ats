@@ -23,6 +23,7 @@ import (
 	"github.com/nexto/hr-ats/internal/auth"
 	"github.com/nexto/hr-ats/internal/candidates"
 	"github.com/nexto/hr-ats/internal/health"
+	"github.com/nexto/hr-ats/internal/interview"
 	"github.com/nexto/hr-ats/internal/middleware"
 	"github.com/nexto/hr-ats/internal/notify"
 	"github.com/nexto/hr-ats/internal/pdpa"
@@ -203,6 +204,18 @@ func main() {
 	pdpaRepo := pdpa.New(pool)
 	public.RegisterRoutes(app, public.NewHandler(intakeSvc, appRepo, positionRepo, lineVerifier, pdpaRepo))
 
+	// AI pre-interview (slice 2.5): HR invites a shortlisted candidate; the
+	// candidate completes an adaptive text chat via an opaque token; the AI writes
+	// an evaluation HR reviews. Turns are synchronous (no worker). Mock interviewer
+	// by default; Azure OpenAI behind config. Public chat routes ride the rate
+	// limiter above; the invite/get routes are authed under /applications.
+	interviewSvc := interview.NewService(
+		interview.NewRepository(pool), interview.New(cfg),
+		appRepo, positionRepo, candidateRepo, notifier, cfg.PortalBaseURL, cfg.InterviewMaxTurns,
+	)
+	interviewHandler := interview.NewHandler(interviewSvc, appRepo, cfg.PortalBaseURL)
+	interview.RegisterPublicRoutes(app, interviewHandler)
+
 	// HR Dashboard API (Sprint 4a): ranked inbox, bulk, resume signed-URLs,
 	// candidate detail/timeline, analytics, PDPA, users/me.
 	activityLog := activity.New(pool)
@@ -219,6 +232,7 @@ func main() {
 	dashboardHandler.SetIndexer(search.NewCandidateSync(pool, searchIndexer))
 	dashboardHandler.SetNotifier(notifier, candidateRepo, cfg.PortalBaseURL)
 	applications.RegisterDashboardRoutes(app, dashboardHandler)
+	interview.RegisterDashboardRoutes(app, interviewHandler)
 	// Candidate search (Sprint 5c) — registered BEFORE profiles so the static
 	// /candidates/search path takes precedence over /candidates/:id. Mock Postgres
 	// trigram by default; Azure AI Search behind config.

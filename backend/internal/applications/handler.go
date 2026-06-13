@@ -165,6 +165,13 @@ func (h *Handler) UpdateStatus(c *fiber.Ctx) error {
 	if !allowedStatuses[req.Status] {
 		return fiber.NewError(fiber.StatusBadRequest, "unsupported status transition")
 	}
+	// Per-record authorization: a store/subregion-scoped user may only act on
+	// applications within their visibility (consistent with the list scoping).
+	if ok, serr := h.apps.ExistsInScope(c.UserContext(), id, scopeFrom(c)); serr != nil {
+		return serr
+	} else if !ok {
+		return fiber.NewError(fiber.StatusNotFound, "application not found")
+	}
 
 	if req.Status == StatusHired {
 		if err := h.apps.SetHired(c.UserContext(), id); err != nil {

@@ -33,6 +33,16 @@ export const api = {
     const res = await fetch(`${BASE}${path}`);
     return unwrap<T>(res);
   },
+  // post sends a JSON body. Used by the AI pre-interview chat (token-gated, no
+  // bearer). Apply still uses postForm (multipart resume upload).
+  post: async <T>(path: string, body?: unknown): Promise<{ data: T; meta?: Meta }> => {
+    const res = await fetch(`${BASE}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+    return unwrap<T>(res);
+  },
   // postForm posts multipart/form-data (resume upload). The browser sets the
   // multipart boundary Content-Type automatically — do not set it manually.
   postForm: async <T>(
