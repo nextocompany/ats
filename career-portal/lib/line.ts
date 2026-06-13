@@ -1,14 +1,20 @@
-// LINE Login (OAuth 2.1 web flow). The candidate authenticates BEFORE filling the
-// apply form — clicking the gate navigates to the backend /line/login entrypoint,
-// which redirects to LINE (real) or bounces straight back (mock). On return the
-// backend puts the id-token in the URL fragment (#line_id_token=…), which the apply
-// page reads and sends as X-LINE-IdToken. The backend handles all secrets; the
-// portal never sees the channel secret or talks to LINE directly.
+// OAuth entrypoints for candidate membership. Clicking these navigates the
+// browser (top-level) to the backend, which redirects to LINE/Google (real) or
+// bounces straight back (mock). On return the backend has set the httpOnly session
+// cookie (account-first) and redirects to `returnUrl`. The backend owns all
+// secrets; the portal never talks to LINE/Google directly.
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
-// lineLoginUrl builds the backend LINE-login entrypoint, returning the candidate
-// to `returnUrl` (the apply page) after authentication.
-export function lineLoginUrl(returnUrl: string): string {
-  return `${API_BASE}/api/v1/public/line/login?return=${encodeURIComponent(returnUrl)}`;
+// lineLoginUrl builds the LINE login/link entrypoint. mode="link" attaches LINE
+// to the already-logged-in account (for email/Google signups) so push works.
+export function lineLoginUrl(returnUrl: string, mode?: "link"): string {
+  const q = new URLSearchParams({ return: returnUrl });
+  if (mode) q.set("mode", mode);
+  return `${API_BASE}/api/v1/public/line/login?${q.toString()}`;
+}
+
+// googleLoginUrl builds the Google login entrypoint.
+export function googleLoginUrl(returnUrl: string): string {
+  return `${API_BASE}/api/v1/public/auth/google/login?return=${encodeURIComponent(returnUrl)}`;
 }

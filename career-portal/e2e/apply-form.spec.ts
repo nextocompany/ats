@@ -13,7 +13,6 @@ test.describe("buildApplyForm", () => {
       fullName: "สมชาย ใจดี",
       consentVersion: "1.0",
       resume,
-      lineIdToken: "stub",
     });
     expect(form.get("position_id")).toBe("pos-1");
     expect(form.get("full_name")).toBe("สมชาย ใจดี");
@@ -28,7 +27,6 @@ test.describe("buildApplyForm", () => {
       fullName: "Test",
       consentVersion: "1.0",
       resume,
-      lineIdToken: "stub",
     });
     expect(form.has("phone")).toBe(false);
     expect(form.has("email")).toBe(false);
@@ -44,7 +42,6 @@ test.describe("buildApplyForm", () => {
       province: "กรุงเทพมหานคร",
       consentVersion: "1.0",
       resume,
-      lineIdToken: "stub",
     });
     expect(form.get("phone")).toBe("0812345678");
     expect(form.get("province")).toBe("กรุงเทพมหานคร");

@@ -137,7 +137,7 @@ func TestParseStateCookie_RoundTrips(t *testing.T) {
 			val = strings.TrimPrefix(strings.TrimSpace(part), stateCookie+"=")
 		}
 	}
-	state, ret := h.parseStateCookie(val)
+	state, ret, _ := h.parseStateCookie(val)
 	if state == "" {
 		t.Fatalf("expected a non-empty state from the round-tripped cookie")
 	}

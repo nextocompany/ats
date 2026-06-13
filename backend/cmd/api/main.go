@@ -21,6 +21,7 @@ import (
 	"github.com/nexto/hr-ats/internal/activity"
 	"github.com/nexto/hr-ats/internal/applications"
 	"github.com/nexto/hr-ats/internal/auth"
+	"github.com/nexto/hr-ats/internal/candidateauth"
 	"github.com/nexto/hr-ats/internal/candidates"
 	"github.com/nexto/hr-ats/internal/health"
 	"github.com/nexto/hr-ats/internal/interview"
@@ -41,6 +42,7 @@ import (
 	"github.com/nexto/hr-ats/pkg/bootstrap"
 	"github.com/nexto/hr-ats/pkg/config"
 	"github.com/nexto/hr-ats/pkg/database"
+	"github.com/nexto/hr-ats/pkg/email"
 	"github.com/nexto/hr-ats/pkg/httpx"
 	"github.com/nexto/hr-ats/pkg/logging"
 	"github.com/nexto/hr-ats/pkg/queue"
@@ -203,10 +205,37 @@ func main() {
 		},
 	}))
 	pdpaRepo := pdpa.New(pool)
-	public.RegisterRoutes(app, public.NewHandler(intakeSvc, appRepo, positionRepo, lineVerifier, pdpaRepo))
-	// LINE Login OAuth web flow (candidate auth). Mock by default → bounces back
-	// with the dev stub; real → full authorize/callback against LINE.
-	lineauth.RegisterRoutes(app, lineauth.NewHandler(cfg))
+	// Candidate membership (career-portal accounts): signup/login via email-OTP
+	// (+ LINE/Google in lineauth/candidateauth), httpOnly session, saved profile +
+	// resume. Email is mock (log-only) by default; ACS Email when EMAIL_PROVIDER=real.
+	// The session cookie is Secure + SameSite=None outside development (portal and
+	// api are cross-site under the apps.io public suffix). Built before the public
+	// handler so apply can be account-first.
+	emailSender := email.NewSender(cfg)
+	caRepo := candidateauth.NewRepository(pool)
+	caSvc := candidateauth.NewService(caRepo, emailSender, blobClient, cfg.EmailOTPTTL, cfg.CandidateSessionTTL)
+	caHandler := candidateauth.NewHandler(caSvc, cfg.SessionCookieName, !cfg.IsDevelopment())
+	// CSRF guard for cookie-authed endpoints: reject cross-origin state-changing
+	// requests (the session cookie is SameSite=None in prod, and multipart uploads
+	// skip CORS preflight). Safe methods (incl. the GET OAuth login/callback) pass.
+	originGuard := candidateauth.EnforceOrigin(cfg.CORSAllowOrigins)
+	app.Use("/api/v1/public/auth", originGuard)
+	app.Use("/api/v1/public/apply", originGuard)
+	candidateauth.RegisterRoutes(app, caHandler)
+	// Google Login OAuth (candidate membership). Mock by default → deterministic
+	// dev identity; real → full authorize/callback against Google.
+	candidateauth.RegisterGoogleRoutes(app, candidateauth.NewGoogleHandler(cfg, caSvc))
+
+	// Public Career API + account-first apply. The handler resolves the member from
+	// the session cookie (caSvc); quick-apply (saved resume) is session-gated.
+	publicHandler := public.NewHandler(intakeSvc, appRepo, positionRepo, lineVerifier, pdpaRepo, caSvc, cfg.SessionCookieName)
+	public.RegisterRoutes(app, publicHandler)
+	app.Post("/api/v1/public/apply/quick", candidateauth.RequireCandidate(caSvc, cfg.SessionCookieName), publicHandler.QuickApply)
+
+	// LINE Login OAuth web flow. With the candidate session issuer wired (account-
+	// first), the callback creates/links an account and sets the session cookie;
+	// the legacy fragment-token path remains when no issuer is supplied.
+	lineauth.RegisterRoutes(app, lineauth.NewHandler(cfg, caSvc, lineVerifier))
 
 	// AI pre-interview (slice 2.5): HR invites a shortlisted candidate; the
 	// candidate completes an adaptive text chat via an opaque token; the AI writes

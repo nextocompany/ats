@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Config holds every runtime setting. It is constructed once via Load and then
@@ -84,6 +85,28 @@ type Config struct {
 	NotifyProvider  string
 	NotifyLINEToken string // LINE Messaging API channel access token (push)
 	NotifyEmailFrom string // from-address for email delivery (real)
+
+	// Google Login (candidate membership) — "mock" (default) or "real". The OAuth
+	// web flow mirrors LINE Login; the client secret signs the code→token exchange
+	// and the callback URL must exactly match the one registered in Google Cloud.
+	GoogleProvider     string
+	GoogleClientID     string
+	GoogleClientSecret string
+	GoogleCallbackURL  string
+
+	// Email delivery for candidate email-OTP (passwordless signup/login) —
+	// "mock" (default, log-only) or "real" (Azure Communication Services Email REST).
+	// ACS has no Go SDK: acsSender signs requests with the access key (shared-key
+	// HMAC, like Azure Storage) and POSTs to {endpoint}/emails:send.
+	EmailProvider     string
+	ACSEmailEndpoint  string // e.g. https://<resource>.<region>.communication.azure.com
+	ACSEmailAccessKey string // base64 access key from the ACS connection string
+	ACSEmailSender    string // verified sender address (e.g. DoNotReply@<domain>)
+
+	// Candidate session (httpOnly cookie) + email-OTP tuning.
+	CandidateSessionTTL time.Duration // how long a login stays valid (default 30d)
+	SessionCookieName   string        // cookie name (default "cp_session")
+	EmailOTPTTL         time.Duration // OTP validity window (default 10m)
 
 	// PortalBaseURL is the public Career Portal origin used to build apply links
 	// in outbound notifications.
@@ -174,6 +197,20 @@ func Load() (*Config, error) {
 		NotifyLINEToken: os.Getenv("NOTIFY_LINE_TOKEN"),
 		NotifyEmailFrom: os.Getenv("NOTIFY_EMAIL_FROM"),
 
+		GoogleProvider:     getenv("GOOGLE_PROVIDER", "mock"),
+		GoogleClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
+		GoogleClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
+		GoogleCallbackURL:  os.Getenv("GOOGLE_CALLBACK_URL"),
+
+		EmailProvider:     getenv("EMAIL_PROVIDER", "mock"),
+		ACSEmailEndpoint:  os.Getenv("ACS_EMAIL_ENDPOINT"),
+		ACSEmailAccessKey: os.Getenv("ACS_EMAIL_ACCESS_KEY"),
+		ACSEmailSender:    os.Getenv("ACS_EMAIL_SENDER"),
+
+		CandidateSessionTTL: getenvDuration("CANDIDATE_SESSION_TTL", 720*time.Hour), // 30 days
+		SessionCookieName:   getenv("CANDIDATE_SESSION_COOKIE", "cp_session"),
+		EmailOTPTTL:         getenvDuration("EMAIL_OTP_TTL", 10*time.Minute),
+
 		PortalBaseURL: getenv("PORTAL_BASE_URL", "http://localhost:3001"),
 
 		ReportScheduleCron: getenv("REPORT_SCHEDULE_CRON", "0 7 * * 1"), // Mon 07:00
@@ -213,6 +250,8 @@ func Load() (*Config, error) {
 		{"PS_PROVIDER", c.PSProvider, []string{"mock", ProviderReal}},
 		{"LINE_PROVIDER", c.LINEProvider, []string{"mock", ProviderReal}},
 		{"NOTIFY_PROVIDER", c.NotifyProvider, []string{"mock", ProviderReal}},
+		{"GOOGLE_PROVIDER", c.GoogleProvider, []string{"mock", ProviderReal}},
+		{"EMAIL_PROVIDER", c.EmailProvider, []string{"mock", ProviderReal}},
 	} {
 		if !isOneOf(p.val, p.allowed) {
 			return nil, fmt.Errorf("config: %s must be one of %v, got %q", p.name, p.allowed, p.val)
@@ -249,6 +288,16 @@ func Load() (*Config, error) {
 	if c.UsesRealNotify() && c.NotifyLINEToken == "" {
 		return nil, fmt.Errorf("config: NOTIFY_LINE_TOKEN is required when NOTIFY_PROVIDER=real")
 	}
+	if c.UsesRealGoogle() {
+		if c.GoogleClientID == "" || c.GoogleClientSecret == "" || c.GoogleCallbackURL == "" {
+			return nil, fmt.Errorf("config: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and GOOGLE_CALLBACK_URL are required when GOOGLE_PROVIDER=real")
+		}
+	}
+	if c.UsesRealEmail() {
+		if c.ACSEmailEndpoint == "" || c.ACSEmailAccessKey == "" || c.ACSEmailSender == "" {
+			return nil, fmt.Errorf("config: ACS_EMAIL_ENDPOINT, ACS_EMAIL_ACCESS_KEY and ACS_EMAIL_SENDER are required when EMAIL_PROVIDER=real")
+		}
+	}
 	if c.UsesAzureSearch() && (c.AzureSearchEndpoint == "" || c.AzureSearchKey == "") {
 		return nil, fmt.Errorf("config: AZURE_SEARCH_ENDPOINT and AZURE_SEARCH_KEY are required when AI_SEARCH_PROVIDER=azure")
 	}
@@ -280,6 +329,14 @@ func (c *Config) UsesRealAuth() bool { return c.AuthProvider == ProviderReal }
 // UsesRealNotify reports whether the real notifier (LINE push / email) should be
 // constructed. Mock (log-only) is the default so local/CI need no credentials.
 func (c *Config) UsesRealNotify() bool { return c.NotifyProvider == ProviderReal }
+
+// UsesRealGoogle reports whether the real Google Login OAuth flow should be used
+// for candidate membership. Mock (stub bounce) is the default.
+func (c *Config) UsesRealGoogle() bool { return c.GoogleProvider == ProviderReal }
+
+// UsesRealEmail reports whether the real ACS Email sender should be constructed
+// for candidate email-OTP. Mock (log-only) is the default so local/CI need no creds.
+func (c *Config) UsesRealEmail() bool { return c.EmailProvider == ProviderReal }
 
 // ReportRecipientList splits the comma-separated REPORT_RECIPIENTS into trimmed,
 // non-empty entries.
@@ -356,6 +413,15 @@ func getenvBool(key string, fallback bool) bool {
 	if v := os.Getenv(key); v != "" {
 		if b, err := strconv.ParseBool(v); err == nil {
 			return b
+		}
+	}
+	return fallback
+}
+
+func getenvDuration(key string, fallback time.Duration) time.Duration {
+	if v := os.Getenv(key); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			return d
 		}
 	}
 	return fallback

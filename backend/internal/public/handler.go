@@ -14,6 +14,7 @@ import (
 
 	"github.com/nexto/hr-ats/internal/applications"
 	"github.com/nexto/hr-ats/internal/auth"
+	"github.com/nexto/hr-ats/internal/candidateauth"
 	"github.com/nexto/hr-ats/internal/pdpa"
 	"github.com/nexto/hr-ats/internal/positions"
 	"github.com/nexto/hr-ats/pkg/httpx"
@@ -22,6 +23,14 @@ import (
 // ConsentRecorder records a candidate's PDPA consent. pdpa.Repo satisfies it.
 type ConsentRecorder interface {
 	Record(ctx context.Context, c pdpa.Consent, ip string) error
+}
+
+// AccountResolver resolves a member account from a session token and reads its
+// saved resume — satisfied by candidateauth.Service. Optional (nil ⇒ legacy
+// LINE-only apply).
+type AccountResolver interface {
+	AccountFromSession(ctx context.Context, token string) (*candidateauth.Account, error)
+	SavedResumeBytes(ctx context.Context, acct *candidateauth.Account) ([]byte, error)
 }
 
 const maxResumeBytes = 10 * 1024 * 1024
@@ -33,18 +42,29 @@ var contentTypeToFileType = map[string]string{
 	"image/png":  "image",
 }
 
-// Handler serves the public Career API.
-type Handler struct {
-	intake   *applications.Service
-	apps     applications.Repository
-	pos      positions.Repository
-	verifier auth.Verifier
-	consent  ConsentRecorder
+// fileTypeToContent maps a stored resume file type back to a representative
+// content type + filename extension for quick-apply re-upload.
+var fileTypeToContent = map[string][2]string{
+	"pdf":   {"application/pdf", "pdf"},
+	"docx":  {"application/vnd.openxmlformats-officedocument.wordprocessingml.document", "docx"},
+	"image": {"image/jpeg", "jpg"},
 }
 
-// NewHandler builds the public handler.
-func NewHandler(intake *applications.Service, apps applications.Repository, pos positions.Repository, v auth.Verifier, consent ConsentRecorder) *Handler {
-	return &Handler{intake: intake, apps: apps, pos: pos, verifier: v, consent: consent}
+// Handler serves the public Career API.
+type Handler struct {
+	intake            *applications.Service
+	apps              applications.Repository
+	pos               positions.Repository
+	verifier          auth.Verifier
+	consent           ConsentRecorder
+	accounts          AccountResolver
+	sessionCookieName string
+}
+
+// NewHandler builds the public handler. accounts/sessionCookieName enable account-
+// first apply + quick-apply; pass nil/"" to keep the legacy LINE-only behaviour.
+func NewHandler(intake *applications.Service, apps applications.Repository, pos positions.Repository, v auth.Verifier, consent ConsentRecorder, accounts AccountResolver, sessionCookieName string) *Handler {
+	return &Handler{intake: intake, apps: apps, pos: pos, verifier: v, consent: consent, accounts: accounts, sessionCookieName: sessionCookieName}
 }
 
 // ListPositions handles GET /api/v1/public/positions (only positions with open vacancies).
@@ -71,15 +91,44 @@ func (h *Handler) GetPosition(c *fiber.Ctx) error {
 	})
 }
 
-// Apply handles POST /api/v1/public/apply (LINE-authenticated multipart).
-func (h *Handler) Apply(c *fiber.Ctx) error {
-	idToken := c.Get("X-LINE-IdToken")
-	if idToken == "" {
-		idToken = c.FormValue("line_id_token")
+// sessionAccount resolves the logged-in member from the session cookie, or nil.
+func (h *Handler) sessionAccount(c *fiber.Ctx) *candidateauth.Account {
+	if h.accounts == nil || h.sessionCookieName == "" {
+		return nil
 	}
-	lineUser, err := h.verifier.Verify(c.UserContext(), idToken)
+	tok := c.Cookies(h.sessionCookieName)
+	if tok == "" {
+		return nil
+	}
+	acct, err := h.accounts.AccountFromSession(c.UserContext(), tok)
 	if err != nil {
-		return fiber.NewError(fiber.StatusUnauthorized, "LINE authentication required")
+		return nil
+	}
+	return acct
+}
+
+// Apply handles POST /api/v1/public/apply (multipart). Account-first: a logged-in
+// member is identified by the session cookie (form fields prefill/override the
+// saved profile). Falls back to LINE id-token identity for the legacy/guest path.
+func (h *Handler) Apply(c *fiber.Ctx) error {
+	acct := h.sessionAccount(c)
+
+	var lineUserID string
+	var accountID *uuid.UUID
+	if acct != nil {
+		lineUserID = acct.LineUserID
+		id := acct.ID
+		accountID = &id
+	} else {
+		idToken := c.Get("X-LINE-IdToken")
+		if idToken == "" {
+			idToken = c.FormValue("line_id_token")
+		}
+		lineUser, err := h.verifier.Verify(c.UserContext(), idToken)
+		if err != nil {
+			return fiber.NewError(fiber.StatusUnauthorized, "authentication required")
+		}
+		lineUserID = lineUser.Subject
 	}
 
 	fileHeader, err := c.FormFile("resume")
@@ -99,16 +148,27 @@ func (h *Handler) Apply(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, "valid position_id is required")
 	}
 	name := c.FormValue("full_name")
+	if name == "" && acct != nil {
+		name = acct.FullName
+	}
 	if name == "" {
 		return fiber.NewError(fiber.StatusBadRequest, "full_name is required")
 	}
-	// PDPA consent is mandatory before any candidate data is stored (F13).
-	if c.FormValue("consent_given") != "true" {
-		return fiber.NewError(fiber.StatusBadRequest, "PDPA consent is required")
-	}
+	// PDPA consent is mandatory and must be REAL — never fabricated. A guest ticks
+	// the box; a member must have actually consented at signup (don't assume).
 	consentVersion := c.FormValue("consent_version")
 	if consentVersion == "" {
 		consentVersion = "1.0"
+	}
+	if acct != nil {
+		if !acct.PDPAConsent {
+			return fiber.NewError(fiber.StatusBadRequest, "PDPA consent required — complete your profile first")
+		}
+		if acct.PDPAVersion != "" {
+			consentVersion = acct.PDPAVersion
+		}
+	} else if c.FormValue("consent_given") != "true" {
+		return fiber.NewError(fiber.StatusBadRequest, "PDPA consent is required")
 	}
 
 	f, err := fileHeader.Open()
@@ -123,12 +183,13 @@ func (h *Handler) Apply(c *fiber.Ctx) error {
 
 	result, err := h.intake.Intake(c.UserContext(), applications.IntakeInput{
 		CandidateName: name,
-		Phone:         c.FormValue("phone"),
-		Email:         c.FormValue("email"),
+		Phone:         formOr(c, "phone", acctPhone(acct)),
+		Email:         formOr(c, "email", acctEmail(acct)),
 		IDCard:        c.FormValue("id_card"),
-		Province:      c.FormValue("province"),
+		Province:      formOr(c, "province", acctProvince(acct)),
 		SourceChannel: "career_portal",
-		LineUserID:    lineUser.Subject,
+		LineUserID:    lineUserID,
+		AccountID:     accountID,
 		PositionID:    positionID,
 		FileName:      fileHeader.Filename,
 		FileType:      fileType,
@@ -138,7 +199,70 @@ func (h *Handler) Apply(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
+	return h.finalizeApplication(c, result, consentVersion)
+}
 
+// QuickApply handles POST /api/v1/public/apply/quick (RequireCandidate). A member
+// applies to a position using their saved profile + saved resume in one step.
+func (h *Handler) QuickApply(c *fiber.Ctx) error {
+	acct := candidateauth.CandidateFromCtx(c)
+	if acct == nil {
+		return fiber.NewError(fiber.StatusUnauthorized, "login required")
+	}
+	if acct.FullName == "" {
+		return fiber.NewError(fiber.StatusBadRequest, "complete your profile before applying")
+	}
+	if !acct.HasResume() {
+		return fiber.NewError(fiber.StatusBadRequest, "no saved resume — upload one first")
+	}
+	if !acct.PDPAConsent {
+		return fiber.NewError(fiber.StatusBadRequest, "PDPA consent required — complete your profile first")
+	}
+	var body struct {
+		PositionID string `json:"position_id"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "invalid request body")
+	}
+	positionID, err := uuid.Parse(body.PositionID)
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "valid position_id is required")
+	}
+	meta, ok := fileTypeToContent[acct.ResumeFileType]
+	if !ok {
+		return fiber.NewError(fiber.StatusBadRequest, "saved resume type is unsupported")
+	}
+	data, err := h.accounts.SavedResumeBytes(c.UserContext(), acct)
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "could not read saved resume")
+	}
+	id := acct.ID
+	result, err := h.intake.Intake(c.UserContext(), applications.IntakeInput{
+		CandidateName: acct.FullName,
+		Phone:         acct.Phone,
+		Email:         acct.Email,
+		Province:      acct.Province,
+		SourceChannel: "career_portal",
+		LineUserID:    acct.LineUserID,
+		AccountID:     &id,
+		PositionID:    positionID,
+		FileName:      "resume." + meta[1],
+		FileType:      acct.ResumeFileType,
+		ContentType:   meta[0],
+		FileBytes:     data,
+	})
+	if err != nil {
+		return err
+	}
+	consentVersion := acct.PDPAVersion
+	if consentVersion == "" {
+		consentVersion = "1.0"
+	}
+	return h.finalizeApplication(c, result, consentVersion)
+}
+
+// finalizeApplication issues the opaque status token and records PDPA consent.
+func (h *Handler) finalizeApplication(c *fiber.Ctx, result applications.IntakeResult, consentVersion string) error {
 	token, err := newPublicToken()
 	if err != nil {
 		return err
@@ -146,9 +270,8 @@ func (h *Handler) Apply(c *fiber.Ctx) error {
 	if err := h.apps.SetPublicToken(c.UserContext(), result.ApplicationID, token); err != nil {
 		return err
 	}
-
-	// Record PDPA consent against the (canonical) candidate. A failure here must
-	// not lose the application — log and continue (consent is retryable).
+	// Record PDPA consent against the candidate. A failure here must not lose the
+	// application — log and continue (consent is retryable).
 	if err := h.consent.Record(c.UserContext(), pdpa.Consent{
 		CandidateID:   result.CandidateID,
 		ConsentGiven:  true,
@@ -157,8 +280,34 @@ func (h *Handler) Apply(c *fiber.Ctx) error {
 	}, c.IP()); err != nil {
 		log.Warn().Err(err).Str("candidate_id", result.CandidateID.String()).Msg("failed to record PDPA consent")
 	}
-
 	return httpx.Created(c, fiber.Map{"status_token": token})
+}
+
+// formOr returns the form value when present, else the fallback (member profile).
+func formOr(c *fiber.Ctx, key, fallback string) string {
+	if v := c.FormValue(key); v != "" {
+		return v
+	}
+	return fallback
+}
+
+func acctPhone(a *candidateauth.Account) string {
+	if a != nil {
+		return a.Phone
+	}
+	return ""
+}
+func acctEmail(a *candidateauth.Account) string {
+	if a != nil {
+		return a.Email
+	}
+	return ""
+}
+func acctProvince(a *candidateauth.Account) string {
+	if a != nil {
+		return a.Province
+	}
+	return ""
 }
 
 // Status handles GET /api/v1/public/status/:token — minimal projection only.

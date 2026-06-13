@@ -58,7 +58,8 @@ export interface InterviewSessionState {
   done: boolean;
 }
 
-// Fields posted as multipart/form-data to /apply (resume is a File).
+// Fields posted as multipart/form-data to /apply (resume is a File). Identity is
+// the candidate session cookie (account-first) — no LINE id-token header.
 export interface ApplyInput {
   positionId: string;
   fullName: string;
@@ -68,5 +69,36 @@ export interface ApplyInput {
   province?: string;
   consentVersion: string;
   resume: File;
-  lineIdToken: string;
+}
+
+// --- candidate membership (internal/candidateauth) ---
+
+// GET /api/v1/public/auth/me — client-safe account projection.
+export interface Account {
+  id: string;
+  full_name: string;
+  email: string;
+  phone: string;
+  province: string;
+  line_display_id: string;
+  line_linked: boolean;
+  google_linked: boolean;
+  has_resume: boolean;
+  resume_file_type: string;
+  pdpa_consent: boolean;
+}
+
+// PATCH /api/v1/public/auth/profile body.
+export interface ProfileInput {
+  full_name?: string;
+  phone?: string;
+  line_display_id?: string;
+  province?: string;
+  consent_given?: boolean;
+  consent_version?: string;
+}
+
+// POST /api/v1/public/apply/quick — quick-apply with the saved resume (201).
+export interface QuickApplyResult {
+  status_token: string;
 }
