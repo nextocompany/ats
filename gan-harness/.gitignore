@@ -1,0 +1,5 @@
+# Generated GAN-harness artifacts (regenerable, large) — not source.
+shots/
+feedback/
+prototype/
+*.prev.md

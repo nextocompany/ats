@@ -1,49 +1,51 @@
-# Brief — HR Dashboard full redesign (UX/UI), keep CP Axtra CI
+# Spec — CP Axtra Careers Portal + Admin System (design redesign)
 
-Redesign **every page** of the HR recruitment dashboard (`frontend/`) — both UX and
-UI — to a more polished, modern, award-worthy product. This is a visual + interaction
-overhaul, NOT a feature rewrite: keep all existing data, routes, and functionality.
+Redesign a **careers portal** (public) and **admin system** (internal) for **CP Axtra**, a
+national-level Thai retail organization. Deliverable for this GAN loop: a **self-contained,
+multi-page static HTML/CSS prototype** under `gan-harness/prototype/` that demonstrates the full
+visual design system across every page below. Visual excellence is the primary goal.
 
-## HARD CONSTRAINT — preserve CP Axtra corporate identity
-The brand/CI is locked. Do NOT change the palette or brand language:
-- **Brand / primary / CTA:** deep CP Axtra blue `#0B47B8` (`--brand` / `--primary`)
-- **Accent / emphasis:** warm yellow `#FFC02E` (`--brass`)
-- **Surfaces:** bright near-white / white; **text:** navy ink
-- **Signature motif:** the multicolour **dot pattern** (`.dot-cluster`, `.dot-rule`, dot tokens)
-- Keep using the design tokens in `frontend/app/globals.css` (`--brand`, `--brass`,
-  `--dot-*`, sidebar tokens). You MAY refine token *values* slightly for harmony, add
-  NEW tokens (spacing/elevation/typography scale), and add new component styles — but
-  the blue+yellow+white+dots identity must remain unmistakably CP Axtra.
+## Brand Identity (non-negotiable)
+- **Primary blue `#0B47B8`** — dominant: main UI, CTA buttons, sidebar, headers.
+- **Accent yellow `#FFC02E`** — intentional accent only: highlights, badges, active states, hover accents. Never the dominant color.
+- Tone: authoritative yet modern, trustworthy, forward-looking — fits a leading Thai enterprise of CP Axtra's scale.
+- A restrained multicolour dot motif may be used as a brand signature (sparingly).
 
-## Pages to redesign (all of `frontend/app/(app)/` + login)
-1. **Overview / dashboard** (`dashboard/page.tsx`) — command center: hero metrics, "where to act".
-2. **Inbox** (ranked applications) — `applications/page.tsx`.
-3. **Application detail** — `applications/[id]/page.tsx` (resume viewer + AI panel).
-4. **Candidates** — `candidates/page.tsx`.
-5. **Candidate detail** — `candidates/[id]/page.tsx`.
-6. **Search** — `search/page.tsx`.
-7. **Analytics** — `analytics/page.tsx` (funnel, KPI, sources, scheduled exports).
-8. **Login** — `app/(auth)/login/page.tsx` (the brand front door).
-9. **Shell/chrome** — sidebar, app header, page headers, mobile bar (`components/shell/*`).
+## Typography
+- **Thai everywhere** — all primary copy in Thai (with English where natural / bilingual labels).
+- Thai font: **Noto Sans Thai** or **IBM Plex Sans Thai** (Google Fonts).
+- English/Latin + numerals: **Inter** or **IBM Plex Sans**.
+- Hierarchy must read cleanly in Thai and English simultaneously (line-height tuned for Thai ascenders/descenders).
 
-## Design goals (push for excellence)
-- **Clear hierarchy** through real scale contrast; intentional spacing rhythm (not uniform padding).
-- **Depth / layering** — surfaces, subtle elevation, overlap, the dot motif as atmosphere.
-- **Typography with character** — a deliberate type scale + pairing; tabular figures for data.
-- **Designed states** — hover/focus/active/empty/loading all feel intentional.
-- **Motion that clarifies** — compositor-friendly (transform/opacity), respects reduced-motion.
-- **Data-viz as part of the system** — funnel, KPIs, score badges, charts share one language.
-- **Editorial / bento composition** where it elevates the page — break the uniform-card grid.
-- Responsive: 320 / 768 / 1024 / 1440. Accessible: AA contrast, keyboard, focus rings.
+## Careers website (public, mobile-first, responsive)
+1. **Home / Hero** — headline + job search bar (keyword + location), trust signals, "invests in people" feel.
+2. **Job listing** — results grid/list with filters: department, location, employment type; result count; sort.
+3. **Job detail** — title, location, type, responsibilities, qualifications, benefits, sticky Apply CTA.
+4. **Application form** — multi-section (personal info, resume upload, consent), clear progress, accessible.
+5. **About CP Axtra careers** — culture, values, why join, growth — human and approachable.
 
-## Constraints / guardrails
-- Next.js 16 App Router, Tailwind v4, shadcn. Reuse/extend existing components where sensible.
-- Keep data fetching (React Query hooks in `lib/queries.ts`) and routes unchanged.
-- Do NOT touch auth flow (`lib/auth.ts`), the resume iframe (no `sandbox`), or CSP in `next.config.ts`.
-- Must build clean (`pnpm build`) and keep TypeScript green.
-- Light theme is the product default; keep it bright and corporate-warm.
+## Admin system (internal, desktop-optimized, `#0B47B8` sidebar)
+6. **Dashboard** — KPI overview (open positions, applicants, pipeline stats) + charts; readable, uncluttered.
+7. **Job posting management** — list with status (draft/published), plus create/edit form (publish flow).
+8. **Applicant tracking** — applicants per job posting, pipeline/kanban or ranked table.
+9. **Applicant detail** — profile + resume + status management (move through stages).
+10. **User & role management** — users table, roles, permissions.
 
-## What "done" looks like
-A dashboard that reads as a believable, premium product screenshot for a national Thai
-retail group — unmistakably CP Axtra (blue/yellow/dots), strong hierarchy, refined
-typography, designed interactions, and a cohesive data-viz language across all pages.
+## Design direction
+- Modern **Thai enterprise** aesthetic — NOT generic SaaS, NOT old-government. Clean type, generous whitespace.
+- `#0B47B8` dominant, `#FFC02E` as a deliberate accent only.
+- Data-heavy admin pages stay readable and uncluttered (Linear / Notion information density, `#0B47B8` sidebar).
+- Careers site mobile-first; admin desktop-first.
+- Polish target: **Workday-level**, adapted for Thai enterprise sensibility.
+
+## Inspiration
+- Careers: approachable, human, professional — feels like CP Axtra invests in people.
+- Admin: Linear/Notion density with a `#0B47B8` sidebar.
+- Overall: Workday-grade polish, Thai enterprise.
+
+## Prototype constraints (for the GAN loop)
+- All pages live under `gan-harness/prototype/` as static `.html` + shared `styles.css` (+ optional small JS for tabs/menus). No build step.
+- Served via `python3 -m http.server` so the evaluator can screenshot via Playwright.
+- A `prototype/index.html` links every page (careers + admin) so the evaluator can navigate.
+- Real Thai copy (no lorem). Realistic CP Axtra retail roles (แคชเชียร์, ผู้จัดการสาขา, พนักงานคลัง, ฯลฯ).
+- Animate only compositor-friendly props (transform/opacity). Respect prefers-reduced-motion.
