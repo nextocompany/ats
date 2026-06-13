@@ -46,13 +46,13 @@ func nullable(s string) *string {
 
 func (r *pgRepository) Create(ctx context.Context, c Candidate) (Candidate, error) {
 	const q = `
-		INSERT INTO candidates (full_name, phone, email, id_card, address, province, subregion, date_of_birth, source_channel, status, line_user_id)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, COALESCE(NULLIF($10,''), 'available'), $11)
+		INSERT INTO candidates (full_name, phone, email, id_card, address, province, subregion, date_of_birth, source_channel, status, line_user_id, account_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, COALESCE(NULLIF($10,''), 'available'), $11, $12)
 		RETURNING id, created_at`
 	err := r.pool.QueryRow(ctx, q,
 		c.FullName, nullable(c.Phone), nullable(c.Email), nullable(c.IDCard),
 		nullable(c.Address), nullable(c.Province), nullable(c.Subregion),
-		c.DateOfBirth, nullable(c.SourceChannel), c.Status, nullable(c.LineUserID),
+		c.DateOfBirth, nullable(c.SourceChannel), c.Status, nullable(c.LineUserID), c.AccountID,
 	).Scan(&c.ID, &c.CreatedAt)
 	if err != nil {
 		return Candidate{}, fmt.Errorf("candidates: create: %w", err)

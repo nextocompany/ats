@@ -21,7 +21,7 @@ test("status page accepts a token and shows a not-found message for an unknown o
   await page.screenshot({ path: `${SCREEN_DIR}/status-${testInfo.project.name}.png`, fullPage: true });
 });
 
-test("apply flow returns a status token, which resolves on the status page", async ({ page }, testInfo) => {
+test("account-first apply returns a status token, which resolves on the status page", async ({ page }, testInfo) => {
   await page.goto("/jobs");
   await expect(page.getByRole("heading", { name: "ตำแหน่งงานที่เปิดรับ" })).toBeVisible();
 
@@ -32,33 +32,25 @@ test("apply flow returns a status token, which resolves on the status page", asy
   }
   await firstJob.click();
 
-  // Detail → apply
+  // Detail → apply. Unauthenticated, so the page redirects to /login.
   await page.getByRole("link", { name: "สมัครงาน" }).click();
+  await expect(page.getByRole("heading", { name: "เข้าสู่ระบบ" })).toBeVisible();
 
-  // LINE gate — auth happens BEFORE the form. In mock mode the backend bounces
-  // straight back with the dev stub token, landing on the consent step.
-  await expect(page.getByRole("heading", { name: "ยืนยันตัวตนด้วย LINE" })).toBeVisible();
-  await page.getByRole("button", { name: "เข้าสู่ระบบด้วย LINE" }).click();
+  // LINE mock login → backend creates an account + session cookie → bounce back
+  // to the apply page (now account-first).
+  await page.getByRole("button", { name: /ด้วย LINE/ }).click();
 
-  // Step 1: consent (required)
-  await expect(page.getByRole("heading", { name: "ความยินยอมในการใช้ข้อมูล" })).toBeVisible();
-  await page.screenshot({ path: `${SCREEN_DIR}/apply-consent-${testInfo.project.name}.png`, fullPage: true });
-  await page.getByRole("checkbox").click();
-  await page.getByRole("button", { name: "ถัดไป" }).click();
+  // Fresh account has no saved resume → use the edit/upload path.
+  await expect(page.getByRole("heading", { name: /สมัครตำแหน่ง|สมัครงาน/ })).toBeVisible();
+  await page.getByRole("button", { name: /กรอกข้อมูล|แก้ไขข้อมูล/ }).click();
 
-  // Step 2: details (name required)
   await page.getByLabel(/ชื่อ-นามสกุล/).fill("ทดสอบ ระบบ");
-  await page.screenshot({ path: `${SCREEN_DIR}/apply-details-${testInfo.project.name}.png`, fullPage: true });
-  await page.getByRole("button", { name: "ถัดไป" }).click();
-
-  // Step 3: resume (LINE already verified at the gate) → submit
   await page.getByLabel(/อัปโหลดเรซูเม่/).setInputFiles({
     name: "resume.pdf",
     mimeType: "application/pdf",
     buffer: Buffer.from("%PDF-1.4 test resume"),
   });
-  await expect(page.getByText("ยืนยันตัวตนด้วย LINE แล้ว")).toBeVisible();
-  await page.screenshot({ path: `${SCREEN_DIR}/apply-resume-${testInfo.project.name}.png`, fullPage: true });
+  await page.screenshot({ path: `${SCREEN_DIR}/apply-form-${testInfo.project.name}.png`, fullPage: true });
   await page.getByRole("button", { name: "ส่งใบสมัคร" }).click();
 
   // Success — a status token is shown.

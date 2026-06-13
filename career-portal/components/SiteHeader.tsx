@@ -1,8 +1,7 @@
 import Link from "next/link";
 
-import { buttonVariants } from "@/components/ui/button";
+import { AccountNav } from "@/components/AccountNav";
 import { Container } from "@/components/Container";
-import { cn } from "@/lib/utils";
 
 interface SiteHeaderProps {
   // backHref renders a back chevron (inner pages); when set, the desktop nav is
@@ -51,20 +50,21 @@ export function SiteHeader({ backHref }: SiteHeaderProps) {
                 {item.label}
               </Link>
             ))}
-            <Link href="/jobs" className={cn(buttonVariants({ size: "tap" }), "ml-2")}>
-              สมัครงาน
-            </Link>
+            <AccountNav />
           </nav>
         ) : null}
 
-        {/* Mobile: a single quick link to the jobs list (no menu drawer needed). */}
+        {/* Mobile: jobs quick link + account affordance (no menu drawer needed). */}
         {!backHref ? (
-          <Link
-            href="/jobs"
-            className="ml-auto rounded-lg px-3 py-2 text-sm font-medium text-foreground/70 transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none md:hidden"
-          >
-            ตำแหน่งงาน
-          </Link>
+          <div className="ml-auto flex items-center gap-1 md:hidden">
+            <Link
+              href="/jobs"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-foreground/70 transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+            >
+              ตำแหน่งงาน
+            </Link>
+            <AccountNav compact />
+          </div>
         ) : null}
       </Container>
     </header>

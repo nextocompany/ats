@@ -22,8 +22,11 @@ type Candidate struct {
 	Status        string     `json:"status"`
 	// LineUserID is the verified LINE `sub` (from the LIFF id-token), captured at
 	// apply time so real LINE push has a valid recipient. Empty for legacy/demo.
-	LineUserID string    `json:"line_user_id,omitempty"`
-	CreatedAt  time.Time `json:"created_at"`
+	LineUserID string `json:"line_user_id,omitempty"`
+	// AccountID links this per-application candidate row to a career-portal member
+	// account (candidateauth). Nil for guest/legacy/PeopleSoft applications.
+	AccountID *uuid.UUID `json:"account_id,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
 }
 
 // ProfileFields are the parsed values written back after CV parsing.

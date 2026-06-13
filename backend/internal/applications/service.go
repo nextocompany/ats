@@ -30,7 +30,8 @@ type IntakeInput struct {
 	IDCard        string
 	Province      string
 	SourceChannel string
-	LineUserID    string // verified LINE `sub` from the LIFF id-token (empty under mock)
+	LineUserID    string     // verified LINE `sub` from the LIFF id-token (empty under mock)
+	AccountID     *uuid.UUID // career-portal member account (nil for guest/legacy)
 	PositionID    uuid.UUID
 	FileName      string
 	FileType      string // pdf | docx | image
@@ -79,6 +80,7 @@ func (s *Service) Intake(ctx context.Context, in IntakeInput) (IntakeResult, err
 		Province:      in.Province,
 		SourceChannel: in.SourceChannel,
 		LineUserID:    in.LineUserID,
+		AccountID:     in.AccountID,
 		Status:        "available",
 	})
 	if err != nil {

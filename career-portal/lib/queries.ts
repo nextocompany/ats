@@ -10,6 +10,7 @@ import type {
   InterviewSessionState,
   PositionDetail,
   PublicPosition,
+  QuickApplyResult,
 } from "./types";
 
 export function usePublicPositions() {
@@ -29,6 +30,7 @@ export function usePublicPosition(id: string) {
 
 // buildApplyForm assembles the multipart body the backend expects. Kept pure and
 // exported so the FormData shape can be unit-tested without a network call.
+// Identity travels in the session cookie (account-first) — no LINE header.
 export function buildApplyForm(input: ApplyInput): FormData {
   const form = new FormData();
   form.set("position_id", input.positionId);
@@ -43,14 +45,20 @@ export function buildApplyForm(input: ApplyInput): FormData {
   return form;
 }
 
+// useApplyMutation submits the apply form with a (possibly new) resume. The
+// session cookie identifies the member.
 export function useApplyMutation() {
   return useMutation<ApplyResult, Error, ApplyInput>({
     mutationFn: (input) =>
-      api
-        .postForm<ApplyResult>("/api/v1/public/apply", buildApplyForm(input), {
-          "X-LINE-IdToken": input.lineIdToken,
-        })
-        .then((r) => r.data),
+      api.postForm<ApplyResult>("/api/v1/public/apply", buildApplyForm(input)).then((r) => r.data),
+  });
+}
+
+// useQuickApply applies to a position using the member's saved profile + resume.
+export function useQuickApply() {
+  return useMutation<QuickApplyResult, Error, string>({
+    mutationFn: (positionId) =>
+      api.post<QuickApplyResult>("/api/v1/public/apply/quick", { position_id: positionId }).then((r) => r.data),
   });
 }
 

@@ -1,6 +1,8 @@
 // Envelope-aware API client for the public Career API. Unwraps {success,data,error,meta}
-// and throws ApiError on failure. Public endpoints need no bearer token; apply sends a
-// LINE id-token header and a multipart body (no JSON).
+// and throws ApiError on failure. Every request sends credentials:'include' so the
+// candidate session cookie (cp_session) rides along — required for membership +
+// account-first apply. The cookie is cross-site in prod, so the backend sets it
+// SameSite=None;Secure and CORS allows credentials.
 import type { Envelope, Meta } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
@@ -30,14 +32,25 @@ async function unwrap<T>(res: Response): Promise<{ data: T; meta?: Meta }> {
 
 export const api = {
   get: async <T>(path: string): Promise<{ data: T; meta?: Meta }> => {
-    const res = await fetch(`${BASE}${path}`);
+    const res = await fetch(`${BASE}${path}`, { credentials: "include" });
     return unwrap<T>(res);
   },
-  // post sends a JSON body. Used by the AI pre-interview chat (token-gated, no
-  // bearer). Apply still uses postForm (multipart resume upload).
+  // post sends a JSON body. Used by the AI pre-interview chat (token-gated) and
+  // the membership endpoints (cookie session).
   post: async <T>(path: string, body?: unknown): Promise<{ data: T; meta?: Meta }> => {
     const res = await fetch(`${BASE}${path}`, {
       method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+    return unwrap<T>(res);
+  },
+  // patch sends a JSON body (profile update).
+  patch: async <T>(path: string, body?: unknown): Promise<{ data: T; meta?: Meta }> => {
+    const res = await fetch(`${BASE}${path}`, {
+      method: "PATCH",
+      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
@@ -50,7 +63,12 @@ export const api = {
     form: FormData,
     headers?: Record<string, string>,
   ): Promise<{ data: T; meta?: Meta }> => {
-    const res = await fetch(`${BASE}${path}`, { method: "POST", body: form, headers });
+    const res = await fetch(`${BASE}${path}`, {
+      method: "POST",
+      credentials: "include",
+      body: form,
+      headers,
+    });
     return unwrap<T>(res);
   },
 };
