@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { ConsentStep } from "@/components/ConsentStep";
-import { LineLoginButton } from "@/components/LineLoginButton";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,6 +24,8 @@ const STEP_LABELS = ["ยินยอม", "ข้อมูล", "เรซู�
 interface ApplyStepperProps {
   positionId: string;
   positionTitle: string;
+  // Verified LINE id-token, obtained by the LineGate before this form renders.
+  lineIdToken: string;
 }
 
 // validateFile mirrors the server's type/size gate (415/413) so the candidate
@@ -35,7 +36,7 @@ function validateFile(file: File): string | null {
   return null;
 }
 
-export function ApplyStepper({ positionId, positionTitle }: ApplyStepperProps) {
+export function ApplyStepper({ positionId, positionTitle, lineIdToken }: ApplyStepperProps) {
   const [step, setStep] = useState(0);
   const [consent, setConsent] = useState(false);
   const [fullName, setFullName] = useState("");
@@ -45,14 +46,13 @@ export function ApplyStepper({ positionId, positionTitle }: ApplyStepperProps) {
   const [province, setProvince] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
-  const [lineToken, setLineToken] = useState("");
   const [statusToken, setStatusToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   const mutation = useApplyMutation();
 
   const detailsValid = fullName.trim().length > 0;
-  const canSubmit = consent && detailsValid && !!file && !fileError && !!lineToken;
+  const canSubmit = consent && detailsValid && !!file && !fileError && !!lineIdToken;
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const picked = e.target.files?.[0] ?? null;
@@ -78,7 +78,7 @@ export function ApplyStepper({ positionId, positionTitle }: ApplyStepperProps) {
         province: province.trim() || undefined,
         consentVersion: CONSENT_VERSION,
         resume: file,
-        lineIdToken: lineToken,
+        lineIdToken,
       },
       { onSuccess: (data) => setStatusToken(data.status_token) },
     );
@@ -211,10 +211,12 @@ export function ApplyStepper({ positionId, positionTitle }: ApplyStepperProps) {
             {file && !fileError ? <p className="text-sm text-accent">เลือกไฟล์: {file.name}</p> : null}
           </div>
 
-          <div className="space-y-2">
-            <p className="text-sm font-medium">ยืนยันตัวตนด้วย LINE</p>
-            <LineLoginButton onToken={setLineToken} connected={!!lineToken} />
-          </div>
+          <p className="flex items-center justify-center gap-1.5 text-sm text-[oklch(50%_0.16_150)]">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            ยืนยันตัวตนด้วย LINE แล้ว
+          </p>
 
           {mutation.isError ? (
             <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
