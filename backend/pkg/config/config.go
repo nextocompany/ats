@@ -69,6 +69,11 @@ type Config struct {
 	// LINE Login — "mock" (default) or "real".
 	LINEProvider  string
 	LINEChannelID string
+	// LINE Login OAuth web flow (real mode): the channel secret signs the
+	// authorization-code → token exchange, and the callback URL must exactly match
+	// the one registered on the LINE Login channel.
+	LINEChannelSecret    string
+	LINELoginCallbackURL string
 
 	// Notifications (re-engagement, report delivery) — "mock" (default) or "real".
 	NotifyProvider  string
@@ -154,8 +159,10 @@ func Load() (*Config, error) {
 		PSCSVFallbackContainer: getenv("PS_CSV_FALLBACK_CONTAINER", "ps-export"),
 		PSWebhookSecret:        os.Getenv("PS_WEBHOOK_SECRET"),
 
-		LINEProvider:  getenv("LINE_PROVIDER", "mock"),
-		LINEChannelID: os.Getenv("LINE_CHANNEL_ID"),
+		LINEProvider:         getenv("LINE_PROVIDER", "mock"),
+		LINEChannelID:        os.Getenv("LINE_CHANNEL_ID"),
+		LINEChannelSecret:    os.Getenv("LINE_CHANNEL_SECRET"),
+		LINELoginCallbackURL: os.Getenv("LINE_LOGIN_CALLBACK_URL"),
 
 		NotifyProvider:  getenv("NOTIFY_PROVIDER", "mock"),
 		NotifyLINEToken: os.Getenv("NOTIFY_LINE_TOKEN"),
@@ -225,8 +232,13 @@ func Load() (*Config, error) {
 			return nil, fmt.Errorf("config: PS_WEBHOOK_SECRET is required when PS_PROVIDER=real")
 		}
 	}
-	if c.UsesRealLINE() && c.LINEChannelID == "" {
-		return nil, fmt.Errorf("config: LINE_CHANNEL_ID is required when LINE_PROVIDER=real")
+	if c.UsesRealLINE() {
+		if c.LINEChannelID == "" {
+			return nil, fmt.Errorf("config: LINE_CHANNEL_ID is required when LINE_PROVIDER=real")
+		}
+		if c.LINEChannelSecret == "" || c.LINELoginCallbackURL == "" {
+			return nil, fmt.Errorf("config: LINE_CHANNEL_SECRET and LINE_LOGIN_CALLBACK_URL are required when LINE_PROVIDER=real")
+		}
 	}
 	if c.UsesRealNotify() && c.NotifyLINEToken == "" {
 		return nil, fmt.Errorf("config: NOTIFY_LINE_TOKEN is required when NOTIFY_PROVIDER=real")

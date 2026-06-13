@@ -24,6 +24,7 @@ import (
 	"github.com/nexto/hr-ats/internal/candidates"
 	"github.com/nexto/hr-ats/internal/health"
 	"github.com/nexto/hr-ats/internal/interview"
+	"github.com/nexto/hr-ats/internal/lineauth"
 	"github.com/nexto/hr-ats/internal/middleware"
 	"github.com/nexto/hr-ats/internal/notify"
 	"github.com/nexto/hr-ats/internal/pdpa"
@@ -203,6 +204,9 @@ func main() {
 	}))
 	pdpaRepo := pdpa.New(pool)
 	public.RegisterRoutes(app, public.NewHandler(intakeSvc, appRepo, positionRepo, lineVerifier, pdpaRepo))
+	// LINE Login OAuth web flow (candidate auth). Mock by default → bounces back
+	// with the dev stub; real → full authorize/callback against LINE.
+	lineauth.RegisterRoutes(app, lineauth.NewHandler(cfg))
 
 	// AI pre-interview (slice 2.5): HR invites a shortlisted candidate; the
 	// candidate completes an adaptive text chat via an opaque token; the AI writes

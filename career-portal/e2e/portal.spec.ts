@@ -35,6 +35,11 @@ test("apply flow returns a status token, which resolves on the status page", asy
   // Detail → apply
   await page.getByRole("link", { name: "สมัครงาน" }).click();
 
+  // LINE gate — auth happens BEFORE the form. In mock mode the backend bounces
+  // straight back with the dev stub token, landing on the consent step.
+  await expect(page.getByRole("heading", { name: "ยืนยันตัวตนด้วย LINE" })).toBeVisible();
+  await page.getByRole("button", { name: "เข้าสู่ระบบด้วย LINE" }).click();
+
   // Step 1: consent (required)
   await expect(page.getByRole("heading", { name: "ความยินยอมในการใช้ข้อมูล" })).toBeVisible();
   await page.screenshot({ path: `${SCREEN_DIR}/apply-consent-${testInfo.project.name}.png`, fullPage: true });
@@ -46,14 +51,13 @@ test("apply flow returns a status token, which resolves on the status page", asy
   await page.screenshot({ path: `${SCREEN_DIR}/apply-details-${testInfo.project.name}.png`, fullPage: true });
   await page.getByRole("button", { name: "ถัดไป" }).click();
 
-  // Step 3: resume + LINE login → submit
+  // Step 3: resume (LINE already verified at the gate) → submit
   await page.getByLabel(/อัปโหลดเรซูเม่/).setInputFiles({
     name: "resume.pdf",
     mimeType: "application/pdf",
     buffer: Buffer.from("%PDF-1.4 test resume"),
   });
-  await page.getByRole("button", { name: "เข้าสู่ระบบด้วย LINE" }).click();
-  await expect(page.getByText("เชื่อมต่อ LINE แล้ว")).toBeVisible();
+  await expect(page.getByText("ยืนยันตัวตนด้วย LINE แล้ว")).toBeVisible();
   await page.screenshot({ path: `${SCREEN_DIR}/apply-resume-${testInfo.project.name}.png`, fullPage: true });
   await page.getByRole("button", { name: "ส่งใบสมัคร" }).click();
 
