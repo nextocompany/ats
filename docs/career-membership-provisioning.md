@@ -44,6 +44,12 @@ New env (api): `GOOGLE_PROVIDER`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
 `ACS_EMAIL_ACCESS_KEY`, `ACS_EMAIL_SENDER`, `CANDIDATE_SESSION_TTL` (720h),
 `CANDIDATE_SESSION_COOKIE` (cp_session), `EMAIL_OTP_TTL` (10m). Migration **000013**.
 
+New env (scheduler/worker, optional — sane defaults): `AUTH_CLEANUP_ENABLED`
+(default `true`), `AUTH_CLEANUP_CRON` (`15 3 * * *`), `AUTH_CLEANUP_BATCH` (500).
+
+**Services to deploy:** `api` + `portal` (steps 5–6) **and** `scheduler` + `worker`
+(step 6b, for the expired-row cleanup job). The dashboard is unaffected.
+
 ---
 
 ## 0) Preflight — confirm names & set shell vars
@@ -200,6 +206,43 @@ az acr build -r $ACR -t hr-ats/portal:$TAG -t hr-ats/portal:latest \
   -f career-portal/Dockerfile career-portal
 az containerapp update -n hrats-prod-portal -g $RG --image $ACR_LOGIN/hr-ats/portal:$TAG
 ```
+
+---
+
+## 6b) Build + deploy scheduler & worker (auth cleanup job)
+
+> Required so the `auth:cleanup` job runs — it deletes expired/consumed
+> `email_otps` and expired/revoked `candidate_sessions` so those tables don't grow
+> unbounded. The **scheduler** (single replica) enqueues it on `AUTH_CLEANUP_CRON`;
+> the **worker** handles it. Both ship from the same backend Dockerfile via `SVC=`.
+> Defaults: `AUTH_CLEANUP_ENABLED=true`, cron `15 3 * * *`, batch `500` — no env
+> needed unless you want to tune/disable; the binaries just need to be the new build.
+
+```bash
+# Build both service images from the backend Dockerfile
+az acr build -r $ACR -t hr-ats/scheduler:$TAG -t hr-ats/scheduler:latest \
+  --build-arg SVC=scheduler -f backend/Dockerfile backend
+az acr build -r $ACR -t hr-ats/worker:$TAG -t hr-ats/worker:latest \
+  --build-arg SVC=worker -f backend/Dockerfile backend
+
+# Roll the container apps
+az containerapp update -n hrats-prod-scheduler -g $RG --image $ACR_LOGIN/hr-ats/scheduler:$TAG
+az containerapp update -n hrats-prod-worker    -g $RG --image $ACR_LOGIN/hr-ats/worker:$TAG
+
+# (optional) tune or disable without a rebuild:
+# az containerapp update -n hrats-prod-scheduler -g $RG --set-env-vars \
+#   AUTH_CLEANUP_ENABLED=true AUTH_CLEANUP_CRON="15 3 * * *" AUTH_CLEANUP_BATCH=500
+```
+
+> Confirm the app names with `az containerapp list -g $RG -o table` (scheduler may
+> be named `hrats-prod-scheduler`). The **scheduler must stay at exactly 1 replica**
+> — multiple instances would double-enqueue.
+>
+> Verify after the roll:
+> ```bash
+> az containerapp logs show -n hrats-prod-scheduler -g $RG --tail 30 | grep -i "auth:cleanup registered"
+> az containerapp logs show -n hrats-prod-worker    -g $RG --tail 50 | grep -i "auth cleanup complete"   # appears after the first cron fire
+> ```
 
 ---
 
