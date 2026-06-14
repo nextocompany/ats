@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -136,6 +137,9 @@ func (h *GoogleHandler) Callback(c *fiber.Ctx) error {
 
 func (h *GoogleHandler) finalize(c *fiber.Ctx, ret, sub, name, email string) error {
 	tok, exp, err := h.svc.LoginWithGoogle(c.UserContext(), sub, name, email)
+	if errors.Is(err, ErrAccountSuspended) {
+		return c.Redirect(ret+"#auth_error=account_suspended", fiber.StatusFound)
+	}
 	if err != nil {
 		log.Warn().Err(err).Msg("googleauth: login failed")
 		return c.Redirect(ret+"#auth_error=login_failed", fiber.StatusFound)

@@ -8,11 +8,30 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// uniqueViolation is the Postgres SQLSTATE for a unique-constraint violation.
+const uniqueViolation = "23505"
+
+// isUnique reports whether err is a Postgres unique-constraint violation.
+func isUnique(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == uniqueViolation
+}
+
 // ErrNotFound is returned when no member matches the lookup key.
 var ErrNotFound = errors.New("members: not found")
+
+// ErrAnonymized is returned when a lifecycle action targets an already-anonymized
+// account: erasure is irreversible, so status can't move out of 'anonymized' and
+// a redacted account can't be re-anonymized.
+var ErrAnonymized = errors.New("members: account already anonymized")
+
+// ErrEmailTaken is returned when an admin profile edit sets an email already held
+// by another account (candidate_accounts.email is UNIQUE).
+var ErrEmailTaken = errors.New("members: email already in use")
 
 // Repository is the member-admin data-access contract.
 type Repository interface {
@@ -20,6 +39,19 @@ type Repository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*Member, error)
 	GetResumeBlobURL(ctx context.Context, id uuid.UUID) (string, error)
 	Stats(ctx context.Context) (Stats, error)
+
+	// SetStatus moves a member between 'active' and 'suspended'. Suspending also
+	// force-logs-out (deletes the member's sessions). Returns ErrNotFound when the
+	// member is missing and ErrAnonymized when it is already erased.
+	SetStatus(ctx context.Context, id uuid.UUID, status string, by *uuid.UUID) error
+	// ForceLogout deletes the member's sessions (revokes every active login).
+	ForceLogout(ctx context.Context, id uuid.UUID) error
+	// UpdateProfile applies a sparse admin profile edit.
+	UpdateProfile(ctx context.Context, id uuid.UUID, p ProfileUpdate) error
+	// Anonymize irreversibly redacts the account's PII, deletes its sessions, and
+	// returns the resume blob URL (if any) so the caller can delete it after the
+	// commit. Idempotent: a second call returns ErrAnonymized.
+	Anonymize(ctx context.Context, id uuid.UUID) (resumeURL string, err error)
 }
 
 type pgRepository struct {

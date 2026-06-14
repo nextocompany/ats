@@ -35,7 +35,9 @@ func newFakeRepo() *fakeRepo {
 }
 
 func (f *fakeRepo) newAccount() *Account {
-	a := &Account{ID: uuid.New(), CreatedAt: time.Now()}
+	// Mirror the DB default (status NOT NULL DEFAULT 'active') so the suspension
+	// guard in issueSessionFor doesn't reject freshly-created fake accounts.
+	a := &Account{ID: uuid.New(), Status: statusActive, CreatedAt: time.Now()}
 	f.accounts[a.ID] = a
 	return a
 }

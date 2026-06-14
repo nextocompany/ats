@@ -12,4 +12,11 @@ func RegisterDashboardRoutes(app *fiber.App, h *Handler) {
 	g.Get("/stats", h.Stats)
 	g.Get("/:id", h.Detail)
 	g.Get("/:id/resume", h.Resume)
+
+	// Lifecycle (Phase B). Suspend/reactivate/edit/force-logout gate on
+	// super_admin+hr_manager inside the handler; anonymize is super_admin-only.
+	g.Patch("/:id", h.UpdateProfile)
+	g.Patch("/:id/status", h.SetStatus)
+	g.Post("/:id/force-logout", h.ForceLogout)
+	g.Post("/:id/anonymize", h.Anonymize)
 }

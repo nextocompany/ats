@@ -281,10 +281,11 @@ func main() {
 	// Mock summarizer by default; Azure OpenAI behind config. Synchronous (no worker).
 	fitSvc := fit.NewService(fit.NewRepository(pool), fit.New(cfg), appRepo, interviewRepo, positionRepo, candidateRepo)
 	fit.RegisterDashboardRoutes(app, fit.NewHandler(fitSvc, appRepo))
-	// HR member management (career-portal accounts): role-gated directory (Phase A:
-	// super_admin + hr_manager). Reads candidate_accounts directly; resume URLs are
-	// signed on demand via the blob client.
-	members.RegisterDashboardRoutes(app, members.NewHandler(members.NewRepository(pool), activityLog, blobClient))
+	// HR member management (career-portal accounts): role-gated directory + lifecycle
+	// (super_admin + hr_manager; PDPA erase super_admin-only). Reads candidate_accounts
+	// directly; resume URLs are signed on demand and erased on anonymize via the blob
+	// client (passed as both signer and deleter).
+	members.RegisterDashboardRoutes(app, members.NewHandler(members.NewRepository(pool), activityLog, blobClient, blobClient))
 	// Candidate search (Sprint 5c) — registered BEFORE profiles so the static
 	// /candidates/search path takes precedence over /candidates/:id. Mock Postgres
 	// trigram by default; Azure AI Search behind config.
