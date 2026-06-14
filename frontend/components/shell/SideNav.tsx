@@ -6,7 +6,7 @@ import { LogOut } from "lucide-react";
 
 import { signOut } from "@/lib/auth";
 import { useMe } from "@/lib/queries";
-import { NAV, BrandMark } from "./nav-config";
+import { navForRole, BrandMark } from "./nav-config";
 import type { Me } from "@/lib/types";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -70,7 +70,7 @@ export function SideNav() {
           Workspace
         </p>
         <ul className="flex flex-col gap-1">
-          {NAV.map((item) => {
+          {navForRole(me?.role).map((item) => {
             const active = pathname.startsWith(item.href);
             const Icon = item.icon;
             return (

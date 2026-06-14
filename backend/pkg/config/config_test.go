@@ -178,6 +178,38 @@ func TestLoad_AzureWithKeys(t *testing.T) {
 	}
 }
 
+func TestAllowedTenantList(t *testing.T) {
+	cases := []struct {
+		name       string
+		homeTenant string
+		allowed    string
+		want       []string
+		multi      bool
+	}{
+		{"falls back to home tenant when unset", "home-tid", "", []string{"home-tid"}, false},
+		{"single explicit tenant", "home-tid", "tid-a", []string{"tid-a"}, false},
+		{"multiple tenants, trimmed", "home-tid", " tid-a , tid-b ,, tid-c ", []string{"tid-a", "tid-b", "tid-c"}, true},
+		{"empty everything", "", "", nil, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := &Config{AzureADTenantID: tc.homeTenant, AzureADAllowedTenants: tc.allowed}
+			got := c.AllowedTenantList()
+			if len(got) != len(tc.want) {
+				t.Fatalf("AllowedTenantList()=%v want %v", got, tc.want)
+			}
+			for i := range got {
+				if got[i] != tc.want[i] {
+					t.Fatalf("AllowedTenantList()[%d]=%q want %q", i, got[i], tc.want[i])
+				}
+			}
+			if c.IsMultiTenantAuth() != tc.multi {
+				t.Fatalf("IsMultiTenantAuth()=%v want %v", c.IsMultiTenantAuth(), tc.multi)
+			}
+		})
+	}
+}
+
 func TestLoad_GeminiRequiresKey(t *testing.T) {
 	// Arrange: gemini provider selected but no API key present.
 	t.Setenv("DB_URL", "postgres://localhost/db")

@@ -4,6 +4,7 @@ import {
   Users,
   Search,
   BarChart3,
+  Settings,
   type LucideIcon,
 } from "lucide-react";
 
@@ -21,6 +22,18 @@ export const NAV: NavItem[] = [
   { href: "/search", label: "Search", icon: Search },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
 ];
+
+// Admin is super_admin-only — appended via navForRole, never in the base NAV.
+export const ADMIN_NAV: NavItem = { href: "/admin", label: "Admin", icon: Settings };
+
+// navForRole returns the nav items visible to a given role. Super admins also see
+// Admin; everyone else gets the base workspace nav.
+export function navForRole(role?: string): NavItem[] {
+  return role === "super_admin" ? [...NAV, ADMIN_NAV] : NAV;
+}
+
+// ALL_NAV is every possible item, for pathname→item lookups (e.g. header title).
+export const ALL_NAV: NavItem[] = [...NAV, ADMIN_NAV];
 
 // Brand lockup — blue monogram + wordmark, shared portal identity.
 // The monogram carries a brass corner-dot: a micro CP Axtra signature.

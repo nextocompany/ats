@@ -99,6 +99,7 @@ jobs:
           DASH_URL: ${{ steps.env.outputs.dashboard_url }}
           AD_CLIENT_ID: ${{ vars.AZURE_AD_CLIENT_ID }}
           AD_TENANT_ID: ${{ vars.AZURE_AD_TENANT_ID }}
+          AD_AUTHORITY: ${{ vars.AZURE_AD_AUTHORITY }}
         run: |
           set -euo pipefail
           # Career portal — only the public API origin is baked in.
@@ -115,6 +116,12 @@ jobs:
               --build-arg NEXT_PUBLIC_AZURE_AD_TENANT_ID="$AD_TENANT_ID"
               --build-arg NEXT_PUBLIC_AZURE_AD_REDIRECT_URI="$DASH_URL"
             )
+            # Multi-tenant SSO: set the AZURE_AD_AUTHORITY var to
+            # https://login.microsoftonline.com/organizations so MSAL accepts any
+            # allowed org. Unset ⇒ single-tenant (home tenant only).
+            if [ -n "${AD_AUTHORITY:-}" ]; then
+              DASH_ARGS+=(--build-arg NEXT_PUBLIC_AZURE_AD_AUTHORITY="$AD_AUTHORITY")
+            fi
           else
             echo "::warning::AZURE_AD_CLIENT_ID var is unset — dashboard will build in DEV sign-in mode (no Entra SSO)"
           fi

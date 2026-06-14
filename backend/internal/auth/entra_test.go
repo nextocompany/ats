@@ -4,6 +4,28 @@ import "testing"
 
 func intPtr(n int) *int { return &n }
 
+func TestMatchesTenantIssuer(t *testing.T) {
+	const tid = "11111111-1111-1111-1111-111111111111"
+	cases := []struct {
+		name   string
+		issuer string
+		tenant string
+		want   bool
+	}{
+		{"exact match", entraIssuer(tid), tid, true},
+		{"case-insensitive", "HTTPS://LOGIN.MICROSOFTONLINE.COM/" + tid + "/V2.0", tid, true},
+		{"issuer for a different tenant", entraIssuer("99999999-9999-9999-9999-999999999999"), tid, false},
+		{"non-microsoft issuer", "https://evil.example.com/" + tid + "/v2.0", tid, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := matchesTenantIssuer(tc.issuer, tc.tenant); got != tc.want {
+				t.Fatalf("matchesTenantIssuer(%q,%q)=%v want %v", tc.issuer, tc.tenant, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestMapIdentity(t *testing.T) {
 	cases := []struct {
 		name   string

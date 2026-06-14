@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api, ApiError, buildQuery } from "./api";
 import type {
+  AdminSettings,
   Application,
   ApplicationFilter,
   Candidate,
@@ -23,6 +24,25 @@ import type {
 
 export function useMe() {
   return useQuery({ queryKey: ["me"], queryFn: () => api.get<Me>("/api/v1/users/me").then((r) => r.data) });
+}
+
+// Admin system settings (super_admin only). The query 403s for other roles, so
+// gate the UI on me.role before rendering.
+export function useAdminSettings(enabled = true) {
+  return useQuery({
+    queryKey: ["admin-settings"],
+    queryFn: () => api.get<AdminSettings>("/api/v1/admin/settings").then((r) => r.data),
+    enabled,
+  });
+}
+
+export function useUpdateAdminSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (settings: AdminSettings) =>
+      api.patch<AdminSettings>("/api/v1/admin/settings", settings).then((r) => r.data),
+    onSuccess: (data) => qc.setQueryData(["admin-settings"], data),
+  });
 }
 
 export function useApplications(filter: ApplicationFilter) {

@@ -11,7 +11,7 @@ import (
 )
 
 func TestAuth_DevPathInjectsSuperAdmin(t *testing.T) {
-	h, err := Auth(context.Background(), &config.Config{Env: "development", AuthProvider: "mock"})
+	h, err := Auth(context.Background(), &config.Config{Env: "development", AuthProvider: "mock"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -26,6 +26,38 @@ func TestAuth_DevPathInjectsSuperAdmin(t *testing.T) {
 	n, _ := resp.Body.Read(body)
 	if got := string(body[:n]); got != "super_admin" {
 		t.Fatalf("expected super_admin in dev, got %q", got)
+	}
+}
+
+type fakeToggle struct{ on bool }
+
+func (f fakeToggle) AllowAllTenants(context.Context) bool { return f.on }
+
+func TestEntraTenantPolicy_AllowsTenant(t *testing.T) {
+	const allowed = "tid-allowed"
+	const other = "tid-other"
+
+	cases := []struct {
+		name   string
+		toggle AllowAllTenantsReader
+		tid    string
+		want   bool
+	}{
+		{"on allowlist, toggle off", fakeToggle{on: false}, allowed, true},
+		{"off allowlist, toggle off", fakeToggle{on: false}, other, false},
+		{"off allowlist, toggle on ⇒ allowed", fakeToggle{on: true}, other, true},
+		{"off allowlist, nil toggle ⇒ denied", nil, other, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := entraTenantPolicy{
+				allowed: map[string]struct{}{allowed: {}},
+				toggle:  tc.toggle,
+			}
+			if got := p.AllowsTenant(context.Background(), tc.tid); got != tc.want {
+				t.Fatalf("AllowsTenant(%q)=%v want %v", tc.tid, got, tc.want)
+			}
+		})
 	}
 }
 

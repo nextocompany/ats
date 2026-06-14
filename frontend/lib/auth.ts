@@ -24,6 +24,15 @@ const LOGIN_SCOPES = ["openid", "profile"];
 const CLIENT_ID = process.env.NEXT_PUBLIC_AZURE_AD_CLIENT_ID;
 const TENANT_ID = process.env.NEXT_PUBLIC_AZURE_AD_TENANT_ID;
 
+// Authority. Single-tenant pins login to the home tenant. Multi-tenant
+// deployments set NEXT_PUBLIC_AZURE_AD_AUTHORITY to
+// "https://login.microsoftonline.com/organizations" so MSAL accepts any
+// work/school account; the backend then enforces the AZURE_AD_ALLOWED_TENANTS
+// allowlist. (The app registration must be multi-tenant for this to work.)
+const AUTHORITY =
+  process.env.NEXT_PUBLIC_AZURE_AD_AUTHORITY ??
+  `https://login.microsoftonline.com/${TENANT_ID}`;
+
 /** True when Entra SSO is configured at build time. */
 export function isEntraConfigured(): boolean {
   return Boolean(CLIENT_ID);
@@ -45,7 +54,7 @@ function buildConfig(): Configuration {
   return {
     auth: {
       clientId: CLIENT_ID as string,
-      authority: `https://login.microsoftonline.com/${TENANT_ID}`,
+      authority: AUTHORITY,
       redirectUri: redirectUri(),
     },
     cache: {

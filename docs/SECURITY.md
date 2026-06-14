@@ -13,6 +13,27 @@
 - HR API auth is a **mock-default seam** (`middleware.Auth`): dev injects a fixed `super_admin` (`MockJWT`);
   `AUTH_PROVIDER=real` validates an **Azure AD (Entra) JWT** (OIDC discovery + JWKS, checks `aud`/`iss`/`exp`)
   and maps claims → the same `DevUser` locals every handler reads (no handler changes).
+- **Tenancy (multi-org SSO)**: by default a single home tenant (`AZURE_AD_TENANT_ID`) is accepted — the OIDC
+  issuer is pinned to that tenant. To let other organisations sign in, set `AZURE_AD_ALLOWED_TENANTS` to a
+  comma-separated allowlist of tenant IDs (≥2 ⇒ multi-tenant mode). In multi-tenant mode discovery runs against
+  the shared `…/organizations/v2.0` endpoint and each token is checked against the allowlist: the `tid` claim
+  must be allowed **and** the verified issuer must equal that exact tenant's `…/{tid}/v2.0` (issuer-binding, so
+  a token can't claim an allowed `tid` while signed by a different directory). Tenants outside the list are
+  rejected with 401 — there is **no** open `/organizations` acceptance. The app registration must be
+  multi-tenant (`signInAudience=AzureADMultipleOrgs`) and the dashboard built with
+  `NEXT_PUBLIC_AZURE_AD_AUTHORITY=https://login.microsoftonline.com/organizations`. A user from an allowed
+  tenant with no app role maps to the most-restrictive (store) scope — visibility fails closed, never widens.
+- **Runtime "allow all tenants" toggle (admin)**: a `super_admin`-only switch in the dashboard (Admin →
+  Tenant access, `GET/PATCH /api/v1/admin/settings`, persisted in `system_settings`) controls whether **any**
+  Entra directory may sign in, flippable without a redeploy. **It is seeded ON** (migration `000014`) — open by
+  default — so an admin can later restrict to the static allowlist rather than having to open it first. The
+  verifier always discovers against the shared `organizations` endpoint so any tenant's token can be validated;
+  acceptance = static allowlist ∪ this toggle. The flag is read on the auth hot path with a 10s cache; on a DB
+  read **error** it falls back to the last known value, defaulting to closed (a transient outage never silently
+  opens it — the seeded default applies only once the row is readable). Issuer-binding still applies, so a token
+  must genuinely originate from the tenant it claims, and no-role users still map to the most restrictive scope.
+  The toggle gates **backend acceptance only** — other orgs still need the multi-tenant authority + app
+  registration to reach the Microsoft login.
 - Auth gates the **HR console only**. Bypassed paths: `/health`, `/api/v1/public/*` (LINE-authed candidate API),
   `/api/v1/ps/*` (PeopleSoft machine webhooks — authenticated separately by HMAC, below).
 - **PeopleSoft webhook auth (Sprint 7)**: the state-changing PS POSTs (`/api/v1/ps/vacancy-opened`,

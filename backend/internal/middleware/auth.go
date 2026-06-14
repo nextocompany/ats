@@ -10,16 +10,46 @@ import (
 	"github.com/nexto/hr-ats/pkg/config"
 )
 
+// AllowAllTenantsReader exposes the runtime, admin-managed "allow all Entra
+// tenants" toggle. The settings.Service satisfies it; defined here so this package
+// does not import settings (which imports this package for DevUser).
+type AllowAllTenantsReader interface {
+	AllowAllTenants(ctx context.Context) bool
+}
+
+// entraTenantPolicy is the authorisation gate for which directories may sign in:
+// the static AZURE_AD_ALLOWED_TENANTS allowlist, OR — when the admin toggle is on
+// — any tenant. The verifier has already validated the token cryptographically
+// and bound the issuer to the tenant before this runs.
+type entraTenantPolicy struct {
+	allowed map[string]struct{}   // lower-cased static allowlist
+	toggle  AllowAllTenantsReader // runtime "allow all"; nil ⇒ allowlist only
+}
+
+func (p entraTenantPolicy) AllowsTenant(ctx context.Context, tenantID string) bool {
+	if _, ok := p.allowed[tenantID]; ok {
+		return true
+	}
+	return p.toggle != nil && p.toggle.AllowAllTenants(ctx)
+}
+
 // Auth returns the authentication middleware selected by config. When
 // AUTH_PROVIDER=real it validates an Azure AD (Entra) bearer token and populates
 // the same UserContextKey→DevUser locals every handler already reads; otherwise
 // it falls back to MockJWT (dev super_admin). Returns an error if real-auth
 // discovery fails (fail fast at startup).
-func Auth(ctx context.Context, cfg *config.Config) (fiber.Handler, error) {
+//
+// allowAll is the runtime tenant toggle (may be nil ⇒ static allowlist only).
+func Auth(ctx context.Context, cfg *config.Config, allowAll AllowAllTenantsReader) (fiber.Handler, error) {
 	if !cfg.UsesRealAuth() {
 		return MockJWT(cfg.IsDevelopment()), nil
 	}
-	verifier, err := auth.NewEntraVerifier(ctx, cfg)
+	allowed := make(map[string]struct{})
+	for _, t := range cfg.AllowedTenantList() {
+		allowed[strings.ToLower(t)] = struct{}{}
+	}
+	policy := entraTenantPolicy{allowed: allowed, toggle: allowAll}
+	verifier, err := auth.NewEntraVerifier(ctx, cfg, policy)
 	if err != nil {
 		return nil, err
 	}
