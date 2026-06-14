@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { Search as SearchIcon, MapPin } from "lucide-react";
 
-import { Pagination } from "@/app/(app)/applications/page";
+import { Pagination } from "@/components/ui/pagination";
 import { ScoreBadge } from "@/components/inbox/ScoreBadge";
 import { InitialChip, StatusPill } from "@/components/people/PeopleBits";
 import { PageHeader } from "@/components/shell/PageHeader";

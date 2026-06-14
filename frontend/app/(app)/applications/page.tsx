@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useMemo, useState } from "react";
-import { X, ChevronLeft, ChevronRight, Flag, SlidersHorizontal, Inbox as InboxIcon } from "lucide-react";
+import { X, Flag, SlidersHorizontal, Inbox as InboxIcon } from "lucide-react";
 
 import { BulkActionBar } from "@/components/bulk/BulkActionBar";
+import { Pagination } from "@/components/ui/pagination";
 import { ScoreBadge, ScoreRail, FitLabel } from "@/components/inbox/ScoreBadge";
 import { InitialChip, Pill, StatusPill } from "@/components/people/PeopleBits";
 import { PageHeader } from "@/components/shell/PageHeader";
@@ -411,32 +412,6 @@ function EmptyState({ filtered, onClear }: { filtered: boolean; onClear: () => v
     <li className="rounded-xl bg-card px-5 py-16 text-center ring-1 ring-hairline">
       <EmptyStateBody filtered={filtered} onClear={onClear} />
     </li>
-  );
-}
-
-export function Pagination({
-  page,
-  pages,
-  onPage,
-}: {
-  page: number;
-  pages: number;
-  onPage: (p: number) => void;
-}) {
-  return (
-    <div className="flex items-center justify-between text-sm">
-      <span className="text-muted-foreground tabular-nums">
-        Page {page} <span className="text-muted-foreground/50">of</span> {pages}
-      </span>
-      <div className="flex gap-2">
-        <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => onPage(page - 1)}>
-          <ChevronLeft className="size-4" /> Previous
-        </Button>
-        <Button variant="outline" size="sm" disabled={page >= pages} onClick={() => onPage(page + 1)}>
-          Next <ChevronRight className="size-4" />
-        </Button>
-      </div>
-    </div>
   );
 }
 

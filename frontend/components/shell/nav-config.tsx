@@ -2,6 +2,7 @@ import {
   LayoutDashboard,
   Inbox,
   Users,
+  UserCog,
   Search,
   BarChart3,
   Settings,
@@ -23,17 +24,21 @@ export const NAV: NavItem[] = [
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
 ];
 
+// Members is super_admin + hr_manager — career-portal member management.
+export const MEMBERS_NAV: NavItem = { href: "/members", label: "Members", icon: UserCog };
+
 // Admin is super_admin-only — appended via navForRole, never in the base NAV.
 export const ADMIN_NAV: NavItem = { href: "/admin", label: "Admin", icon: Settings };
 
-// navForRole returns the nav items visible to a given role. Super admins also see
-// Admin; everyone else gets the base workspace nav.
+// navForRole returns the nav items visible to a given role. super_admin + hr_manager
+// see Members; super_admin also sees Admin; everyone else gets the base workspace nav.
 export function navForRole(role?: string): NavItem[] {
-  return role === "super_admin" ? [...NAV, ADMIN_NAV] : NAV;
+  const base = role === "super_admin" || role === "hr_manager" ? [...NAV, MEMBERS_NAV] : NAV;
+  return role === "super_admin" ? [...base, ADMIN_NAV] : base;
 }
 
 // ALL_NAV is every possible item, for pathname→item lookups (e.g. header title).
-export const ALL_NAV: NavItem[] = [...NAV, ADMIN_NAV];
+export const ALL_NAV: NavItem[] = [...NAV, MEMBERS_NAV, ADMIN_NAV];
 
 // Brand lockup — blue monogram + wordmark, shared portal identity.
 // The monogram carries a brass corner-dot: a micro CP Axtra signature.
