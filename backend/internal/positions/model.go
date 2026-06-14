@@ -46,6 +46,9 @@ type Repository interface {
 	FindByPSCode(ctx context.Context, code string) (*Position, error)
 	// ListPublic returns active positions that have at least one open vacancy.
 	ListPublic(ctx context.Context) ([]PublicPosition, error)
+	// ListAll returns every active position with its full Master JD text — used by
+	// the cross-position fit analysis to match a candidate against the whole catalogue.
+	ListAll(ctx context.Context) ([]Position, error)
 }
 
 type pgRepository struct {
@@ -105,6 +108,44 @@ func (r *pgRepository) FindByPSCode(ctx context.Context, code string) (*Position
 		}
 	}
 	return &p, nil
+}
+
+func (r *pgRepository) ListAll(ctx context.Context) ([]Position, error) {
+	const q = `
+		SELECT id, title_th, COALESCE(title_en,''), COALESCE(level,''),
+		       COALESCE(must_have_criteria, '{}'::jsonb),
+		       COALESCE(keywords, '{}'), COALESCE(format_types, '{}'),
+		       COALESCE(responsibilities, ''), COALESCE(qualifications, '')
+		FROM positions WHERE is_active = TRUE ORDER BY title_th`
+	rows, err := r.pool.Query(ctx, q)
+	if err != nil {
+		return nil, fmt.Errorf("positions: list all: %w", err)
+	}
+	defer rows.Close()
+
+	var out []Position
+	for rows.Next() {
+		var (
+			p           Position
+			mustHaveRaw []byte
+		)
+		if err := rows.Scan(
+			&p.ID, &p.TitleTH, &p.TitleEN, &p.Level, &mustHaveRaw, &p.Keywords, &p.FormatTypes,
+			&p.Responsibilities, &p.Qualifications,
+		); err != nil {
+			return nil, fmt.Errorf("positions: scan all: %w", err)
+		}
+		if len(mustHaveRaw) > 0 {
+			if err := json.Unmarshal(mustHaveRaw, &p.MustHave); err != nil {
+				return nil, fmt.Errorf("positions: parse must_have_criteria: %w", err)
+			}
+		}
+		out = append(out, p)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("positions: all rows: %w", err)
+	}
+	return out, nil
 }
 
 func (r *pgRepository) ListPublic(ctx context.Context) ([]PublicPosition, error) {

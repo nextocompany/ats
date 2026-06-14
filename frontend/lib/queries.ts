@@ -8,6 +8,7 @@ import type {
   Application,
   ApplicationFilter,
   Candidate,
+  FitAnalysis,
   Funnel,
   InterviewInviteResult,
   InterviewView,
@@ -185,6 +186,41 @@ export function useInviteInterview(id: string) {
   return useMutation({
     mutationFn: () => api.post<InterviewInviteResult>(`/api/v1/applications/${id}/interview`).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["interview-session", id] }),
+  });
+}
+
+// useFitAnalysis loads the cross-position fit analysis for an application. A 404
+// (not generated yet) resolves to null so the panel can render a "generate" CTA.
+export function useFitAnalysis(id: string) {
+  return useQuery({
+    queryKey: ["fit-analysis", id],
+    queryFn: async () => {
+      try {
+        return (await api.get<{ analysis: FitAnalysis }>(`/api/v1/applications/${id}/fit-analysis`)).data.analysis;
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 404) return null;
+        throw e;
+      }
+    },
+    enabled: !!id,
+    retry: false, // a 404 (not generated yet) is an expected, non-retryable state
+  });
+}
+
+// useGenerateFitAnalysis runs (or re-runs) the AI cross-position fit analysis and
+// refreshes the fit view. Surfaces the backend's 409 message when pre-conditions
+// (scored + interview completed) are not met.
+export function useGenerateFitAnalysis(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api.post<{ analysis: FitAnalysis }>(`/api/v1/applications/${id}/fit-analysis`).then((r) => r.data.analysis),
+    onSuccess: (analysis) => {
+      // Seed the cache from the mutation response so the panel updates instantly,
+      // then revalidate in the background.
+      qc.setQueryData(["fit-analysis", id], analysis);
+      void qc.invalidateQueries({ queryKey: ["fit-analysis", id] });
+    },
   });
 }
 

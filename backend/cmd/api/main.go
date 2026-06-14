@@ -23,6 +23,7 @@ import (
 	"github.com/nexto/hr-ats/internal/auth"
 	"github.com/nexto/hr-ats/internal/candidateauth"
 	"github.com/nexto/hr-ats/internal/candidates"
+	"github.com/nexto/hr-ats/internal/fit"
 	"github.com/nexto/hr-ats/internal/health"
 	"github.com/nexto/hr-ats/internal/interview"
 	"github.com/nexto/hr-ats/internal/lineauth"
@@ -249,8 +250,9 @@ func main() {
 	// an evaluation HR reviews. Turns are synchronous (no worker). Mock interviewer
 	// by default; Azure OpenAI behind config. Public chat routes ride the rate
 	// limiter above; the invite/get routes are authed under /applications.
+	interviewRepo := interview.NewRepository(pool)
 	interviewSvc := interview.NewService(
-		interview.NewRepository(pool), interview.New(cfg),
+		interviewRepo, interview.New(cfg),
 		appRepo, positionRepo, candidateRepo, notifier, cfg.PortalBaseURL, cfg.InterviewMaxTurns,
 	)
 	interviewHandler := interview.NewHandler(interviewSvc, appRepo, cfg.PortalBaseURL)
@@ -273,6 +275,11 @@ func main() {
 	dashboardHandler.SetNotifier(notifier, candidateRepo, cfg.PortalBaseURL)
 	applications.RegisterDashboardRoutes(app, dashboardHandler)
 	interview.RegisterDashboardRoutes(app, interviewHandler)
+	// AI cross-position fit analysis: HR-triggered verdict combining the CV-screening
+	// result + the AI pre-interview, matched against the whole Master JD catalogue.
+	// Mock summarizer by default; Azure OpenAI behind config. Synchronous (no worker).
+	fitSvc := fit.NewService(fit.NewRepository(pool), fit.New(cfg), appRepo, interviewRepo, positionRepo, candidateRepo)
+	fit.RegisterDashboardRoutes(app, fit.NewHandler(fitSvc, appRepo))
 	// Candidate search (Sprint 5c) — registered BEFORE profiles so the static
 	// /candidates/search path takes precedence over /candidates/:id. Mock Postgres
 	// trigram by default; Azure AI Search behind config.
