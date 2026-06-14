@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI Scoring — วิธีคิดคะแนน | CP Axtra HR</title>
+<style>
+  :root {
+    /* CP Axtra brand */
+    --brand: #0B47B8;
+    --brand-deep: #06307f;
+    --brand-soft: #e8eefc;
+    --accent: #FFC02E;
+    --accent-deep: #e0a200;
+
+    --ink: #0e1726;
+    --ink-soft: #475068;
+    --ink-faint: #8a92a6;
+    --surface: #ffffff;
+    --canvas: #f4f6fb;
+    --line: #e2e7f1;
+
+    /* dimension hues */
+    --exp: #0B47B8;
+    --skill: #7c3aed;
+    --edu: #0ea5a4;
+    --lang: #2563eb;
+    --loc: #f59e0b;
+
+    --radius: 18px;
+    --radius-sm: 11px;
+    --shadow-card: 0 1px 2px rgba(11,71,184,.06), 0 12px 30px -12px rgba(11,71,184,.18);
+    --shadow-hero: 0 24px 60px -28px rgba(11,71,184,.55);
+
+    --font: "Sukhumvit Set", "IBM Plex Sans Thai", "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body { height: 100%; }
+
+  body {
+    font-family: var(--font);
+    color: var(--ink);
+    background:
+      radial-gradient(1200px 600px at 88% -10%, rgba(255,192,46,.10), transparent 60%),
+      radial-gradient(900px 500px at -5% 110%, rgba(11,71,184,.10), transparent 55%),
+      var(--canvas);
+    -webkit-font-smoothing: antialiased;
+    display: flex;
+    justify-content: center;
+    padding: 36px 28px;
+    min-height: 100%;
+  }
+
+  .slide {
+    width: 100%;
+    max-width: 1280px;
+    aspect-ratio: 16 / 9;
+    min-height: 720px;
+    background: var(--surface);
+    border-radius: 26px;
+    box-shadow: var(--shadow-hero);
+    border: 1px solid var(--line);
+    padding: 40px 48px 36px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* dot motif corner */
+  .slide::after {
+    content: "";
+    position: absolute;
+    top: 30px; right: 36px;
+    width: 120px; height: 60px;
+    background-image: radial-gradient(var(--accent) 2.4px, transparent 2.6px);
+    background-size: 16px 16px;
+    opacity: .55;
+    pointer-events: none;
+  }
+
+  /* ---------- header ---------- */
+  header { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 9px;
+    font-size: 12.5px; font-weight: 700; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--brand);
+    background: var(--brand-soft);
+    padding: 6px 12px; border-radius: 999px;
+  }
+  .eyebrow .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+  h1 { font-size: 31px; font-weight: 800; letter-spacing: -.01em; margin-top: 14px; line-height: 1.1; }
+  h1 .num { color: var(--brand); }
+  .sub { color: var(--ink-soft); font-size: 15px; margin-top: 7px; max-width: 640px; line-height: 1.45; }
+
+  .total-chip {
+    flex-shrink: 0; text-align: center;
+    background: linear-gradient(155deg, var(--brand), var(--brand-deep));
+    color: #fff; border-radius: var(--radius);
+    padding: 16px 22px 14px; box-shadow: var(--shadow-card);
+    position: relative; overflow: hidden;
+  }
+  .total-chip::before {
+    content:""; position:absolute; inset:0;
+    background: radial-gradient(120px 60px at 80% 0%, rgba(255,192,46,.32), transparent 70%);
+  }
+  .total-chip .label { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; opacity: .82; font-weight: 700; position: relative; }
+  .total-chip .val { font-size: 40px; font-weight: 850; line-height: 1; margin-top: 4px; position: relative; }
+  .total-chip .val small { font-size: 17px; font-weight: 600; opacity: .7; }
+
+  /* ---------- gate strip ---------- */
+  .gate {
+    margin-top: 20px;
+    display: flex; align-items: center; gap: 16px;
+    background: linear-gradient(90deg, #fff8e6, #fffdf7 60%);
+    border: 1px solid #f3dca0;
+    border-left: 5px solid var(--accent);
+    border-radius: var(--radius-sm);
+    padding: 12px 18px;
+  }
+  .gate .badge {
+    font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--accent-deep); background: #fff2cf; padding: 5px 10px; border-radius: 7px; white-space: nowrap;
+  }
+  .gate .body { font-size: 13.5px; color: #6b5410; line-height: 1.4; }
+  .gate .body b { color: #5a4408; }
+  .gate .arrow { margin-left: auto; font-size: 12.5px; color: var(--accent-deep); font-weight: 700; white-space: nowrap; }
+
+  /* ---------- formula bars ---------- */
+  .formula { margin-top: 20px; flex: 1; display: flex; flex-direction: column; }
+  .formula-head { display:flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
+  .formula-head .t { font-size: 13px; font-weight: 800; letter-spacing: .04em; color: var(--ink); }
+  .formula-head .legend { font-size: 12px; color: var(--ink-faint); display:flex; gap:16px; }
+  .formula-head .legend span { display:inline-flex; align-items:center; gap:6px; }
+  .lg-sq { width:11px; height:11px; border-radius:3px; display:inline-block; }
+  .lg-det { background: var(--brand); }
+  .lg-llm { background: var(--skill); }
+
+  .bars { display: grid; gap: 11px; }
+  .row {
+    display: grid;
+    grid-template-columns: 168px 1fr 54px;
+    align-items: center; gap: 16px;
+  }
+  .row .name { display:flex; flex-direction: column; gap: 2px; }
+  .row .name .th { font-size: 14.5px; font-weight: 700; }
+  .row .name .en { font-size: 11px; color: var(--ink-faint); letter-spacing: .03em; }
+
+  .track {
+    height: 30px; border-radius: 9px; background: var(--canvas);
+    border: 1px solid var(--line); position: relative; overflow: hidden;
+  }
+  .fill {
+    height: 100%; border-radius: 8px 0 0 8px;
+    display: flex; align-items: center; padding-left: 12px;
+    color: #fff; font-size: 12px; font-weight: 700;
+    position: relative;
+  }
+  .fill .tag {
+    position:absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    font-size: 10.5px; font-weight: 700; opacity: .9; white-space: nowrap;
+  }
+  .row .max { font-size: 14px; font-weight: 800; color: var(--ink); text-align: right; }
+  .row .max small { color: var(--ink-faint); font-weight: 600; font-size: 11px; }
+
+  .pill-llm {
+    font-size: 9.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+    background: rgba(124,58,237,.14); color: var(--skill);
+    padding: 2px 7px; border-radius: 6px; margin-left: 7px; vertical-align: middle;
+  }
+
+  /* ---------- footer: split + verdict ---------- */
+  .footer { margin-top: 18px; display: grid; grid-template-columns: 1.05fr 1.55fr; gap: 22px; align-items: stretch; }
+
+  .split {
+    background: var(--brand-soft); border-radius: var(--radius-sm); padding: 14px 18px;
+    display: flex; flex-direction: column; justify-content: center;
+  }
+  .split .cap { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--brand); }
+  .split .meter { height: 14px; border-radius: 8px; overflow: hidden; display: flex; margin: 10px 0 8px; box-shadow: inset 0 0 0 1px rgba(11,71,184,.12); }
+  .split .meter .det { width: 80%; background: linear-gradient(90deg, var(--brand), #3b6fd4); }
+  .split .meter .llm { width: 20%; background: linear-gradient(90deg, var(--skill), #a06bf0); }
+  .split .note { font-size: 12.5px; color: var(--ink-soft); line-height: 1.45; }
+  .split .note b { color: var(--brand-deep); }
+
+  .verdict { display: flex; flex-direction: column; }
+  .verdict .cap { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 9px; }
+  .scale { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; flex: 1; }
+  .vcard {
+    border-radius: var(--radius-sm); padding: 12px 14px; border: 1px solid var(--line);
+    display: flex; flex-direction: column; gap: 3px; position: relative; overflow: hidden;
+    background: var(--surface);
+  }
+  .vcard .rng { font-size: 19px; font-weight: 850; letter-spacing: -.01em; }
+  .vcard .lab { font-size: 13px; font-weight: 700; }
+  .vcard .desc { font-size: 11px; color: var(--ink-faint); }
+  .vcard.strong { background: linear-gradient(160deg, #eef3fe, #fff); }
+  .vcard.strong .rng, .vcard.strong .lab { color: var(--brand); }
+  .vcard.strong { border-color: #bcd0f5; }
+  .vcard.mid .rng, .vcard.mid .lab { color: #5b6478; }
+  .vcard.low .rng, .vcard.low .lab { color: #c0392b; }
+  .vcard .edge { position:absolute; left:0; top:0; bottom:0; width:4px; }
+  .vcard.strong .edge { background: var(--brand); }
+  .vcard.mid .edge { background: #94a0b8; }
+  .vcard.low .edge { background: #d65a4a; }
+
+  footer.brand {
+    margin-top: 16px; display: flex; align-items: center; justify-content: space-between;
+    border-top: 1px solid var(--line); padding-top: 12px;
+    font-size: 11.5px; color: var(--ink-faint);
+  }
+  footer.brand .logo { display:flex; align-items:center; gap:9px; font-weight:800; color: var(--ink); letter-spacing:.02em; }
+  footer.brand .logo .mark {
+    width:22px; height:22px; border-radius:6px; background: var(--brand);
+    color:#fff; font-size:11px; font-weight:800; display:grid; place-items:center; position:relative;
+  }
+  footer.brand .logo .mark::after { content:""; position:absolute; right:-3px; bottom:-3px; width:7px; height:7px; border-radius:50%; background: var(--accent); border:1.5px solid #fff; }
+
+  @media print {
+    body { padding: 0; background: #fff; }
+    .slide { box-shadow: none; border: none; max-width: none; aspect-ratio: auto; }
+  }
+</style>
+</head>
+<body>
+  <main class="slide">
+    <header>
+      <div>
+        <span class="eyebrow"><span class="dot"></span> AI Screening · วิธีคิดคะแนน</span>
+        <h1>คะแนน AI คิดจาก <span class="num">5 มิติ</span> รวมเป็น <span class="num">100</span> คะแนน</h1>
+        <p class="sub">Hybrid scoring — กฎที่ตรวจสอบได้ <b>80 คะแนน</b> + การวิเคราะห์เชิงความหมายด้วย LLM <b>20 คะแนน</b> เทียบกับ Master JD จริง</p>
+      </div>
+      <div class="total-chip">
+        <div class="label">คะแนนเต็ม</div>
+        <div class="val">100<small>/100</small></div>
+      </div>
+    </header>
+
+    <!-- Gate -->
+    <section class="gate">
+      <span class="badge">ด่านแรก · Must-have Gate</span>
+      <p class="body">
+        เช็คขั้นต่ำก่อน: <b>การศึกษา ≥ ขั้นต่ำของ JD</b> และ <b>ประสบการณ์ ≥ ขั้นต่ำของ JD</b>
+        — ถ้าไม่ผ่าน คัดออกทันที (ไม่เรียก LLM เพื่อประหยัด token)
+      </p>
+      <span class="arrow">ผ่าน → คิดคะแนนต่อ ▼</span>
+    </section>
+
+    <!-- Formula bars -->
+    <section class="formula">
+      <div class="formula-head">
+        <span class="t">Experience + Skills + Education + Language + Location</span>
+        <span class="legend">
+          <span><i class="lg-sq lg-det"></i> Deterministic (กฎ)</span>
+          <span><i class="lg-sq lg-llm"></i> LLM (Azure OpenAI)</span>
+        </span>
+      </div>
+
+      <div class="bars">
+        <!-- Experience 30 -->
+        <div class="row">
+          <div class="name"><span class="th">ประสบการณ์</span><span class="en">EXPERIENCE</span></div>
+          <div class="track"><div class="fill" style="width:100%; background:linear-gradient(90deg,var(--exp),#3b6fd4);">
+            <span class="tag">เกิน 2× ขั้นต่ำ → เต็ม · ≥ขั้นต่ำ → 20 · มีบ้าง → 10</span>
+          </div></div>
+          <div class="max">30<br><small>คะแนน</small></div>
+        </div>
+
+        <!-- Location 20 -->
+        <div class="row">
+          <div class="name"><span class="th">ทำเล / ภูมิภาค</span><span class="en">LOCATION</span></div>
+          <div class="track"><div class="fill" style="width:66.6%; background:linear-gradient(90deg,var(--loc),#f7b733);">
+            <span class="tag">มีตำแหน่งว่างในภูมิภาค → 20 · ที่อื่น → 8</span>
+          </div></div>
+          <div class="max">20<br><small>คะแนน</small></div>
+        </div>
+
+        <!-- Skills 20 LLM -->
+        <div class="row">
+          <div class="name"><span class="th">ทักษะ <span class="pill-llm">LLM</span></span><span class="en">SKILLS · semantic match</span></div>
+          <div class="track"><div class="fill" style="width:66.6%; background:linear-gradient(90deg,var(--skill),#a06bf0);">
+            <span class="tag">เทียบ CV ↔ JD (responsibilities + qualifications)</span>
+          </div></div>
+          <div class="max">20<br><small>คะแนน</small></div>
+        </div>
+
+        <!-- Education 10 -->
+        <div class="row">
+          <div class="name"><span class="th">การศึกษา</span><span class="en">EDUCATION</span></div>
+          <div class="track"><div class="fill" style="width:33.3%; background:linear-gradient(90deg,var(--edu),#3cc7c6);">
+            <span class="tag">เกินขั้นต่ำ ≥2 ระดับ → 10 · +1 → 7 · เท่า → 5</span>
+          </div></div>
+          <div class="max">10<br><small>คะแนน</small></div>
+        </div>
+
+        <!-- Language 10 -->
+        <div class="row">
+          <div class="name"><span class="th">ภาษา</span><span class="en">LANGUAGE</span></div>
+          <div class="track"><div class="fill" style="width:33.3%; background:linear-gradient(90deg,var(--lang),#5b8def);">
+            <span class="tag">ไทย +5 · อังกฤษ +5</span>
+          </div></div>
+          <div class="max">10<br><small>คะแนน</small></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <section class="footer">
+      <div class="split">
+        <span class="cap">โปร่งใส · ตรวจสอบได้</span>
+        <div class="meter"><div class="det"></div><div class="llm"></div></div>
+        <p class="note"><b>80%</b> เป็นกฎที่อธิบายได้ทุกคะแนน · <b>20%</b> เป็น LLM เชิงเนื้อหา → defend ได้เวลา HR / audit ถาม</p>
+      </div>
+
+      <div class="verdict">
+        <span class="cap">การแปลผลบนหน้าจอ HR</span>
+        <div class="scale">
+          <div class="vcard strong"><span class="edge"></span><span class="rng">≥ 75</span><span class="lab">Strong fit</span><span class="desc">ตรงคุณสมบัติสูง</span></div>
+          <div class="vcard mid"><span class="edge"></span><span class="rng">50–74</span><span class="lab">Worth a review</span><span class="desc">ควรพิจารณา</span></div>
+          <div class="vcard low"><span class="edge"></span><span class="rng">&lt; 50</span><span class="lab">Below threshold</span><span class="desc">ต่ำกว่าเกณฑ์</span></div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="brand">
+      <span class="logo"><span class="mark">HR</span> AI HR Recruitment · CP Axtra</span>
+      <span>Score = Experience(30) + Skills(20·LLM) + Education(10) + Language(10) + Location(20) · clamp 0–100</span>
+    </footer>
+  </main>
+</body>
+</html>

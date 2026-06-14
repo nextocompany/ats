@@ -36,6 +36,7 @@ import (
 	"github.com/nexto/hr-ats/internal/reengage"
 	"github.com/nexto/hr-ats/internal/reports"
 	"github.com/nexto/hr-ats/internal/search"
+	"github.com/nexto/hr-ats/internal/settings"
 	"github.com/nexto/hr-ats/internal/users"
 	"github.com/nexto/hr-ats/internal/vacancies"
 	"github.com/nexto/hr-ats/pkg/blob"
@@ -144,7 +145,10 @@ func main() {
 		PermissionPolicy:      "camera=(), microphone=(), geolocation=()",
 	}))
 	app.Use(middleware.RequestLogger())
-	authMW, err := middleware.Auth(ctx, cfg)
+	// Settings service backs the runtime "allow all Entra tenants" admin toggle,
+	// read by the auth middleware (cached) and managed via /api/v1/admin/settings.
+	settingsSvc := settings.NewService(settings.NewRepository(pool))
+	authMW, err := middleware.Auth(ctx, cfg, settingsSvc)
 	if err != nil {
 		log.Fatal().Err(err).Msg("auth middleware init failed")
 	}
@@ -189,6 +193,9 @@ func main() {
 
 	// Re-engagement manual trigger (Sprint 5a).
 	reengage.RegisterRoutes(app, reengage.NewHandler(reengageTrigger))
+
+	// Admin system settings (super_admin only) — e.g. the allow-all-tenants toggle.
+	settings.RegisterRoutes(app, settings.NewHandler(settingsSvc))
 
 	// Public Career API (consumed by the Next.js portal in Sprint 4). Rate-limited
 	// per IP (Sprint 6a) — apply/status are the public abuse surface.

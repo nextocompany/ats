@@ -7,7 +7,7 @@ import { Menu, X, LogOut } from "lucide-react";
 
 import { signOut } from "@/lib/auth";
 import { useMe } from "@/lib/queries";
-import { NAV, BrandMark } from "./nav-config";
+import { navForRole, BrandMark } from "./nav-config";
 
 // Mobile / tablet chrome (<1024): top bar + slide-in drawer.
 export function MobileBar() {
@@ -54,7 +54,7 @@ export function MobileBar() {
             <div className="mx-5 h-px bg-sidebar-border" />
             <nav aria-label="Main navigation" className="flex-1 px-3 py-4">
               <ul className="flex flex-col gap-0.5">
-                {NAV.map((item) => {
+                {navForRole(me?.role).map((item) => {
                   const active = pathname.startsWith(item.href);
                   const Icon = item.icon;
                   return (

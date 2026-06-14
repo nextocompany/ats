@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Score Explainability — คะแนนของแต่ละคนมาจากไหน | CP Axtra HR</title>
+<style>
+  :root {
+    --brand: #0B47B8;
+    --brand-deep: #06307f;
+    --brand-soft: #e8eefc;
+    --accent: #FFC02E;
+    --accent-deep: #e0a200;
+
+    --ink: #0e1726;
+    --ink-soft: #475068;
+    --ink-faint: #8a92a6;
+    --surface: #ffffff;
+    --canvas: #f4f6fb;
+    --line: #e2e7f1;
+
+    --exp: #0B47B8;
+    --skill: #7c3aed;
+    --edu: #0ea5a4;
+    --lang: #2563eb;
+    --loc: #f59e0b;
+
+    --ok: #16a34a;
+
+    --radius: 18px;
+    --radius-sm: 11px;
+    --shadow-card: 0 1px 2px rgba(11,71,184,.06), 0 12px 30px -12px rgba(11,71,184,.18);
+    --shadow-hero: 0 24px 60px -28px rgba(11,71,184,.55);
+    --font: "Sukhumvit Set", "IBM Plex Sans Thai", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --mono: "SF Mono", "JetBrains Mono", ui-monospace, "Cascadia Code", monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--font); color: var(--ink);
+    background:
+      radial-gradient(1200px 600px at 88% -10%, rgba(255,192,46,.10), transparent 60%),
+      radial-gradient(900px 500px at -5% 110%, rgba(11,71,184,.10), transparent 55%),
+      var(--canvas);
+    -webkit-font-smoothing: antialiased;
+    display: flex; justify-content: center; padding: 36px 28px; min-height: 100%;
+  }
+  .slide {
+    width: 100%; max-width: 1280px; aspect-ratio: 16/9; min-height: 720px;
+    background: var(--surface); border-radius: 26px; box-shadow: var(--shadow-hero);
+    border: 1px solid var(--line); padding: 34px 44px 28px;
+    display: flex; flex-direction: column; position: relative; overflow: hidden;
+  }
+  .slide::after {
+    content: ""; position: absolute; top: 26px; right: 32px;
+    width: 110px; height: 54px;
+    background-image: radial-gradient(var(--accent) 2.4px, transparent 2.6px);
+    background-size: 16px 16px; opacity: .5; pointer-events: none;
+  }
+
+  /* header / candidate card */
+  header { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+  .lead .eyebrow {
+    display: inline-flex; align-items: center; gap: 9px; font-size: 12px; font-weight: 700;
+    letter-spacing: .14em; text-transform: uppercase; color: var(--brand);
+    background: var(--brand-soft); padding: 6px 12px; border-radius: 999px;
+  }
+  .lead .eyebrow .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+  h1 { font-size: 25px; font-weight: 800; letter-spacing: -.01em; margin-top: 11px; line-height: 1.1; }
+  h1 .hl { color: var(--brand); }
+  .lead .sub { color: var(--ink-faint); font-size: 12.5px; margin-top: 5px; }
+
+  .cand {
+    display: flex; align-items: center; gap: 16px; flex-shrink: 0;
+    background: linear-gradient(155deg, #f7f9ff, #fff); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 12px 16px 12px 14px; box-shadow: var(--shadow-card);
+  }
+  .cand .avatar {
+    width: 48px; height: 48px; border-radius: 13px; flex-shrink: 0;
+    background: linear-gradient(150deg, var(--brand), var(--brand-deep)); color: #fff;
+    display: grid; place-items: center; font-size: 18px; font-weight: 800;
+  }
+  .cand .meta .nm { font-size: 16px; font-weight: 800; }
+  .cand .meta .role { font-size: 12px; color: var(--ink-soft); margin-top: 1px; }
+  .cand .meta .where { font-size: 11px; color: var(--ink-faint); margin-top: 2px; }
+  .cand .score {
+    margin-left: 6px; text-align: center; border-left: 1px solid var(--line); padding-left: 16px;
+  }
+  .cand .score .v { font-size: 34px; font-weight: 850; color: var(--brand); line-height: 1; }
+  .cand .score .v small { font-size: 14px; color: var(--ink-faint); font-weight: 600; }
+  .cand .score .verdict {
+    margin-top: 4px; font-size: 10px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase;
+    color: #fff; background: var(--brand); padding: 3px 9px; border-radius: 6px; display: inline-block;
+  }
+
+  /* gate */
+  .gate {
+    margin-top: 16px; display: flex; align-items: center; gap: 14px;
+    background: #f0fbf3; border: 1px solid #b8e6c4; border-left: 5px solid var(--ok);
+    border-radius: var(--radius-sm); padding: 9px 16px;
+  }
+  .gate .badge {
+    font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+    color: #0f7a36; background: #d6f5de; padding: 4px 10px; border-radius: 7px; white-space: nowrap;
+  }
+  .gate .checks { display: flex; gap: 22px; font-size: 12.5px; color: #15663a; }
+  .gate .checks b { color: #0c4f2c; }
+  .gate .checks .ck::before { content: "✓ "; color: var(--ok); font-weight: 800; }
+  .gate .pass { margin-left: auto; font-size: 11.5px; font-weight: 800; color: #0f7a36; white-space: nowrap; }
+
+  /* main grid: trace table + qualitative sidebar */
+  .body { margin-top: 16px; flex: 1; display: grid; grid-template-columns: 1.95fr 1fr; gap: 20px; min-height: 0; }
+
+  .trace { display: flex; flex-direction: column; min-height: 0; }
+  .trace .caption { font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  thead th {
+    text-align: left; font-size: 10px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase;
+    color: var(--ink-faint); padding: 0 10px 7px; border-bottom: 1.5px solid var(--line);
+  }
+  thead th.r { text-align: right; }
+  tbody td { padding: 9px 10px; border-bottom: 1px solid #eef1f7; vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+
+  .dim { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 13px; white-space: nowrap; }
+  .dim .swatch { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
+  .dim .llm { font-size: 8.5px; font-weight: 800; letter-spacing: .05em; background: rgba(124,58,237,.14); color: var(--skill); padding: 1px 5px; border-radius: 5px; }
+
+  .src { color: var(--ink-soft); line-height: 1.4; }
+  .src .field { font-family: var(--mono); font-size: 11px; color: var(--brand-deep); background: var(--brand-soft); padding: 1px 5px; border-radius: 5px; }
+  .src .val { display: block; margin-top: 3px; color: var(--ink); font-weight: 600; }
+
+  .rule { color: var(--ink-soft); line-height: 1.4; font-size: 11.5px; }
+  .rule .applied { display:block; margin-top: 3px; color: var(--ink); font-weight: 700; }
+
+  td.pts { text-align: right; white-space: nowrap; }
+  .pts .got { font-size: 18px; font-weight: 850; color: var(--ink); }
+  .pts .of { font-size: 11px; color: var(--ink-faint); font-weight: 600; }
+
+  tfoot td { padding: 11px 10px 0; border-top: 1.5px solid var(--line); }
+  tfoot .tlabel { font-size: 13px; font-weight: 800; }
+  tfoot .ttotal { text-align: right; }
+  tfoot .ttotal .v { font-size: 22px; font-weight: 850; color: var(--brand); }
+  tfoot .ttotal .v small { font-size: 12px; color: var(--ink-faint); font-weight: 600; }
+
+  /* qualitative sidebar */
+  .qual { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+  .panel { background: var(--canvas); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 13px 15px; }
+  .panel.llm-panel { background: linear-gradient(160deg, #f6f2ff, #fdfcff); border-color: #e0d4f7; }
+  .panel .ph { display:flex; align-items:center; gap: 8px; font-size: 10.5px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 9px; }
+  .panel .ph .tag { font-size: 8.5px; background: var(--skill); color:#fff; padding: 2px 6px; border-radius: 5px; letter-spacing: .04em; }
+  .panel.llm-panel .ph { color: var(--skill); }
+
+  .bullets { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+  .bullets li { font-size: 12px; color: var(--ink); line-height: 1.4; padding-left: 18px; position: relative; }
+  .bullets li::before { content: ""; position: absolute; left: 2px; top: 6px; width: 6px; height: 6px; border-radius: 50%; background: var(--skill); }
+  .bullets.flags li::before { background: #e0a200; }
+
+  .outcome { background: linear-gradient(155deg, var(--brand), var(--brand-deep)); color: #fff; border-radius: var(--radius-sm); padding: 13px 15px; position: relative; overflow: hidden; }
+  .outcome::before { content:""; position:absolute; inset:0; background: radial-gradient(120px 70px at 90% 0%, rgba(255,192,46,.28), transparent 70%); }
+  .outcome .ph { color: rgba(255,255,255,.78); }
+  .outcome .ph::before { content: none; }
+  .outcome .line { display:flex; justify-content: space-between; align-items:center; font-size: 12.5px; padding: 4px 0; position: relative; }
+  .outcome .line + .line { border-top: 1px solid rgba(255,255,255,.14); }
+  .outcome .line .k { opacity: .8; }
+  .outcome .line .vv { font-weight: 800; }
+  .outcome .line .vv.brass { color: var(--accent); }
+
+  footer.brand {
+    margin-top: 14px; display: flex; align-items: center; justify-content: space-between;
+    border-top: 1px solid var(--line); padding-top: 11px; font-size: 11px; color: var(--ink-faint);
+  }
+  footer.brand .logo { display:flex; align-items:center; gap:9px; font-weight:800; color: var(--ink); }
+  footer.brand .logo .mark { width:21px; height:21px; border-radius:6px; background: var(--brand); color:#fff; font-size:10px; font-weight:800; display:grid; place-items:center; position:relative; }
+  footer.brand .logo .mark::after { content:""; position:absolute; right:-3px; bottom:-3px; width:7px; height:7px; border-radius:50%; background: var(--accent); border:1.5px solid #fff; }
+  footer.brand .ex { font-style: italic; }
+
+  @media print {
+    body { padding: 0; background: #fff; }
+    .slide { box-shadow: none; border: none; max-width: none; aspect-ratio: auto; }
+  }
+</style>
+</head>
+<body>
+  <main class="slide">
+    <header>
+      <div class="lead">
+        <span class="eyebrow"><span class="dot"></span> Score Explainability</span>
+        <h1>คะแนนของแต่ละคน <span class="hl">มาจากข้อมูลส่วนไหน</span></h1>
+        <p class="sub">trace ทีละมิติ — จาก field ใน CV/Profile → กฎที่ใช้ → คะแนนที่ได้ (ตัวอย่างผู้สมัคร 1 คน)</p>
+      </div>
+      <div class="cand">
+        <div class="avatar">สญ</div>
+        <div class="meta">
+          <div class="nm">สมหญิง ใจดี</div>
+          <div class="role">สมัคร: ผู้ช่วยผู้จัดการร้าน</div>
+          <div class="where">จ.เชียงใหม่ · ช่องทาง: career portal</div>
+        </div>
+        <div class="score">
+          <div class="v">81<small>/100</small></div>
+          <div class="verdict">Strong fit</div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Gate -->
+    <section class="gate">
+      <span class="badge">Must-have Gate</span>
+      <div class="checks">
+        <span class="ck">การศึกษา <b>ป.ตรี (3)</b> ≥ ขั้นต่ำ JD <b>(3)</b></span>
+        <span class="ck">ประสบการณ์ <b>54 เดือน</b> ≥ ขั้นต่ำ JD <b>(24)</b></span>
+      </div>
+      <span class="pass">→ ผ่านด่าน · คิดคะแนนต่อ</span>
+    </section>
+
+    <!-- Body -->
+    <section class="body">
+      <!-- Trace table -->
+      <div class="trace">
+        <span class="caption">การคิดคะแนน · ทีละมิติ</span>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:120px">มิติ</th>
+              <th>ข้อมูลที่ใช้ (จาก CV / Profile)</th>
+              <th style="width:210px">กฎที่ใช้</th>
+              <th class="r" style="width:64px">คะแนน</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><div class="dim"><span class="swatch" style="background:var(--exp)"></span>ประสบการณ์</div></td>
+              <td class="src"><span class="field">experience[].duration_months</span><span class="val">7‑Eleven 30 ด. + Lotus's 24 ด. = รวม 54 เดือน</span></td>
+              <td class="rule">เทียบขั้นต่ำ JD = 24 ด.<span class="applied">54 ≥ 24×2 → เต็ม</span></td>
+              <td class="pts"><span class="got">30</span><span class="of"> / 30</span></td>
+            </tr>
+            <tr>
+              <td><div class="dim"><span class="swatch" style="background:var(--loc)"></span>ทำเล</div></td>
+              <td class="src"><span class="field">candidate.province</span><span class="val">เชียงใหม่ → ภูมิภาค “ภาคเหนือ”</span></td>
+              <td class="rule">มีตำแหน่งว่างในภูมิภาค?<span class="applied">มีว่างในภาคเหนือ → 20</span></td>
+              <td class="pts"><span class="got">20</span><span class="of"> / 20</span></td>
+            </tr>
+            <tr>
+              <td><div class="dim"><span class="swatch" style="background:var(--skill)"></span>ทักษะ <span class="llm">LLM</span></div></td>
+              <td class="src"><span class="field">skills[] · experience[].description</span> เทียบกับ <span class="field">JD.responsibilities + qualifications</span><span class="val">บริหารหน้าร้าน, ดูแลทีม, จัดการสต็อก, POS</span></td>
+              <td class="rule">Azure OpenAI ให้ semantic match 0–20<span class="applied">ตรงเกือบครบ → 16</span></td>
+              <td class="pts"><span class="got">16</span><span class="of"> / 20</span></td>
+            </tr>
+            <tr>
+              <td><div class="dim"><span class="swatch" style="background:var(--edu)"></span>การศึกษา</div></td>
+              <td class="src"><span class="field">education[].degree</span><span class="val">ป.ตรี บริหารธุรกิจ (ระดับ 3)</span></td>
+              <td class="rule">เทียบขั้นต่ำ JD = ป.ตรี (3)<span class="applied">เท่าขั้นต่ำพอดี → 5</span></td>
+              <td class="pts"><span class="got">5</span><span class="of"> / 10</span></td>
+            </tr>
+            <tr>
+              <td><div class="dim"><span class="swatch" style="background:var(--lang)"></span>ภาษา</div></td>
+              <td class="src"><span class="field">languages[]</span><span class="val">ไทย (เจ้าของภาษา) · อังกฤษ (ดี)</span></td>
+              <td class="rule">ไทย +5 · อังกฤษ +5<span class="applied">ครบทั้งคู่ → 10</span></td>
+              <td class="pts"><span class="got">10</span><span class="of"> / 10</span></td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="3" class="tlabel">รวมคะแนน = 30 + 20 + 16 + 5 + 10</td>
+              <td class="ttotal"><span class="v">81<small>/100</small></span></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <!-- Qualitative sidebar -->
+      <aside class="qual">
+        <div class="panel llm-panel">
+          <div class="ph">จุดแข็ง (จาก LLM) <span class="tag">AI</span></div>
+          <ul class="bullets">
+            <li>มีประสบการณ์บริหารหน้าร้านค้าปลีกตรงสายกว่า 4 ปี</li>
+            <li>เคยดูแลทีมและจัดการสต็อก ตรงกับ JD</li>
+            <li>อยู่ในพื้นที่ มีสาขาที่เปิดรับ</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <div class="ph">ข้อสังเกต / Red flags</div>
+          <ul class="bullets flags">
+            <li>ยังไม่ระบุประสบการณ์ระดับ “ผู้ช่วยผู้จัดการ” โดยตรง</li>
+          </ul>
+        </div>
+        <div class="outcome">
+          <div class="ph">ผลลัพธ์ &amp; การจัดเส้นทาง</div>
+          <div class="line"><span class="k">Must-have gate</span><span class="vv">ผ่าน</span></div>
+          <div class="line"><span class="k">จัดให้สาขา</span><span class="vv brass">CM‑014 เชียงใหม่</span></div>
+          <div class="line"><span class="k">OCR confidence</span><span class="vv">0.94</span></div>
+          <div class="line"><span class="k">สถานะ</span><span class="vv">scored → รอ HR</span></div>
+        </div>
+      </aside>
+    </section>
+
+    <footer class="brand">
+      <span class="logo"><span class="mark">HR</span> AI HR Recruitment · CP Axtra</span>
+      <span class="ex">* ข้อมูลผู้สมัครเป็นตัวอย่างประกอบ — ทุกคะแนนอ้างอิง field จริงใน Profile/JD ที่ตรวจสอบย้อนได้</span>
+    </footer>
+  </main>
+</body>
+</html>

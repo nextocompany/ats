@@ -164,6 +164,11 @@ export interface Me {
   subregion: string;
 }
 
+// AdminSettings mirrors the Go settings handler dto — runtime, admin-managed flags.
+export interface AdminSettings {
+  allow_all_tenants: boolean;
+}
+
 export interface ApplicationFilter {
   status?: string;
   min_score?: number;

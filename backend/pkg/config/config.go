@@ -66,6 +66,12 @@ type Config struct {
 	AuthProvider    string
 	AzureADTenantID string
 	AzureADClientID string // expected token audience
+	// AzureADAllowedTenants is the comma-separated allowlist of Entra tenant IDs
+	// (the token `tid` claim) permitted to sign in. Empty ⇒ single-tenant: only
+	// AzureADTenantID is accepted (unchanged behaviour). Set to two or more to
+	// enable multi-tenant SSO (e.g. partner organisations) — the app registration
+	// must also be multi-tenant (signInAudience=AzureADMultipleOrgs).
+	AzureADAllowedTenants string
 
 	// LINE Login — "mock" (default) or "real".
 	LINEProvider  string
@@ -178,9 +184,10 @@ func Load() (*Config, error) {
 
 		InterviewMaxTurns: getenvInt("INTERVIEW_MAX_TURNS", 6),
 
-		AuthProvider:    getenv("AUTH_PROVIDER", "mock"),
-		AzureADTenantID: os.Getenv("AZURE_AD_TENANT_ID"),
-		AzureADClientID: os.Getenv("AZURE_AD_CLIENT_ID"),
+		AuthProvider:          getenv("AUTH_PROVIDER", "mock"),
+		AzureADTenantID:       os.Getenv("AZURE_AD_TENANT_ID"),
+		AzureADClientID:       os.Getenv("AZURE_AD_CLIENT_ID"),
+		AzureADAllowedTenants: os.Getenv("AZURE_AD_ALLOWED_TENANTS"),
 
 		AISearchProvider:    getenv("AI_SEARCH_PROVIDER", "mock"),
 		AzureSearchEndpoint: os.Getenv("AZURE_SEARCH_ENDPOINT"),
@@ -337,6 +344,28 @@ func (c *Config) UsesRealLINE() bool { return c.LINEProvider == ProviderReal }
 // UsesRealAuth reports whether real Azure AD (Entra) JWT validation should be
 // used for the HR API. Mock (dev super_admin) is the default.
 func (c *Config) UsesRealAuth() bool { return c.AuthProvider == ProviderReal }
+
+// AllowedTenantList returns the Entra tenant IDs permitted to sign in: the
+// trimmed AZURE_AD_ALLOWED_TENANTS entries when set, otherwise a single-element
+// fallback to the home tenant (AzureADTenantID) so single-tenant deployments are
+// unchanged.
+func (c *Config) AllowedTenantList() []string {
+	var out []string
+	for _, t := range strings.Split(c.AzureADAllowedTenants, ",") {
+		if s := strings.TrimSpace(t); s != "" {
+			out = append(out, s)
+		}
+	}
+	if len(out) == 0 && c.AzureADTenantID != "" {
+		out = []string{c.AzureADTenantID}
+	}
+	return out
+}
+
+// IsMultiTenantAuth reports whether more than one Entra tenant may sign in, which
+// switches the verifier to the shared `organizations` issuer plus a `tid`
+// allowlist instead of a single pinned-tenant issuer.
+func (c *Config) IsMultiTenantAuth() bool { return len(c.AllowedTenantList()) > 1 }
 
 // UsesRealNotify reports whether the real notifier (LINE push / email) should be
 // constructed. Mock (log-only) is the default so local/CI need no credentials.

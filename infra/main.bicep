@@ -80,6 +80,9 @@ param azureAdTenantId string = ''
 @description('Entra (Azure AD) app client ID — the API validates token aud against this. Required when deployEntra=true.')
 param azureAdClientId string = ''
 
+@description('Comma-separated Entra tenant-ID allowlist for multi-tenant SSO. Empty ⇒ single home tenant (azureAdTenantId) only; set ≥2 to allow partner orgs.')
+param azureAdAllowedTenants string = ''
+
 // --- Cost-lean / thin-pilot toggles ----------------------------------------
 
 @description('Provision Azure OpenAI + Document Intelligence. Set false on subscriptions without OpenAI access (e.g. MPN/credit) — backend then runs AI_PROVIDER=mock.')
@@ -453,6 +456,7 @@ var basePlainEnv = [
 var entraPlainEnv = [
   { name: 'AZURE_AD_TENANT_ID', value: azureAdTenantId }
   { name: 'AZURE_AD_CLIENT_ID', value: azureAdClientId }
+  { name: 'AZURE_AD_ALLOWED_TENANTS', value: azureAdAllowedTenants }
 ]
 
 var backendPlainEnv = concat(basePlainEnv, deployAi ? aiPlainEnv : [], deploySearch ? searchPlainEnv : [], deployEntra ? entraPlainEnv : [])

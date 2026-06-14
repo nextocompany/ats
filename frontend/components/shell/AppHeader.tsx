@@ -3,14 +3,14 @@
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { NAV } from "./nav-config";
+import { ALL_NAV } from "./nav-config";
 
 // Slim desktop context bar above the page — orients the operator without
 // duplicating the sidebar's navigation landmark. Hidden on mobile (MobileBar covers it).
 // A live ticking clock + brand pulse signal a console that's reading the pipeline now.
 export function AppHeader() {
   const pathname = usePathname();
-  const active = NAV.find((n) => pathname.startsWith(n.href));
+  const active = ALL_NAV.find((n) => pathname.startsWith(n.href));
 
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => {
