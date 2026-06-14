@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { InitialChip } from "@/components/people/PeopleBits";
 import { MemberStatusBadge } from "@/components/people/MemberStatusBadge";
+import { MemberActions } from "@/components/members/MemberActions";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
@@ -129,9 +130,7 @@ export default function MemberDetailPage() {
                 value={m.last_login_at ? new Date(m.last_login_at).toLocaleString("th-TH") : "—"}
               />
             </div>
-            <div className="rounded-xl bg-brand-soft/40 p-5 text-xs text-muted-foreground ring-1 ring-brand/10">
-              การจัดการสมาชิก (ระงับ / ลบข้อมูล PDPA / โน้ต / แท็ก) จะเพิ่มในเฟสถัดไป
-            </div>
+            <MemberActions member={m} role={me?.role} />
           </aside>
         </div>
       )}

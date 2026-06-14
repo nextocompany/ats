@@ -14,6 +14,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -25,6 +26,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/nexto/hr-ats/internal/auth"
+	"github.com/nexto/hr-ats/internal/candidateauth"
 	"github.com/nexto/hr-ats/pkg/config"
 )
 
@@ -196,6 +198,11 @@ func (h *Handler) finalize(c *fiber.Ctx, ret, mode string, lineUser auth.LineUse
 	}
 
 	tok, exp, err := h.issuer.LoginWithLine(c.UserContext(), lineUser.Subject, lineUser.Name, lineUser.Email)
+	if errors.Is(err, candidateauth.ErrAccountSuspended) {
+		// Suspended/anonymized account: login is refused server-side; tell the portal
+		// specifically so it can show the right message (mirrors the Google handler).
+		return c.Redirect(ret+"#line_error=account_suspended", fiber.StatusFound)
+	}
 	if err != nil {
 		log.Warn().Err(err).Msg("lineauth: login failed")
 		return c.Redirect(ret+"#line_error=login_failed", fiber.StatusFound)

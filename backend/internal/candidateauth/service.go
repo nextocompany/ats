@@ -96,7 +96,7 @@ func (s *Service) VerifyEmailOTP(ctx context.Context, rawEmail, code string) (*A
 	if err != nil {
 		return nil, Session{}, err
 	}
-	sess, err := s.issueSession(ctx, acct.ID)
+	sess, err := s.issueSessionFor(ctx, acct)
 	if err != nil {
 		return nil, Session{}, err
 	}
@@ -110,7 +110,7 @@ func (s *Service) LoginWithLine(ctx context.Context, sub, name, email string) (s
 	if err != nil {
 		return "", time.Time{}, err
 	}
-	sess, err := s.issueSession(ctx, acct.ID)
+	sess, err := s.issueSessionFor(ctx, acct)
 	if err != nil {
 		return "", time.Time{}, err
 	}
@@ -123,7 +123,7 @@ func (s *Service) LoginWithGoogle(ctx context.Context, sub, name, email string) 
 	if err != nil {
 		return "", time.Time{}, err
 	}
-	sess, err := s.issueSession(ctx, acct.ID)
+	sess, err := s.issueSessionFor(ctx, acct)
 	if err != nil {
 		return "", time.Time{}, err
 	}
@@ -182,6 +182,17 @@ func (s *Service) SavedResumeBytes(ctx context.Context, acct *Account) ([]byte, 
 		return nil, fmt.Errorf("candidateauth: no saved resume")
 	}
 	return s.blob.Download(ctx, acct.ResumeBlobURL) // stores the blob key
+}
+
+// issueSessionFor refuses a suspended/anonymized account a fresh session: the
+// provider identity is valid, but the account may not log in. This is the
+// fresh-login half of the suspension enforcement (the session-resolve query in
+// the repository handles existing cookies).
+func (s *Service) issueSessionFor(ctx context.Context, acct *Account) (Session, error) {
+	if !acct.IsActive() {
+		return Session{}, ErrAccountSuspended
+	}
+	return s.issueSession(ctx, acct.ID)
 }
 
 func (s *Service) issueSession(ctx context.Context, accountID uuid.UUID) (Session, error) {

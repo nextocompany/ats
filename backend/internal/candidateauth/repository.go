@@ -66,7 +66,7 @@ const accountColumns = `
 	id, full_name, COALESCE(email,''), email_verified, COALESCE(phone,''),
 	COALESCE(line_user_id,''), COALESCE(line_display_id,''), COALESCE(google_sub,''),
 	COALESCE(province,''), COALESCE(resume_blob_url,''), COALESCE(resume_file_type,''),
-	pdpa_consent, COALESCE(pdpa_version,''), created_at`
+	pdpa_consent, COALESCE(pdpa_version,''), status, created_at`
 
 func scanAccount(row pgx.Row) (*Account, error) {
 	var a Account
@@ -74,7 +74,7 @@ func scanAccount(row pgx.Row) (*Account, error) {
 		&a.ID, &a.FullName, &a.Email, &a.EmailVerified, &a.Phone,
 		&a.LineUserID, &a.LineDisplayID, &a.GoogleSub,
 		&a.Province, &a.ResumeBlobURL, &a.ResumeFileType,
-		&a.PDPAConsent, &a.PDPAVersion, &a.CreatedAt,
+		&a.PDPAConsent, &a.PDPAVersion, &a.Status, &a.CreatedAt,
 	); err != nil {
 		return nil, err
 	}
@@ -233,13 +233,16 @@ func (r *pgRepository) FindAccountBySessionHash(ctx context.Context, tokenHash s
 	// Resolve via a subquery (not a JOIN) so accountColumns stays unqualified —
 	// candidate_accounts and candidate_sessions share column names (id, created_at)
 	// that would be ambiguous in a JOIN's select list.
+	// The trailing status filter makes suspension/anonymization revoke an existing
+	// cookie too: once status leaves 'active', the live session no longer resolves
+	// (treated as logged-out), without having to delete the session row.
 	const q = `
 		SELECT ` + accountColumns + `
 		FROM candidate_accounts
 		WHERE id = (
 			SELECT account_id FROM candidate_sessions
 			WHERE token_hash = $1 AND revoked_at IS NULL AND expires_at > NOW()
-		)`
+		) AND status = 'active'`
 	a, err := scanAccount(r.pool.QueryRow(ctx, q, tokenHash))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound

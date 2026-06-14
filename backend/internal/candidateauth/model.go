@@ -11,6 +11,12 @@ import (
 	"github.com/google/uuid"
 )
 
+// statusActive is the only account status that may resolve a session or be
+// issued a fresh one. Suspended/anonymized accounts are treated as logged-out.
+// (Mirrors internal/members status values without importing it — candidateauth is
+// the lower layer.)
+const statusActive = "active"
+
 // Sentinel errors.
 var (
 	// ErrNotFound is returned when no account/session matches the lookup.
@@ -19,6 +25,11 @@ var (
 	// (wrong code, already consumed, or expired). Kept generic to avoid leaking
 	// which case occurred.
 	ErrOTPInvalid = errors.New("candidateauth: otp invalid or expired")
+	// ErrAccountSuspended is returned when a verified login resolves to a
+	// suspended/anonymized account: the identity is valid but the account may not
+	// hold a session. The session-resolve path additionally filters these out so
+	// an existing cookie also stops working.
+	ErrAccountSuspended = errors.New("candidateauth: account not active")
 )
 
 // Account is a persistent candidate identity. Any one of email / line_user_id /
@@ -37,8 +48,12 @@ type Account struct {
 	ResumeFileType string    `json:"resume_file_type"`
 	PDPAConsent    bool      `json:"pdpa_consent"`
 	PDPAVersion    string    `json:"pdpa_version"`
+	Status         string    `json:"-"` // active | suspended | anonymized — gates login, not client-facing
 	CreatedAt      time.Time `json:"created_at"`
 }
+
+// IsActive reports whether the account may resolve or be issued a session.
+func (a *Account) IsActive() bool { return a.Status == statusActive }
 
 // HasResume reports whether a saved resume is attached (enables quick-apply).
 func (a *Account) HasResume() bool { return a.ResumeBlobURL != "" }

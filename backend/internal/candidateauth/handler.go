@@ -85,6 +85,9 @@ func (h *Handler) VerifyEmail(c *fiber.Ctx) error {
 	if errors.Is(err, ErrOTPInvalid) {
 		return fiber.NewError(fiber.StatusUnauthorized, "รหัสไม่ถูกต้องหรือหมดอายุ")
 	}
+	if errors.Is(err, ErrAccountSuspended) {
+		return fiber.NewError(fiber.StatusForbidden, "บัญชีนี้ถูกระงับการใช้งาน กรุณาติดต่อเจ้าหน้าที่")
+	}
 	if err != nil {
 		return err
 	}

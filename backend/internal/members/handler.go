@@ -30,9 +30,22 @@ const resumeURLTTL = 10 * time.Minute
 
 const actionMemberViewResume = "member_view_resume"
 
+// memberEraseRoles may run the irreversible PDPA anonymize. Stricter than
+// memberAdminRoles: hr_manager can suspend/edit, only super_admin can erase.
+var memberEraseRoles = map[string]bool{"super_admin": true}
+
 // ResumeSigner produces a short-lived signed URL for a stored blob URL.
 type ResumeSigner interface {
 	SignedURLForStored(storedURL string, ttl time.Duration) (string, error)
+}
+
+// blobDeleter erases a member's stored resume on anonymization. Implemented by
+// *blob.Client; nil-safe (a nil deleter just skips blob cleanup). The stored
+// value is a bare blob key for portal uploads but a full URL for some seeded
+// rows, so anonymize picks Delete vs DeleteStored by inspecting the value.
+type blobDeleter interface {
+	Delete(ctx context.Context, name string) error
+	DeleteStored(ctx context.Context, storedURL string) error
 }
 
 // activityWriter records an audit entry (satisfied by *activity.Log).
@@ -45,11 +58,13 @@ type Handler struct {
 	repo     Repository
 	activity activityWriter
 	signer   ResumeSigner
+	blob     blobDeleter
 }
 
-// NewHandler builds the member-admin handler.
-func NewHandler(repo Repository, act activityWriter, signer ResumeSigner) *Handler {
-	return &Handler{repo: repo, activity: act, signer: signer}
+// NewHandler builds the member-admin handler. blob may be nil (blob cleanup on
+// anonymize is then skipped — the DB redaction, the critical part, still runs).
+func NewHandler(repo Repository, act activityWriter, signer ResumeSigner, blob blobDeleter) *Handler {
+	return &Handler{repo: repo, activity: act, signer: signer, blob: blob}
 }
 
 func (h *Handler) authorized(c *fiber.Ctx) bool {
@@ -58,6 +73,27 @@ func (h *Handler) authorized(c *fiber.Ctx) bool {
 		return false // no auth context → treat as unauthenticated, fail closed
 	}
 	return memberAdminRoles[u.Role]
+}
+
+// authorizedErase gates the super_admin-only destructive anonymize action.
+func (h *Handler) authorizedErase(c *fiber.Ctx) bool {
+	u, ok := c.Locals(middleware.UserContextKey).(middleware.DevUser)
+	if !ok || u.ID == "" {
+		return false
+	}
+	return memberEraseRoles[u.Role]
+}
+
+// actorID parses the authenticated user's id as a UUID for the suspended_by /
+// anonymized-by column. Mock/dev users may carry a non-UUID id; that maps to NULL
+// (the column has no FK to users, so a missing actor id is acceptable).
+func actorID(c *fiber.Ctx) *uuid.UUID {
+	u, _ := c.Locals(middleware.UserContextKey).(middleware.DevUser)
+	id, err := uuid.Parse(u.ID)
+	if err != nil {
+		return nil
+	}
+	return &id
 }
 
 // actor returns the authenticated user's email (or id) for audit records.

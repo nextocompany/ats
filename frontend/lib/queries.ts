@@ -274,3 +274,51 @@ export function useBulk() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["applications"] }),
   });
 }
+
+// invalidateMember refreshes a member's detail plus the directory/stats so the
+// list badges and summary strip reflect a lifecycle change immediately.
+function invalidateMember(qc: ReturnType<typeof useQueryClient>, id: string) {
+  void qc.invalidateQueries({ queryKey: ["member", id] });
+  void qc.invalidateQueries({ queryKey: ["members"] });
+  void qc.invalidateQueries({ queryKey: ["member-stats"] });
+}
+
+// useSetMemberStatus suspends ('suspended') or reactivates ('active') a member.
+// Suspending also force-logs-out the account server-side.
+export function useSetMemberStatus(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (status: "active" | "suspended") =>
+      api.patch(`/api/v1/admin/members/${id}/status`, { status }),
+    onSuccess: () => invalidateMember(qc, id),
+  });
+}
+
+// useForceLogout revokes every active session for the member (without changing status).
+export function useForceLogout(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post(`/api/v1/admin/members/${id}/force-logout`),
+    onSuccess: () => invalidateMember(qc, id),
+  });
+}
+
+// useUpdateMember applies a sparse admin profile edit.
+export function useUpdateMember(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (fields: Partial<Pick<Member, "full_name" | "phone" | "province" | "email">>) =>
+      api.patch<Member>(`/api/v1/admin/members/${id}`, fields).then((r) => r.data),
+    onSuccess: () => invalidateMember(qc, id),
+  });
+}
+
+// useAnonymizeMember runs the irreversible PDPA erasure (super_admin only — the
+// server enforces the role; this hook is used behind a super_admin-gated button).
+export function useAnonymizeMember(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post(`/api/v1/admin/members/${id}/anonymize`),
+    onSuccess: () => invalidateMember(qc, id),
+  });
+}

@@ -71,6 +71,21 @@ func (f *ListFilter) normalize() {
 	}
 }
 
+// ProfileUpdate carries the admin-editable member fields (sparse: empty values
+// are ignored so a partial save never blanks existing data). Mirrors
+// candidateauth.ProfileUpdate but admin-side (email is editable here).
+type ProfileUpdate struct {
+	FullName string
+	Phone    string
+	Province string
+	Email    string
+}
+
+// IsEmpty reports whether the update would change nothing (all fields blank).
+func (p ProfileUpdate) IsEmpty() bool {
+	return p.FullName == "" && p.Phone == "" && p.Province == "" && p.Email == ""
+}
+
 // Stats is the directory summary strip.
 type Stats struct {
 	Total            int            `json:"total"`
