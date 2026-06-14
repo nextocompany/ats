@@ -14,6 +14,9 @@ import type {
   InterviewView,
   KPI,
   Me,
+  Member,
+  MemberFilter,
+  MemberStats,
   OpenRole,
   ReportExport,
   SearchFilter,
@@ -221,6 +224,45 @@ export function useGenerateFitAnalysis(id: string) {
       qc.setQueryData(["fit-analysis", id], analysis);
       void qc.invalidateQueries({ queryKey: ["fit-analysis", id] });
     },
+  });
+}
+
+// useMembers loads the career-portal member directory (paginated). The query fn
+// keeps the full {data, meta} wrapper (no .then unwrap) so the page can read
+// meta.total — same convention as useApplications. Pass enabled=false to skip the
+// call for non-admin users (avoids a spurious 403 in the query cache).
+export function useMembers(filter: MemberFilter, enabled = true) {
+  return useQuery({
+    queryKey: ["members", filter],
+    queryFn: () =>
+      api.get<Member[]>(
+        "/api/v1/admin/members" +
+          buildQuery({
+            search: filter.search,
+            provider: filter.provider,
+            status: filter.status,
+            has_resume: filter.has_resume === undefined ? undefined : String(filter.has_resume),
+            page: filter.page,
+            limit: filter.limit,
+          }),
+      ),
+    enabled,
+  });
+}
+
+export function useMember(id: string) {
+  return useQuery({
+    queryKey: ["member", id],
+    queryFn: () => api.get<Member>(`/api/v1/admin/members/${id}`).then((r) => r.data),
+    enabled: !!id,
+  });
+}
+
+export function useMemberStats(enabled = true) {
+  return useQuery({
+    queryKey: ["member-stats"],
+    queryFn: () => api.get<MemberStats>("/api/v1/admin/members/stats").then((r) => r.data),
+    enabled,
   });
 }
 

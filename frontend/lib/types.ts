@@ -199,6 +199,49 @@ export interface ApplicationFilter {
   limit?: number;
 }
 
+// Member mirrors the Go members.Member admin projection (career-portal accounts).
+export interface Member {
+  id: string;
+  full_name: string;
+  email: string;
+  phone: string;
+  province: string;
+  email_verified: boolean;
+  line_linked: boolean;
+  google_linked: boolean;
+  email_linked: boolean;
+  has_resume: boolean;
+  resume_file_type: string;
+  status: "active" | "suspended" | "anonymized";
+  pdpa_consent: boolean;
+  pdpa_version: string;
+  applications_count: number;
+  active_sessions: number;
+  last_login_at: string | null;
+  created_at: string;
+}
+
+export interface MemberFilter {
+  search?: string;
+  provider?: string; // line | google | email
+  status?: string;
+  has_resume?: boolean;
+  from?: string;
+  to?: string;
+  page?: number;
+  limit?: number;
+}
+
+// MemberStats mirrors the Go members.Stats summary strip.
+export interface MemberStats {
+  total: number;
+  active: number;
+  suspended: number;
+  with_applications: number;
+  new_this_week: number;
+  by_provider: Record<string, number>;
+}
+
 // ReportExport mirrors reports.exportView (Sprint 5b): a stored export plus
 // short-lived signed download links.
 export interface ReportExport {

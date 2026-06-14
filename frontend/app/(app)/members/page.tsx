@@ -1,0 +1,272 @@
+"use client";
+
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense } from "react";
+import { ShieldAlert } from "lucide-react";
+
+import { InitialChip } from "@/components/people/PeopleBits";
+import { MemberStatusBadge } from "@/components/people/MemberStatusBadge";
+import { PageHeader } from "@/components/shell/PageHeader";
+import { SummaryStrip } from "@/components/shell/SummaryStrip";
+import { Input } from "@/components/ui/input";
+import { Pagination } from "@/components/ui/pagination";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useMe, useMembers, useMemberStats } from "@/lib/queries";
+import { isMemberAdmin } from "@/lib/roles";
+import type { Member } from "@/lib/types";
+
+const LIMIT = 20;
+
+function joinedAgo(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "—";
+  const days = Math.floor((Date.now() - then) / 86400000);
+  if (days < 1) return "วันนี้";
+  if (days < 7) return `${days} วันก่อน`;
+  if (days < 30) return `${Math.floor(days / 7)} สัปดาห์ก่อน`;
+  return new Date(iso).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit" });
+}
+
+function ProviderChips({ m }: { m: Member }) {
+  const ps = [
+    m.line_linked && "LINE",
+    m.google_linked && "Google",
+    m.email_linked && "Email",
+  ].filter(Boolean) as string[];
+  if (ps.length === 0) return <span className="text-xs text-muted-foreground">—</span>;
+  return (
+    <span className="flex flex-wrap gap-1">
+      {ps.map((p) => (
+        <span key={p} className="rounded-full bg-brand-soft px-1.5 py-0.5 text-[10px] font-medium text-brand">
+          {p}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function MembersInner() {
+  const params = useSearchParams();
+  const router = useRouter();
+  const { data: me, isLoading: meLoading } = useMe();
+  const allowed = isMemberAdmin(me?.role);
+
+  const search = params.get("search") ?? "";
+  const provider = params.get("provider") ?? "";
+  const status = params.get("status") ?? "";
+  const page = Math.max(1, Number(params.get("page") ?? "1"));
+
+  const setParam = (key: string, value: string) => {
+    const next = new URLSearchParams(params.toString());
+    if (value) next.set(key, value);
+    else next.delete(key);
+    if (key !== "page") next.delete("page");
+    router.replace(`/members?${next.toString()}`);
+  };
+
+  const { data, isLoading, isError, error } = useMembers({
+    search: search || undefined,
+    provider: provider || undefined,
+    status: status || undefined,
+    page,
+    limit: LIMIT,
+  }, allowed && !meLoading);
+  const { data: stats } = useMemberStats(allowed);
+
+  const items = data?.data ?? [];
+  const total = data?.meta?.total ?? 0;
+  const pages = Math.max(1, Math.ceil(total / LIMIT));
+
+  if (meLoading) return <Skeleton className="h-40 w-full rounded-xl" />;
+
+  if (!allowed) {
+    return (
+      <div className="settle space-y-8">
+        <PageHeader eyebrow="Member management" title="Members" />
+        <section className="flex items-start gap-3 rounded-xl bg-card p-6 ring-1 ring-hairline">
+          <ShieldAlert className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">
+            หน้านี้จำกัดเฉพาะ <span className="font-medium text-foreground">super admin และ HR manager</span>
+          </p>
+        </section>
+      </div>
+    );
+  }
+
+  return (
+    <div className="settle space-y-6">
+      <PageHeader
+        eyebrow="Member management"
+        title="สมาชิก Career Portal"
+        meta={<span className="tabular-nums">{total} สมาชิก</span>}
+        actions={
+          <>
+            <label className="flex flex-col gap-1 text-[0.6875rem] font-medium uppercase tracking-wide text-muted-foreground">
+              ค้นหา
+              <Input
+                key={search}
+                defaultValue={search}
+                placeholder="ชื่อ · อีเมล · เบอร์"
+                className="w-48"
+                onBlur={(e) => setParam("search", e.target.value.trim())}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") setParam("search", (e.target as HTMLInputElement).value.trim());
+                }}
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-[0.6875rem] font-medium uppercase tracking-wide text-muted-foreground">
+              ช่องทาง
+              <Select value={provider || "all"} onValueChange={(v) => setParam("provider", v && v !== "all" ? v : "")}>
+                <SelectTrigger className="w-32" size="sm">
+                  <SelectValue placeholder="ทั้งหมด" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">ทั้งหมด</SelectItem>
+                  <SelectItem value="line">LINE</SelectItem>
+                  <SelectItem value="google">Google</SelectItem>
+                  <SelectItem value="email">Email</SelectItem>
+                </SelectContent>
+              </Select>
+            </label>
+            <label className="flex flex-col gap-1 text-[0.6875rem] font-medium uppercase tracking-wide text-muted-foreground">
+              สถานะ
+              <Select value={status || "all"} onValueChange={(v) => setParam("status", v && v !== "all" ? v : "")}>
+                <SelectTrigger className="w-32" size="sm">
+                  <SelectValue placeholder="ทั้งหมด" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">ทั้งหมด</SelectItem>
+                  <SelectItem value="active">ใช้งาน</SelectItem>
+                  <SelectItem value="suspended">ระงับ</SelectItem>
+                  <SelectItem value="anonymized">ลบข้อมูลแล้ว</SelectItem>
+                </SelectContent>
+              </Select>
+            </label>
+          </>
+        }
+      />
+
+      {stats && (
+        <SummaryStrip
+          stats={[
+            { label: "สมาชิกทั้งหมด", value: <span className="tabular-nums">{stats.total}</span>, lead: true, accent: true },
+            { label: "ใช้งาน", value: <span className="tabular-nums">{stats.active}</span>, hint: "active" },
+            { label: "เคยสมัครงาน", value: <span className="tabular-nums">{stats.with_applications}</span>, hint: "with applications" },
+            { label: "ใหม่สัปดาห์นี้", value: <span className="tabular-nums">{stats.new_this_week}</span>, hint: "last 7 days" },
+          ]}
+        />
+      )}
+
+      {isError && (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+          {error instanceof Error ? error.message : "โหลดรายชื่อสมาชิกไม่สำเร็จ"}
+        </div>
+      )}
+
+      {/* Mobile */}
+      <ul className="space-y-2.5 md:hidden">
+        {isLoading && Array.from({ length: 6 }).map((_, i) => (
+          <li key={i} className="rounded-xl bg-card p-4 ring-1 ring-hairline"><Skeleton className="h-5 w-full" /></li>
+        ))}
+        {!isLoading && items.length === 0 && (
+          <li className="rounded-xl bg-card px-5 py-12 text-center text-sm text-muted-foreground ring-1 ring-hairline">
+            ไม่พบสมาชิก
+          </li>
+        )}
+        {items.map((m) => (
+          <li key={m.id} className="rounded-xl bg-card ring-1 ring-hairline">
+            <Link href={`/members/${m.id}`} className="flex items-start gap-3 p-4">
+              <InitialChip name={m.full_name || m.email || "?"} />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-foreground">{m.full_name || "(ไม่มีชื่อ)"}</p>
+                    <p className="truncate text-xs text-muted-foreground">{m.email || m.phone || "—"}</p>
+                  </div>
+                  <MemberStatusBadge status={m.status} />
+                </div>
+                <div className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-hairline pt-2.5">
+                  <ProviderChips m={m} />
+                  <span className="ml-auto text-xs text-muted-foreground tabular-nums">
+                    {m.applications_count} ใบสมัคร · {joinedAgo(m.created_at)}
+                  </span>
+                </div>
+              </div>
+            </Link>
+          </li>
+        ))}
+      </ul>
+
+      {/* Desktop */}
+      <div className="hidden overflow-hidden rounded-xl bg-card ring-1 ring-hairline md:block">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[820px] text-sm">
+            <thead className="ledger-head sticky top-0 z-10 text-left">
+              <tr>
+                <th scope="col" className="px-5 py-3">สมาชิก</th>
+                <th scope="col" className="w-32 px-3 py-3">จังหวัด</th>
+                <th scope="col" className="w-40 px-3 py-3">ช่องทาง</th>
+                <th scope="col" className="w-24 px-3 py-3">ใบสมัคร</th>
+                <th scope="col" className="w-28 px-3 py-3">สถานะ</th>
+                <th scope="col" className="w-28 py-3 pl-3 pr-5">สมัครเมื่อ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading && Array.from({ length: 8 }).map((_, i) => (
+                <tr key={i} className="border-b border-hairline last:border-0">
+                  <td className="px-5 py-3.5" colSpan={6}><Skeleton className="h-5 w-full" /></td>
+                </tr>
+              ))}
+              {!isLoading && items.length === 0 && (
+                <tr><td colSpan={6} className="px-5 py-16 text-center text-muted-foreground">ไม่พบสมาชิก</td></tr>
+              )}
+              {items.map((m) => (
+                <tr key={m.id} className="ledger-row group border-b border-hairline last:border-0">
+                  <td className="px-5 py-3.5">
+                    <div className="flex items-center gap-3">
+                      <InitialChip name={m.full_name || m.email || "?"} size="sm" />
+                      <div className="min-w-0">
+                        <Link
+                          href={`/members/${m.id}`}
+                          className="truncate font-medium text-foreground underline-offset-2 hover:text-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                        >
+                          {m.full_name || "(ไม่มีชื่อ)"}
+                        </Link>
+                        <p className="truncate text-xs text-muted-foreground">{m.email || m.phone || "—"}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-3 py-3.5 text-muted-foreground">{m.province || "—"}</td>
+                  <td className="px-3 py-3.5"><ProviderChips m={m} /></td>
+                  <td className="px-3 py-3.5 tabular-nums text-muted-foreground">{m.applications_count}</td>
+                  <td className="px-3 py-3.5"><MemberStatusBadge status={m.status} /></td>
+                  <td className="py-3.5 pl-3 pr-5 text-muted-foreground" title={new Date(m.created_at).toLocaleString()}>
+                    {joinedAgo(m.created_at)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <Pagination page={page} pages={pages} onPage={(p) => setParam("page", String(p))} />
+    </div>
+  );
+}
+
+export default function MembersPage() {
+  return (
+    <Suspense fallback={<Skeleton className="h-96 w-full rounded-xl" />}>
+      <MembersInner />
+    </Suspense>
+  );
+}

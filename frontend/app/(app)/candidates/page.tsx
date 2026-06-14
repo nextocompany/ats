@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { MapPin, Users } from "lucide-react";
 
-import { Pagination } from "@/app/(app)/applications/page";
+import { Pagination } from "@/components/ui/pagination";
 import { InitialChip, SourceChip, StatusPill, toneForStatus } from "@/components/people/PeopleBits";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { SummaryStrip } from "@/components/shell/SummaryStrip";
