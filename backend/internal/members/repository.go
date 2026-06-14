@@ -12,13 +12,23 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// uniqueViolation is the Postgres SQLSTATE for a unique-constraint violation.
-const uniqueViolation = "23505"
+// Postgres SQLSTATEs we branch on.
+const (
+	uniqueViolation     = "23505"
+	foreignKeyViolation = "23503"
+)
 
 // isUnique reports whether err is a Postgres unique-constraint violation.
 func isUnique(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == uniqueViolation
+}
+
+// isForeignKey reports whether err is a Postgres FK-constraint violation (e.g. a
+// note/tag insert referencing a member that doesn't exist).
+func isForeignKey(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == foreignKeyViolation
 }
 
 // ErrNotFound is returned when no member matches the lookup key.
@@ -36,6 +46,9 @@ var ErrEmailTaken = errors.New("members: email already in use")
 // Repository is the member-admin data-access contract.
 type Repository interface {
 	List(ctx context.Context, f ListFilter) ([]Member, int, error)
+	// ListForExport returns up to max rows matching the filter (no pagination,
+	// newest-first) for the CSV export.
+	ListForExport(ctx context.Context, f ListFilter, max int) ([]Member, error)
 	GetByID(ctx context.Context, id uuid.UUID) (*Member, error)
 	GetResumeBlobURL(ctx context.Context, id uuid.UUID) (string, error)
 	Stats(ctx context.Context) (Stats, error)
@@ -52,6 +65,16 @@ type Repository interface {
 	// returns the resume blob URL (if any) so the caller can delete it after the
 	// commit. Idempotent: a second call returns ErrAnonymized.
 	Anonymize(ctx context.Context, id uuid.UUID) (resumeURL string, err error)
+
+	// AddNote appends an HR note; ListNotes returns a member's notes newest-first.
+	// Both return ErrNotFound when the member is missing.
+	AddNote(ctx context.Context, id uuid.UUID, author, body string) (*Note, error)
+	ListNotes(ctx context.Context, id uuid.UUID) ([]Note, error)
+	// AddTag attaches a tag (idempotent); RemoveTag detaches it; ListTags returns
+	// a member's tags sorted. AddTag returns ErrNotFound for a missing member.
+	AddTag(ctx context.Context, id uuid.UUID, tag string) error
+	RemoveTag(ctx context.Context, id uuid.UUID, tag string) error
+	ListTags(ctx context.Context, id uuid.UUID) ([]string, error)
 }
 
 type pgRepository struct {
@@ -95,9 +118,11 @@ func scanMember(row pgx.Row) (*Member, error) {
 	return &m, nil
 }
 
-func (r *pgRepository) List(ctx context.Context, f ListFilter) ([]Member, int, error) {
-	f.normalize()
-
+// buildMemberWhere turns a ListFilter into a parameterised WHERE clause + args.
+// Shared by List (paginated) and ListForExport (capped, no offset) so the filter
+// semantics can't drift between the directory and its CSV export. Callers continue
+// the placeholder numbering from len(args).
+func buildMemberWhere(f ListFilter) (string, []any) {
 	var args []any
 	add := func(v any) string {
 		args = append(args, v)
@@ -123,6 +148,9 @@ func (r *pgRepository) List(ctx context.Context, f ListFilter) ([]Member, int, e
 	if f.Status != "" {
 		conds = append(conds, "a.status = "+add(f.Status))
 	}
+	if f.Tag != "" {
+		conds = append(conds, "EXISTS (SELECT 1 FROM member_tags t WHERE t.account_id = a.id AND t.tag = "+add(f.Tag)+")")
+	}
 	if f.HasResume != nil {
 		if *f.HasResume {
 			conds = append(conds, "(a.resume_blob_url IS NOT NULL AND a.resume_blob_url <> '')")
@@ -141,14 +169,24 @@ func (r *pgRepository) List(ctx context.Context, f ListFilter) ([]Member, int, e
 	if len(conds) > 0 {
 		where = " WHERE " + strings.Join(conds, " AND ")
 	}
+	return where, args
+}
+
+func (r *pgRepository) List(ctx context.Context, f ListFilter) ([]Member, int, error) {
+	f.normalize()
+	where, args := buildMemberWhere(f)
 
 	var total int
 	if err := r.pool.QueryRow(ctx, "SELECT COUNT(*) FROM candidate_accounts a"+where, args...).Scan(&total); err != nil {
 		return nil, 0, fmt.Errorf("members: list count: %w", err)
 	}
 
-	limitPH := add(f.Limit)
-	offsetPH := add((f.Page - 1) * f.Limit)
+	nextPH := func(v any) string {
+		args = append(args, v)
+		return fmt.Sprintf("$%d", len(args))
+	}
+	limitPH := nextPH(f.Limit)
+	offsetPH := nextPH((f.Page - 1) * f.Limit)
 	q := memberSelect + where + " ORDER BY a.created_at DESC LIMIT " + limitPH + " OFFSET " + offsetPH
 
 	rows, err := r.pool.Query(ctx, q, args...)
@@ -169,6 +207,29 @@ func (r *pgRepository) List(ctx context.Context, f ListFilter) ([]Member, int, e
 		return nil, 0, fmt.Errorf("members: list rows: %w", err)
 	}
 	return out, total, nil
+}
+
+func (r *pgRepository) ListForExport(ctx context.Context, f ListFilter, max int) ([]Member, error) {
+	f.normalize() // parity with List, even though pagination fields are unused here
+	where, args := buildMemberWhere(f)
+	args = append(args, max)
+	q := fmt.Sprintf("%s%s ORDER BY a.created_at DESC LIMIT $%d", memberSelect, where, len(args))
+
+	rows, err := r.pool.Query(ctx, q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("members: export query: %w", err)
+	}
+	defer rows.Close()
+
+	var out []Member
+	for rows.Next() {
+		m, serr := scanMember(rows)
+		if serr != nil {
+			return nil, fmt.Errorf("members: export scan: %w", serr)
+		}
+		out = append(out, *m)
+	}
+	return out, rows.Err()
 }
 
 func (r *pgRepository) GetByID(ctx context.Context, id uuid.UUID) (*Member, error) {

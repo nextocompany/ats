@@ -49,7 +49,33 @@ export const api = {
   get: <T>(path: string) => request<T>("GET", path),
   post: <T>(path: string, body?: unknown) => request<T>("POST", path, body),
   patch: <T>(path: string, body?: unknown) => request<T>("PATCH", path, body),
+  del: <T>(path: string) => request<T>("DELETE", path),
 };
+
+// downloadFile fetches a non-JSON endpoint (e.g. a CSV export) with the same auth
+// as `request` and triggers a browser download. Used for endpoints that stream a
+// file attachment rather than the JSON envelope, so they can't go through `api`.
+export async function downloadFile(path: string, filename: string): Promise<void> {
+  const headers: Record<string, string> = {};
+  if (isEntraConfigured()) {
+    const token = await getIdToken();
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+  }
+  const res = await fetch(`${BASE}${path}`, { headers, credentials: "include" });
+  if (!res.ok) {
+    throw new ApiError(`Download failed (${res.status})`, res.status);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename.replace(/[/\\]/g, "_"); // never let a path separator through
+
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
 
 export function buildQuery(params: Record<string, string | number | undefined>): string {
   const sp = new URLSearchParams();

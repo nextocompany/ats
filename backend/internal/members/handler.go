@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -206,6 +207,7 @@ func parseFilter(c *fiber.Ctx) (ListFilter, error) {
 		Search:   c.Query("search"),
 		Provider: c.Query("provider"), // unknown providers are ignored by the repo switch
 		Status:   c.Query("status"),
+		Tag:      strings.ToLower(strings.TrimSpace(c.Query("tag"))),
 		Page:     atoiDefault(c.Query("page"), 0),
 		Limit:    atoiDefault(c.Query("limit"), 0),
 	}

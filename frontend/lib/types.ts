@@ -225,11 +225,20 @@ export interface MemberFilter {
   search?: string;
   provider?: string; // line | google | email
   status?: string;
+  tag?: string;
   has_resume?: boolean;
   from?: string;
   to?: string;
   page?: number;
   limit?: number;
+}
+
+// MemberNote mirrors the Go members.Note (HR-only timeline note).
+export interface MemberNote {
+  id: string;
+  author_email: string;
+  body: string;
+  created_at: string;
 }
 
 // MemberStats mirrors the Go members.Stats summary strip.

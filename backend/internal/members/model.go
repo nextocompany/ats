@@ -52,6 +52,7 @@ type ListFilter struct {
 	Search    string // matches full_name / email / phone (ILIKE)
 	Provider  string // line | google | email
 	Status    string // active | suspended | anonymized
+	Tag       string // members carrying this exact tag
 	HasResume *bool
 	From      *time.Time
 	To        *time.Time
@@ -95,3 +96,19 @@ type Stats struct {
 	NewThisWeek      int            `json:"new_this_week"`
 	ByProvider       map[string]int `json:"by_provider"` // line | google | email
 }
+
+// Note is an HR-only timeline note on a member (never exposed on the public portal).
+type Note struct {
+	ID          uuid.UUID `json:"id"`
+	AuthorEmail string    `json:"author_email"`
+	Body        string    `json:"body"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+// maxTagLen / maxNoteLen bound CRM free-text (defends storage + UI). Tags are
+// normalised (trimmed, lowercased) before persistence so "Retail" and "retail"
+// don't both exist.
+const (
+	maxTagLen  = 50
+	maxNoteLen = 2000
+)
