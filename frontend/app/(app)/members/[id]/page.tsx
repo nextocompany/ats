@@ -8,6 +8,8 @@ import { toast } from "sonner";
 import { InitialChip } from "@/components/people/PeopleBits";
 import { MemberStatusBadge } from "@/components/people/MemberStatusBadge";
 import { MemberActions } from "@/components/members/MemberActions";
+import { NotesPanel } from "@/components/members/NotesPanel";
+import { TagEditor } from "@/components/members/TagEditor";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
@@ -119,6 +121,8 @@ export default function MemberDetailPage() {
                   : `มี ${m.applications_count} ใบสมัคร — ดูได้จากหน้า Inbox (ค้นด้วยชื่อ/อีเมล)`}
               </div>
             </section>
+
+            <NotesPanel memberId={m.id} />
           </div>
 
           <aside aria-label="Account" className="space-y-6">
@@ -130,6 +134,7 @@ export default function MemberDetailPage() {
                 value={m.last_login_at ? new Date(m.last_login_at).toLocaleString("th-TH") : "—"}
               />
             </div>
+            <TagEditor memberId={m.id} />
             <MemberActions member={m} role={me?.role} />
           </aside>
         </div>

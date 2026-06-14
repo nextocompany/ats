@@ -2,13 +2,17 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense } from "react";
-import { ShieldAlert } from "lucide-react";
+import { Suspense, useState } from "react";
+import { Download, ShieldAlert } from "lucide-react";
+import { toast } from "sonner";
 
 import { InitialChip } from "@/components/people/PeopleBits";
 import { MemberStatusBadge } from "@/components/people/MemberStatusBadge";
+import { MemberBulkBar } from "@/components/members/MemberBulkBar";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { SummaryStrip } from "@/components/shell/SummaryStrip";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Pagination } from "@/components/ui/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -19,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { downloadFile, buildQuery } from "@/lib/api";
 import { useMe, useMembers, useMemberStats } from "@/lib/queries";
 import { isMemberAdmin } from "@/lib/roles";
 import type { Member } from "@/lib/types";
@@ -62,7 +67,11 @@ function MembersInner() {
   const search = params.get("search") ?? "";
   const provider = params.get("provider") ?? "";
   const status = params.get("status") ?? "";
+  const tag = params.get("tag") ?? "";
   const page = Math.max(1, Number(params.get("page") ?? "1"));
+
+  const [selected, setSelected] = useState<string[]>([]);
+  const [exporting, setExporting] = useState(false);
 
   const setParam = (key: string, value: string) => {
     const next = new URLSearchParams(params.toString());
@@ -70,12 +79,14 @@ function MembersInner() {
     else next.delete(key);
     if (key !== "page") next.delete("page");
     router.replace(`/members?${next.toString()}`);
+    setSelected([]); // a filter/page change invalidates the current selection
   };
 
   const { data, isLoading, isError, error } = useMembers({
     search: search || undefined,
     provider: provider || undefined,
     status: status || undefined,
+    tag: tag || undefined,
     page,
     limit: LIMIT,
   }, allowed && !meLoading);
@@ -84,6 +95,24 @@ function MembersInner() {
   const items = data?.data ?? [];
   const total = data?.meta?.total ?? 0;
   const pages = Math.max(1, Math.ceil(total / LIMIT));
+  const allChecked = items.length > 0 && items.every((m) => selected.includes(m.id));
+
+  const toggle = (id: string) =>
+    setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  const toggleAll = () =>
+    setSelected((s) => (items.every((m) => s.includes(m.id)) ? [] : items.map((m) => m.id)));
+
+  const exportCsv = async () => {
+    setExporting(true);
+    try {
+      const qs = buildQuery({ search, provider, status, tag });
+      await downloadFile(`/api/v1/admin/members/export.csv${qs}`, "members.csv");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "ดาวน์โหลด CSV ไม่สำเร็จ");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   if (meLoading) return <Skeleton className="h-40 w-full rounded-xl" />;
 
@@ -150,19 +179,52 @@ function MembersInner() {
                 </SelectContent>
               </Select>
             </label>
+            <label className="flex flex-col gap-1 text-[0.6875rem] font-medium uppercase tracking-wide text-muted-foreground">
+              แท็ก
+              <Input
+                key={tag}
+                defaultValue={tag}
+                placeholder="เช่น retail"
+                className="w-28"
+                onBlur={(e) => setParam("tag", e.target.value.trim().toLowerCase())}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") setParam("tag", (e.target as HTMLInputElement).value.trim().toLowerCase());
+                }}
+              />
+            </label>
+            <Button variant="outline" size="sm" className="self-end" disabled={exporting} onClick={exportCsv}>
+              <Download className="size-4" /> ส่งออก CSV
+            </Button>
           </>
         }
       />
 
       {stats && (
-        <SummaryStrip
-          stats={[
-            { label: "สมาชิกทั้งหมด", value: <span className="tabular-nums">{stats.total}</span>, lead: true, accent: true },
-            { label: "ใช้งาน", value: <span className="tabular-nums">{stats.active}</span>, hint: "active" },
-            { label: "เคยสมัครงาน", value: <span className="tabular-nums">{stats.with_applications}</span>, hint: "with applications" },
-            { label: "ใหม่สัปดาห์นี้", value: <span className="tabular-nums">{stats.new_this_week}</span>, hint: "last 7 days" },
-          ]}
-        />
+        <div className="space-y-3">
+          <SummaryStrip
+            stats={[
+              { label: "สมาชิกทั้งหมด", value: <span className="tabular-nums">{stats.total}</span>, lead: true, accent: true },
+              { label: "ใช้งาน", value: <span className="tabular-nums">{stats.active}</span>, hint: "active" },
+              { label: "เคยสมัครงาน", value: <span className="tabular-nums">{stats.with_applications}</span>, hint: "with applications" },
+              { label: "ใหม่สัปดาห์นี้", value: <span className="tabular-nums">{stats.new_this_week}</span>, hint: "last 7 days" },
+            ]}
+          />
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            <span className="font-medium uppercase tracking-wide">แยกตามช่องทาง</span>
+            {(["line", "google", "email"] as const).map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setParam("provider", provider === p ? "" : p)}
+                className="rounded-sm hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-pressed={provider === p}
+              >
+                {p === "line" ? "LINE" : p === "google" ? "Google" : "Email"}{" "}
+                <span className="tabular-nums text-foreground">{stats.by_provider?.[p] ?? 0}</span>
+              </button>
+            ))}
+          </div>
+        </div>
       )}
 
       {isError && (
@@ -211,7 +273,10 @@ function MembersInner() {
           <table className="w-full min-w-[820px] text-sm">
             <thead className="ledger-head sticky top-0 z-10 text-left">
               <tr>
-                <th scope="col" className="px-5 py-3">สมาชิก</th>
+                <th scope="col" className="w-10 pl-5 pr-2 py-3">
+                  <Checkbox checked={allChecked} onCheckedChange={toggleAll} aria-label="เลือกทั้งหมด" />
+                </th>
+                <th scope="col" className="px-3 py-3">สมาชิก</th>
                 <th scope="col" className="w-32 px-3 py-3">จังหวัด</th>
                 <th scope="col" className="w-40 px-3 py-3">ช่องทาง</th>
                 <th scope="col" className="w-24 px-3 py-3">ใบสมัคร</th>
@@ -222,15 +287,22 @@ function MembersInner() {
             <tbody>
               {isLoading && Array.from({ length: 8 }).map((_, i) => (
                 <tr key={i} className="border-b border-hairline last:border-0">
-                  <td className="px-5 py-3.5" colSpan={6}><Skeleton className="h-5 w-full" /></td>
+                  <td className="px-5 py-3.5" colSpan={7}><Skeleton className="h-5 w-full" /></td>
                 </tr>
               ))}
               {!isLoading && items.length === 0 && (
-                <tr><td colSpan={6} className="px-5 py-16 text-center text-muted-foreground">ไม่พบสมาชิก</td></tr>
+                <tr><td colSpan={7} className="px-5 py-16 text-center text-muted-foreground">ไม่พบสมาชิก</td></tr>
               )}
               {items.map((m) => (
-                <tr key={m.id} className="ledger-row group border-b border-hairline last:border-0">
-                  <td className="px-5 py-3.5">
+                <tr key={m.id} data-sel={selected.includes(m.id)} className="ledger-row group border-b border-hairline last:border-0 data-[sel=true]:bg-brand-soft/30">
+                  <td className="pl-5 pr-2 py-3.5">
+                    <Checkbox
+                      checked={selected.includes(m.id)}
+                      onCheckedChange={() => toggle(m.id)}
+                      aria-label={`เลือก ${m.full_name || m.email}`}
+                    />
+                  </td>
+                  <td className="px-3 py-3.5">
                     <div className="flex items-center gap-3">
                       <InitialChip name={m.full_name || m.email || "?"} size="sm" />
                       <div className="min-w-0">
@@ -259,6 +331,8 @@ function MembersInner() {
       </div>
 
       <Pagination page={page} pages={pages} onPage={(p) => setParam("page", String(p))} />
+
+      <MemberBulkBar selected={selected} onDone={() => setSelected([])} />
     </div>
   );
 }

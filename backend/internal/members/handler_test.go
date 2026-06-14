@@ -23,8 +23,13 @@ type stubRepo struct {
 	statusErr    error
 	anonymizeErr error
 	updateErr    error
+	noteErr      error
+	tagErr       error
+	notes        []Note
+	tags         []string
 	lastStatus   string    // status passed to SetStatus
 	lastAnonID   uuid.UUID // id passed to Anonymize
+	lastTag      string    // tag passed to AddTag/RemoveTag
 	forceLogouts int       // ForceLogout call count
 }
 
@@ -58,6 +63,28 @@ func (s *stubRepo) Anonymize(_ context.Context, id uuid.UUID) (string, error) {
 	s.lastAnonID = id
 	return s.resumeURL, s.anonymizeErr
 }
+func (s *stubRepo) ListForExport(context.Context, ListFilter, int) ([]Member, error) {
+	if s.member == nil {
+		return nil, nil
+	}
+	return []Member{*s.member}, nil
+}
+func (s *stubRepo) AddNote(_ context.Context, _ uuid.UUID, author, body string) (*Note, error) {
+	if s.noteErr != nil {
+		return nil, s.noteErr
+	}
+	return &Note{AuthorEmail: author, Body: body}, nil
+}
+func (s *stubRepo) ListNotes(context.Context, uuid.UUID) ([]Note, error) { return s.notes, nil }
+func (s *stubRepo) AddTag(_ context.Context, _ uuid.UUID, tag string) error {
+	s.lastTag = tag
+	return s.tagErr
+}
+func (s *stubRepo) RemoveTag(_ context.Context, _ uuid.UUID, tag string) error {
+	s.lastTag = tag
+	return nil
+}
+func (s *stubRepo) ListTags(context.Context, uuid.UUID) ([]string, error) { return s.tags, nil }
 
 type stubSigner struct{}
 

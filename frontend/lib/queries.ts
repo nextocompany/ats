@@ -16,6 +16,7 @@ import type {
   Me,
   Member,
   MemberFilter,
+  MemberNote,
   MemberStats,
   OpenRole,
   ReportExport,
@@ -241,6 +242,7 @@ export function useMembers(filter: MemberFilter, enabled = true) {
             search: filter.search,
             provider: filter.provider,
             status: filter.status,
+            tag: filter.tag,
             has_resume: filter.has_resume === undefined ? undefined : String(filter.has_resume),
             page: filter.page,
             limit: filter.limit,
@@ -320,5 +322,66 @@ export function useAnonymizeMember(id: string) {
   return useMutation({
     mutationFn: () => api.post(`/api/v1/admin/members/${id}/anonymize`),
     onSuccess: () => invalidateMember(qc, id),
+  });
+}
+
+// ── CRM (Phase C): notes, tags, bulk, CSV export ────────────────────────────
+
+export function useMemberNotes(id: string) {
+  return useQuery({
+    queryKey: ["member-notes", id],
+    queryFn: () => api.get<MemberNote[]>(`/api/v1/admin/members/${id}/notes`).then((r) => r.data),
+    enabled: !!id,
+  });
+}
+
+export function useAddNote(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: string) => api.post<MemberNote>(`/api/v1/admin/members/${id}/notes`, { body }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["member-notes", id] }),
+  });
+}
+
+export function useMemberTags(id: string) {
+  return useQuery({
+    queryKey: ["member-tags", id],
+    queryFn: () => api.get<string[]>(`/api/v1/admin/members/${id}/tags`).then((r) => r.data),
+    enabled: !!id,
+  });
+}
+
+export function useAddTag(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (tag: string) => api.post(`/api/v1/admin/members/${id}/tags`, { tag }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["member-tags", id] });
+      void qc.invalidateQueries({ queryKey: ["members"] });
+    },
+  });
+}
+
+export function useRemoveTag(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (tag: string) => api.del(`/api/v1/admin/members/${id}/tags?tag=${encodeURIComponent(tag)}`),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["member-tags", id] });
+      void qc.invalidateQueries({ queryKey: ["members"] });
+    },
+  });
+}
+
+// useMemberBulk applies one action (tag/suspend/reactivate) to many members.
+export function useMemberBulk() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { ids: string[]; action: string; value?: string }) =>
+      api.post<{ updated: number; failed: number }>("/api/v1/admin/members/bulk", vars).then((r) => r.data),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["members"] });
+      void qc.invalidateQueries({ queryKey: ["member-stats"] });
+    },
   });
 }
