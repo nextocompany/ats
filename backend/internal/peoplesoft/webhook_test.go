@@ -43,6 +43,7 @@ func (f fakePos) FindByPSCode(_ context.Context, code string) (*positions.Positi
 	return nil, errors.New("not found")
 }
 func (fakePos) ListPublic(context.Context) ([]positions.PublicPosition, error) { return nil, nil }
+func (fakePos) ListAll(context.Context) ([]positions.Position, error)          { return nil, nil }
 
 type fakeReengage struct {
 	called  int

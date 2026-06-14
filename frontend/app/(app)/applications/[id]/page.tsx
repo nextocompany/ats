@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
 import { AiSummaryPanel } from "@/components/resume/AiSummaryPanel";
+import { FitAnalysisPanel } from "@/components/resume/FitAnalysisPanel";
 import { InterviewPanel } from "@/components/resume/InterviewPanel";
 import { ResumeViewer } from "@/components/resume/ResumeViewer";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -45,6 +46,7 @@ export default function ApplicationDetailPage() {
           >
             <AiSummaryPanel app={app} />
             <InterviewPanel applicationId={app.id} />
+            <FitAnalysisPanel applicationId={app.id} app={app} />
           </aside>
         </div>
       )}

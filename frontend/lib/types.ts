@@ -120,6 +120,27 @@ export interface InterviewInviteResult {
   interview_url: string;
 }
 
+// RecommendedPosition is one Master JD role the AI judges the candidate a fit for.
+export interface RecommendedPosition {
+  position_id: string;
+  title: string;
+  fit_score: number;
+  reasons: string[];
+}
+
+// FitAnalysis mirrors the backend fit.Analysis JSON — the cross-position verdict
+// combining screening + AI interview against the whole Master JD catalogue.
+export interface FitAnalysis {
+  application_id: string;
+  overall_fit: "strong" | "moderate" | "weak" | "none";
+  summary: string;
+  strengths: string[];
+  concerns: string[];
+  recommended: RecommendedPosition[];
+  no_match_reason?: string;
+  generated_at: string;
+}
+
 export interface Funnel {
   applied: number;
   passed_ai: number;
