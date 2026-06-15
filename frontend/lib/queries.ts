@@ -8,8 +8,10 @@ import type {
   Application,
   ApplicationFilter,
   Candidate,
+  CreateHRUserInput,
   FitAnalysis,
   Funnel,
+  HRUser,
   InterviewInviteResult,
   InterviewView,
   KPI,
@@ -25,6 +27,7 @@ import type {
   Source,
   StoreLoad,
   TimelineEntry,
+  UpdateHRUserInput,
 } from "./types";
 
 export function useMe() {
@@ -47,6 +50,35 @@ export function useUpdateAdminSettings() {
     mutationFn: (settings: AdminSettings) =>
       api.patch<AdminSettings>("/api/v1/admin/settings", settings).then((r) => r.data),
     onSuccess: (data) => qc.setQueryData(["admin-settings"], data),
+  });
+}
+
+// HR user accounts (super_admin only — the list 403s for other roles, so gate the
+// UI on me.role first). These are the local username/password accounts that sign
+// in alongside Entra SSO.
+export function useHRUsers(enabled = true) {
+  return useQuery({
+    queryKey: ["hr-users"],
+    queryFn: () => api.get<HRUser[]>("/api/v1/admin/users").then((r) => r.data ?? []),
+    enabled,
+  });
+}
+
+export function useCreateHRUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateHRUserInput) =>
+      api.post<HRUser>("/api/v1/admin/users", input).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["hr-users"] }),
+  });
+}
+
+export function useUpdateHRUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: UpdateHRUserInput }) =>
+      api.patch<HRUser>(`/api/v1/admin/users/${id}`, input).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["hr-users"] }),
   });
 }
 
