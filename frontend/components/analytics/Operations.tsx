@@ -62,7 +62,7 @@ function RankPanel({ eyebrow, title, icon, meta, rows, emptyTitle, emptyHint }: 
           </span>
           <p className="text-sm font-semibold text-foreground">{emptyTitle}</p>
           <p className="mx-auto mt-1 max-w-xs text-xs text-muted-foreground">{emptyHint}</p>
-          <span className="dot-rule mt-5 opacity-70" aria-hidden />
+          <span className="mx-auto mt-5 block h-px w-10 bg-hairline" aria-hidden />
         </div>
       ) : (
         <ol className="flex flex-col gap-3">

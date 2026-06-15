@@ -21,50 +21,23 @@ export default function LoginPage() {
     <main className="grid min-h-dvh lg:grid-cols-[1.4fr_minmax(26rem,0.85fr)]">
       {/* Brand panel — the CP Axtra blue "front door" of the enterprise */}
       <section className="relative hidden flex-col justify-between overflow-hidden bg-sidebar p-12 text-sidebar-foreground lg:flex">
-        {/* Brass glow + dot dither — layered atmosphere, not a flat gradient */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -right-28 -top-28 size-[28rem] rounded-full opacity-25"
-          style={{ background: "radial-gradient(circle, var(--brass) 0%, transparent 62%)" }}
-        />
+        {/* Single brand glow — calm atmosphere, not a flat gradient */}
         <div
           aria-hidden
           className="pointer-events-none absolute -bottom-32 -left-24 size-[26rem] rounded-full opacity-20"
           style={{ background: "radial-gradient(circle, var(--brand) 0%, transparent 65%)" }}
         />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 opacity-[0.06]"
-          style={{
-            backgroundImage: "radial-gradient(oklch(100% 0 0 / 0.7) 0.7px, transparent 0.7px)",
-            backgroundSize: "7px 7px",
-          }}
-        />
-        {/* Brass crown keyline */}
+        {/* Crown keyline */}
         <span aria-hidden className="absolute inset-x-0 top-0 h-px bg-sidebar-primary/40" />
 
-        <div className="relative flex items-center gap-3">
-          <span
-            className="relative grid size-10 place-items-center rounded-xl bg-brand font-semibold text-brand-foreground"
-            style={{ boxShadow: "inset 0 0 0 1px oklch(100% 0 0 / 0.14), 0 4px 14px -4px oklch(46% 0.18 264 / 0.7)" }}
-          >
-            HR
-            <span
-              aria-hidden
-              className="absolute -right-1 -top-1 size-2.5 rounded-full bg-brass"
-              style={{ boxShadow: "0 0 0 2px var(--sidebar)" }}
-            />
+        <div className="relative flex flex-col leading-none">
+          <span className="text-xs font-semibold uppercase tracking-[0.24em] text-sidebar-foreground/80">
+            CP&nbsp;Axtra
           </span>
-          <span className="flex flex-col leading-none">
-            <span className="text-base font-semibold tracking-tight">ATS Console</span>
-            <span className="mt-1 text-[0.625rem] font-medium uppercase tracking-[0.2em] text-brass">
-              Recruitment Operations
-            </span>
-          </span>
+          <span className="mt-1.5 text-base font-semibold tracking-tight">ATS Console</span>
         </div>
 
         <div className="relative max-w-md">
-          <div className="dot-cluster mb-6" aria-hidden />
           <p className="eyebrow text-brass">National recruitment platform</p>
           <h2 className="mt-3 font-heading text-[3rem] font-semibold leading-[1.02] tracking-tight">
             One pipeline,
@@ -80,7 +53,7 @@ export default function LoginPage() {
           <dl className="mt-9 flex divide-x divide-sidebar-border">
             {PROOF.map((p, i) => (
               <div key={p.label} className={i === 0 ? "pr-7" : "px-7"}>
-                <dt className="font-heading text-2xl font-semibold tabular-nums tracking-tight text-sidebar-foreground">
+                <dt className="num text-2xl font-semibold tabular-nums tracking-tight text-sidebar-foreground">
                   {p.value}
                 </dt>
                 <dd className="mt-1 text-[0.6875rem] uppercase tracking-[0.1em] text-sidebar-foreground/55">
@@ -107,42 +80,22 @@ export default function LoginPage() {
           style={{ background: "linear-gradient(to bottom, transparent, var(--brass) 18%, var(--brass) 82%, transparent)" }}
         />
         <div className="w-full max-w-sm">
-          {/* Desktop-only dot accent crowning the form — the signature motif */}
-          <div className="dot-cluster mb-6 hidden lg:flex" aria-hidden />
           {/* Mobile brand hero — a compact version of the desktop "front door" so
               the brand holds at 390 instead of dropping a form into white space.
-              Navy panel, monogram, headline, and a single proof line. */}
+              Navy panel, text wordmark, headline, and a single proof line. */}
           <div className="relative mb-8 overflow-hidden rounded-2xl bg-sidebar p-6 text-sidebar-foreground lg:hidden">
             <span aria-hidden className="absolute inset-x-0 top-0 h-px bg-sidebar-primary/40" />
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-0 opacity-[0.06]"
-              style={{
-                backgroundImage: "radial-gradient(oklch(100% 0 0 / 0.7) 0.7px, transparent 0.7px)",
-                backgroundSize: "7px 7px",
-              }}
-            />
-            <div className="relative flex items-center gap-2.5">
-              <span className="relative grid size-9 place-items-center rounded-lg bg-brand text-sm font-semibold text-brand-foreground">
-                HR
-                <span
-                  aria-hidden
-                  className="absolute -right-1 -top-1 size-2 rounded-full bg-brass"
-                  style={{ boxShadow: "0 0 0 2px var(--sidebar)" }}
-                />
+            <div className="relative flex flex-col leading-none">
+              <span className="text-[0.625rem] font-semibold uppercase tracking-[0.22em] text-sidebar-foreground/80">
+                CP&nbsp;Axtra
               </span>
-              <span className="flex flex-col leading-none">
-                <span className="text-sm font-semibold tracking-tight">ATS Console</span>
-                <span className="mt-1 text-[0.5625rem] font-medium uppercase tracking-[0.2em] text-brass">
-                  Recruitment Operations
-                </span>
-              </span>
+              <span className="mt-1 text-sm font-semibold tracking-tight">ATS Console</span>
             </div>
             <h2 className="relative mt-5 font-heading text-2xl font-semibold leading-[1.05] tracking-tight">
               One pipeline, <span className="text-brass">every hire.</span>
             </h2>
             <p className="relative mt-3 flex items-center gap-2 text-xs text-sidebar-foreground/65">
-              <span className="dot-rule shrink-0 opacity-80" aria-hidden />
+              <span className="h-px w-5 shrink-0 bg-sidebar-border" aria-hidden />
               AI-assisted screening across 42 stores nationwide
             </p>
           </div>

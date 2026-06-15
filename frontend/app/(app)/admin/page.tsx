@@ -99,7 +99,7 @@ export default function AdminPage() {
                 </div>
               ) : (
                 <div className="mt-5 flex items-start gap-3 rounded-lg bg-muted px-4 py-3 text-sm text-muted-foreground">
-                  <ShieldCheck className="mt-0.5 size-4 shrink-0 text-emerald-600" />
+                  <ShieldCheck className="mt-0.5 size-4 shrink-0 text-brand" />
                   <p>Restricted to the configured tenant allowlist (recommended).</p>
                 </div>
               )}

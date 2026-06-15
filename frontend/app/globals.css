@@ -7,19 +7,19 @@
 /* ────────────────────────────────────────────────────────────────────────
    HR·ATS — "Ledger" design system, CP Axtra identity
    Bright corporate-warmth for a national-scale Thai retail group.
-   Near-white paper, navy-ink text, deep CP Axtra blue brand (#0B47B8),
-   warm yellow (#FFC02E) for emphasis, plus a multicolour dot motif as the
-   brand signature. Hairline rules, real scale contrast, calm density.
+   Near-white paper, navy-ink text, deep CP Axtra blue brand (#0B47B8) as the
+   single accent. Hairline rules, real scale contrast, calm density.
    ──────────────────────────────────────────────────────────────────────── */
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  /* Geist for latin, Noto Sans Thai for the national roster — the deliberate
-     two-family pairing. font-heading reuses the sans at display weights. */
-  --font-sans: var(--font-geist-sans), var(--font-thai), system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
-  --font-heading: var(--font-geist-sans), var(--font-thai), system-ui, sans-serif;
+  /* Institutional superfamily shared with the career portal: IBM Plex Sans Thai
+     Looped (body/UI) + Anuphan (display headings). Thai+Latin parity; hierarchy
+     comes from scale, not type personality. */
+  --font-sans: var(--font-body), system-ui, sans-serif;
+  --font-mono: ui-monospace, monospace;
+  --font-heading: var(--font-display), var(--font-body), system-ui, sans-serif;
 
   /* Brand + emphasis tokens (the opinionated layer) */
   --color-brand: var(--brand);
@@ -96,9 +96,11 @@
   --primary: oklch(46% 0.18 264);
   --primary-foreground: oklch(99% 0.01 250);
 
-  /* ── Brass → warm yellow accent (#FFC02E) — used sparingly ── */
-  --brass: oklch(83% 0.155 85);
-  --brass-soft: oklch(95% 0.07 90);
+  /* ── Brass retired for the institutional direction: repointed to the single CP
+     Axtra blue accent so existing "brass" keylines/emphasis read on-brand (one
+     accent, navy ink on white — no yellow). ── */
+  --brass: oklch(46% 0.18 264);
+  --brass-soft: oklch(96% 0.028 258);
 
   /* ── Neutrals tuned cool-neutral to sit under blue ── */
   --secondary: oklch(96% 0.006 250);
@@ -121,19 +123,11 @@
   --chart-4: oklch(70% 0.12 200);
   --chart-5: oklch(30% 0.03 264);
 
-  /* CP Axtra multicolour dot motif — the brand signature */
-  --dot-1: oklch(46% 0.18 264);             /* blue */
-  --dot-2: oklch(83% 0.155 85);             /* yellow */
-  --dot-3: oklch(66% 0.19 18);              /* coral */
-  --dot-4: oklch(70% 0.12 200);             /* cyan */
-  --dot-5: oklch(64% 0.16 150);             /* green */
-  --dot-6: oklch(72% 0.16 55);              /* orange */
-
   --radius: 0.5rem;
 
   --sidebar: oklch(28% 0.07 264);           /* deep navy-blue spine */
   --sidebar-foreground: oklch(88% 0.02 255);
-  --sidebar-primary: oklch(83% 0.155 85);   /* yellow active */
+  --sidebar-primary: oklch(93% 0.008 255);  /* near-white active rail/icon (institutional, was yellow) */
   --sidebar-primary-foreground: oklch(25% 0.05 264);
   --sidebar-accent: oklch(34% 0.07 264);
   --sidebar-accent-foreground: oklch(98% 0.01 250);
@@ -155,8 +149,8 @@
   --brand-soft: oklch(32% 0.08 264);
   --primary: oklch(70% 0.14 258);
   --primary-foreground: oklch(18% 0.04 264);
-  --brass: oklch(85% 0.15 86);
-  --brass-soft: oklch(34% 0.08 86);
+  --brass: oklch(70% 0.14 258);
+  --brass-soft: oklch(32% 0.08 264);
   --secondary: oklch(28% 0.03 264);
   --secondary-foreground: oklch(92% 0.008 250);
   --muted: oklch(28% 0.03 264);
@@ -173,15 +167,9 @@
   --chart-3: oklch(85% 0.15 86);
   --chart-4: oklch(72% 0.12 200);
   --chart-5: oklch(86% 0.02 250);
-  --dot-1: oklch(70% 0.14 258);
-  --dot-2: oklch(85% 0.15 86);
-  --dot-3: oklch(70% 0.18 18);
-  --dot-4: oklch(74% 0.12 200);
-  --dot-5: oklch(70% 0.15 150);
-  --dot-6: oklch(76% 0.15 55);
   --sidebar: oklch(17% 0.03 264);
   --sidebar-foreground: oklch(88% 0.02 255);
-  --sidebar-primary: oklch(85% 0.15 86);
+  --sidebar-primary: oklch(91% 0.008 255);
   --sidebar-primary-foreground: oklch(20% 0.04 264);
   --sidebar-accent: oklch(26% 0.05 264);
   --sidebar-accent-foreground: oklch(96% 0.01 250);
@@ -199,8 +187,24 @@
   html {
     @apply font-sans;
   }
+  /* Institutional headings: Anuphan display, balanced wrap, tight tracking, with
+     enough line-height that Thai never clips. */
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-heading);
+    letter-spacing: -0.015em;
+    line-height: 1.14;
+  }
   /* Tabular figures everywhere numbers matter — a ledger reads in columns */
   .tabular-nums {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+  /* Display numerals (stats, counts) — shared with careers. */
+  .num {
+    font-family: var(--font-display);
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum" 1;
   }
@@ -239,58 +243,10 @@
   background: var(--hairline);
 }
 
-/* Subtle dot field on the app frame — atmosphere, not decoration. A faint
-   brand-blue dither that nods to the CP Axtra dot motif. Pure CSS, no asset. */
-.paper-grain {
-  background-image:
-    radial-gradient(oklch(46% 0.18 264 / 0.03) 0.6px, transparent 0.6px);
-  background-size: 6px 6px;
-}
-
-/* ── CP Axtra dot motif ───────────────────────────────────────────────────
-   The brand signature: a scatter of multicolour dots. Used as decorative
-   atmosphere behind hero metrics and section heads. Pointer-events:none so it
-   never intercepts input; aria-hidden expected on the host element. */
-.dot-cluster {
-  --d: 7px;          /* dot diameter */
-  width: calc(var(--d) * 9);
-  height: calc(var(--d) * 5);
-  background-repeat: no-repeat;
-  background-image:
-    radial-gradient(circle, var(--dot-1) 50%, transparent 52%),
-    radial-gradient(circle, var(--dot-2) 50%, transparent 52%),
-    radial-gradient(circle, var(--dot-3) 50%, transparent 52%),
-    radial-gradient(circle, var(--dot-4) 50%, transparent 52%),
-    radial-gradient(circle, var(--dot-5) 50%, transparent 52%),
-    radial-gradient(circle, var(--dot-6) 50%, transparent 52%),
-    radial-gradient(circle, var(--dot-1) 50%, transparent 52%),
-    radial-gradient(circle, var(--dot-2) 50%, transparent 52%);
-  background-size: var(--d) var(--d);
-  background-position:
-    0 0, calc(var(--d) * 2) calc(var(--d) * 2),
-    calc(var(--d) * 4) 0, calc(var(--d) * 6) calc(var(--d) * 3),
-    calc(var(--d) * 8) calc(var(--d) * 1), calc(var(--d) * 1) calc(var(--d) * 4),
-    calc(var(--d) * 5) calc(var(--d) * 4), calc(var(--d) * 7) 0;
-}
-
-/* A horizontal multicolour dot rule — sits under a hero eyebrow as a playful
-   CP Axtra accent in place of (or beside) the brass keyline. */
-.dot-rule {
-  height: 8px;
-  width: 4.5rem;
-  background-repeat: repeat-x;
-  background-image:
-    radial-gradient(circle at 4px 4px, var(--dot-1) 3px, transparent 3.5px),
-    radial-gradient(circle at 16px 4px, var(--dot-2) 3px, transparent 3.5px),
-    radial-gradient(circle at 28px 4px, var(--dot-3) 3px, transparent 3.5px),
-    radial-gradient(circle at 40px 4px, var(--dot-5) 3px, transparent 3.5px);
-  background-size: 48px 8px;
-}
-
 /* ── Ledger table system ──────────────────────────────────────────────────
    One designed treatment shared by Inbox, Candidates, and Search so tables
    read as part of the system, not bare grids. A tinted, hairline-ruled header
-   and a row hover/active state: subtle ivory tint + an emerald left-rail that
+   and a row hover/active state: subtle ivory tint + a CP Axtra blue left-rail that
    slides in. The rail is a compositor-friendly transform (scaleY), no layout. */
 
 .ledger-head {
