@@ -38,7 +38,7 @@ func testApp(t *testing.T) (*fiber.App, *Service, uuid.UUID) {
 	t.Helper()
 	repo := newMemRepo()
 	appID := uuid.New()
-	app := &applications.Application{ID: appID, CandidateID: uuid.New(), PositionID: uuid.New(), AISummary: "สรุป"}
+	app := &applications.Application{ID: appID, CandidateID: uuid.New(), PositionID: uuid.New(), Status: applications.StatusScored, AISummary: "สรุป"}
 	pos := &positions.Position{TitleTH: "พนักงานขาย", Responsibilities: "ดูแลร้าน", Qualifications: "สื่อสารดี"}
 	cand := &candidates.Candidate{FullName: "สมหญิง"}
 	svc := NewService(repo, mockInterviewer{}, stubApps{app}, stubPositions{pos}, stubCands{cand}, &recordingNotifier{}, "http://portal", 3)

@@ -48,6 +48,9 @@ export interface Application {
   ai_summary?: string;
   ai_red_flags?: string;
   ai_suggested_positions?: string[] | null;
+  // Internal rejection reason (single-record detail responses). Never shown to the
+  // candidate; surfaced to HR on a rejected application.
+  rejection_reason?: string;
   // Human-readable joins from the inbox list endpoint (omitted on single-record
   // responses). The inbox leads with these so a row reads as a person, not a UUID.
   candidate_name?: string;
@@ -55,6 +58,18 @@ export interface Application {
   source_channel?: string;
   position_title?: string;
   store_name?: string;
+}
+
+// InterviewAppointment is a scheduled human interview (mirrors applications.Appointment).
+export interface InterviewAppointment {
+  id: string;
+  application_id: string;
+  scheduled_at: string;
+  duration_min: number;
+  mode: "onsite" | "online";
+  location_text?: string;
+  online_join_url?: string;
+  created_at: string;
 }
 
 export interface Candidate {

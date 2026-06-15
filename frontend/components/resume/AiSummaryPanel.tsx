@@ -1,36 +1,65 @@
 "use client";
 
+import { useState } from "react";
 import { toast } from "sonner";
 
 import type { Application } from "@/lib/types";
+import { allowedActions, type Action } from "@/lib/statusMachine";
 import { useInviteInterview, useSetStatus } from "@/lib/queries";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScoreBreakdown } from "@/components/resume/ScoreBreakdown";
-
-const NEXT_ACTIONS: { label: string; value: string; variant?: "secondary" | "destructive" }[] = [
-  { label: "Shortlist", value: "shortlisted", variant: "secondary" },
-  { label: "Interview", value: "interview", variant: "secondary" },
-  { label: "Hire", value: "hired" },
-  { label: "Reject", value: "rejected", variant: "destructive" },
-];
+import { ScheduleInterviewDialog } from "@/components/resume/ScheduleInterviewDialog";
+import { RejectDialog } from "@/components/resume/RejectDialog";
 
 export function AiSummaryPanel({ app }: { app: Application }) {
   const setStatus = useSetStatus(app.id);
   const inviteInterview = useInviteInterview(app.id);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
 
-  const act = (value: string, label: string) =>
-    setStatus.mutate(value, {
-      onSuccess: () =>
-        toast.success(value === "hired" ? "Hired — pushed to PeopleSoft" : `Status: ${label}`),
-      onError: (e) => toast.error(e instanceof Error ? e.message : "Update failed"),
-    });
+  // Only the actions the state machine permits from the current status are shown.
+  const actions = allowedActions(app.status);
+
+  const move = (status: string, msg: string) =>
+    setStatus.mutate(
+      { status },
+      {
+        onSuccess: () => toast.success(msg),
+        onError: (e) => toast.error(e instanceof Error ? e.message : "Update failed"),
+      },
+    );
 
   const sendInterview = () =>
     inviteInterview.mutate(undefined, {
       onSuccess: () => toast.success("AI interview invite sent"),
       onError: (e) => toast.error(e instanceof Error ? e.message : "Could not send interview"),
     });
+
+  // One renderer per action keeps the button set declarative + ordered.
+  function renderAction(a: Action) {
+    const busy = setStatus.isPending || inviteInterview.isPending;
+    switch (a) {
+      case "send_ai_interview":
+        return (
+          <Button key={a} size="sm" variant="default" disabled={busy} onClick={sendInterview} className="col-span-2 w-full">
+            {inviteInterview.isPending ? "Sending…" : <><span aria-hidden="true">▶</span> Send AI interview</>}
+          </Button>
+        );
+      case "shortlist":
+        return <Button key={a} size="sm" variant="secondary" disabled={busy} onClick={() => move("shortlisted", "Shortlisted")} className="w-full">Shortlist</Button>;
+      case "interview":
+        return <Button key={a} size="sm" variant="secondary" disabled={busy} onClick={() => setScheduleOpen(true)} className="w-full">Interview…</Button>;
+      case "mark_interviewed":
+        return <Button key={a} size="sm" variant="secondary" disabled={busy} onClick={() => move("interviewed", "Marked as interviewed")} className="w-full">Mark interview done</Button>;
+      case "hire":
+        return <Button key={a} size="sm" variant="default" disabled={busy} onClick={() => move("offer", "Hired — entered offer process")} className="w-full">Hire</Button>;
+      case "reject":
+        return <Button key={a} size="sm" variant="destructive" disabled={busy} onClick={() => setRejectOpen(true)} className="w-full">Reject…</Button>;
+      default:
+        return null;
+    }
+  }
 
   const score = app.ai_score;
   const tone =
@@ -92,42 +121,32 @@ export function AiSummaryPanel({ app }: { app: Application }) {
         />
       )}
 
+      {app.status === "rejected" && app.rejection_reason && (
+        <div className="rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <p className="font-medium">Not selected</p>
+          <p className="mt-0.5 text-destructive/90">{app.rejection_reason}</p>
+        </div>
+      )}
+
       <div className="h-px bg-hairline" />
 
       <div>
         <p className="mb-2.5 text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-          Move to
+          Next step
         </p>
-        <div className="grid grid-cols-2 gap-2">
-          {NEXT_ACTIONS.map((a) => (
-            <Button
-              key={a.value}
-              size="sm"
-              variant={a.variant ?? "default"}
-              disabled={setStatus.isPending}
-              onClick={() => act(a.value, a.label)}
-              className="w-full"
-            >
-              {a.label}
-            </Button>
-          ))}
-        </div>
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={inviteInterview.isPending}
-          onClick={sendInterview}
-          className="mt-2 w-full"
-        >
-          {inviteInterview.isPending ? (
-            "Sending…"
-          ) : (
-            <>
-              <span aria-hidden="true">▶</span> Send AI interview
-            </>
-          )}
-        </Button>
+        {actions.length > 0 ? (
+          <div className="grid grid-cols-2 gap-2">{actions.map(renderAction)}</div>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            {app.status === "ai_interview"
+              ? "AI interview in progress — awaiting the candidate."
+              : "No actions available at this stage."}
+          </p>
+        )}
       </div>
+
+      <ScheduleInterviewDialog applicationId={app.id} open={scheduleOpen} onClose={() => setScheduleOpen(false)} />
+      <RejectDialog applicationId={app.id} open={rejectOpen} onClose={() => setRejectOpen(false)} />
 
       <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2.5 border-t border-hairline pt-5 text-xs">
         <dt className="text-muted-foreground">OCR confidence</dt>

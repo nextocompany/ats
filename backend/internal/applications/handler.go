@@ -3,6 +3,7 @@ package applications
 import (
 	"context"
 	"io"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -140,19 +141,17 @@ func (h *Handler) JobStatus(c *fiber.Ctx) error {
 	})
 }
 
-// allowedStatuses bounds manual status transitions (HR Dashboard uses this in S4).
-var allowedStatuses = map[string]bool{
-	StatusScored: true, StatusRejected: true, StatusHired: true,
-	"shortlisted": true, "interview": true,
-}
-
 type updateStatusReq struct {
 	Status string `json:"status"`
+	Reason string `json:"reason"` // required when status=rejected
 }
 
-// UpdateStatus handles PATCH /api/v1/applications/:id/status. Setting "hired"
-// records hired_at and pushes the candidate to PeopleSoft (the push never fails
-// the hire — see peoplesoft.Service).
+// UpdateStatus handles PATCH /api/v1/applications/:id/status. It enforces the
+// candidate state machine (transitions.go): the move is only allowed if
+// CanTransition(current, target). "interview" is reachable only via the schedule
+// endpoint (it needs a date/time + mode); "rejected" requires a reason (stored,
+// never sent to the candidate); "offer" is the hire action (entering the Offer
+// Package process — PeopleSoft sync is deferred to a future offer-accepted step).
 func (h *Handler) UpdateStatus(c *fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
@@ -162,9 +161,6 @@ func (h *Handler) UpdateStatus(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "invalid payload")
 	}
-	if !allowedStatuses[req.Status] {
-		return fiber.NewError(fiber.StatusBadRequest, "unsupported status transition")
-	}
 	// Per-record authorization: a store/subregion-scoped user may only act on
 	// applications within their visibility (consistent with the list scoping).
 	if ok, serr := h.apps.ExistsInScope(c.UserContext(), id, scopeFrom(c)); serr != nil {
@@ -172,23 +168,34 @@ func (h *Handler) UpdateStatus(c *fiber.Ctx) error {
 	} else if !ok {
 		return fiber.NewError(fiber.StatusNotFound, "application not found")
 	}
+	// "interview" carries a schedule — force the dedicated endpoint.
+	if RequiresSchedule(req.Status) {
+		return fiber.NewError(fiber.StatusBadRequest, "use the interview-schedule endpoint to set an interview")
+	}
+	app, err := h.apps.FindByID(c.UserContext(), id)
+	if err != nil {
+		return err
+	}
+	if !CanTransition(app.Status, req.Status) {
+		return fiber.NewError(fiber.StatusBadRequest, "transition not allowed from "+app.Status)
+	}
 
-	if req.Status == StatusHired {
-		if err := h.apps.SetHired(c.UserContext(), id); err != nil {
+	// Reject: mandatory reason, stored internally; the candidate is NOT notified.
+	if req.Status == StatusRejected {
+		if strings.TrimSpace(req.Reason) == "" {
+			return fiber.NewError(fiber.StatusBadRequest, "a rejection reason is required")
+		}
+		if err := h.apps.SetRejection(c.UserContext(), id, strings.TrimSpace(req.Reason)); err != nil {
 			return err
 		}
-		if h.hired != nil {
-			if err := h.hired.SyncHired(c.UserContext(), id); err != nil {
-				return err
-			}
-		}
-		h.notifyDeps.notifyStatusChange(c.UserContext(), h.apps, id, StatusHired)
-		return httpx.OK(c, fiber.Map{"id": id, "status": StatusHired})
+		return httpx.OK(c, fiber.Map{"id": id, "status": StatusRejected})
 	}
 
 	if err := h.apps.SetStatus(c.UserContext(), id, req.Status); err != nil {
 		return err
 	}
+	// Best-effort candidate notification (only shortlisted produces a message today;
+	// offer/interviewed have none defined — the seam is a no-op for those).
 	h.notifyDeps.notifyStatusChange(c.UserContext(), h.apps, id, req.Status)
 	return httpx.OK(c, fiber.Map{"id": id, "status": req.Status})
 }

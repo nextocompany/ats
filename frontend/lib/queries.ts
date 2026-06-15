@@ -12,6 +12,7 @@ import type {
   FitAnalysis,
   Funnel,
   HRUser,
+  InterviewAppointment,
   InterviewInviteResult,
   InterviewView,
   KPI,
@@ -185,10 +186,27 @@ export function useTriggerExport() {
   });
 }
 
+// useSetStatus changes the application status. `reason` is required by the backend
+// when status="rejected" (stored internally, never sent to the candidate).
 export function useSetStatus(id: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (status: string) => api.patch(`/api/v1/applications/${id}/status`, { status }),
+    mutationFn: (vars: { status: string; reason?: string }) =>
+      api.patch(`/api/v1/applications/${id}/status`, vars),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["application", id] });
+      qc.invalidateQueries({ queryKey: ["applications"] });
+    },
+  });
+}
+
+// useScheduleInterview books a human interview (status → interview). For an online
+// interview the backend creates a Teams meeting + emails the candidate an invite.
+export function useScheduleInterview(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { scheduled_at: string; duration_min: number; mode: "onsite" | "online"; location_text?: string }) =>
+      api.post<InterviewAppointment>(`/api/v1/applications/${id}/interview-schedule`, vars).then((r) => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["application", id] });
       qc.invalidateQueries({ queryKey: ["applications"] });
@@ -303,7 +321,7 @@ export function useMemberStats(enabled = true) {
 export function useBulk() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (vars: { ids: string[]; action: string; value: string }) =>
+    mutationFn: (vars: { ids: string[]; action: string; value: string; reason?: string }) =>
       api.post("/api/v1/applications/bulk", vars),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["applications"] }),
   });

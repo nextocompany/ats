@@ -28,7 +28,15 @@ const maxAnswerLen = 4000
 // from applications/positions/candidates satisfy these.
 type appReader interface {
 	FindByID(ctx context.Context, id uuid.UUID) (*applications.Application, error)
+	// SetStatus advances the application status as the AI interview progresses
+	// (scored → ai_interview on invite, ai_interview → ai_interviewed on completion).
+	SetStatus(ctx context.Context, id uuid.UUID, status string) error
 }
+
+// ErrNotScreened is returned when an AI interview is requested for an application
+// that is not in the "screened" (scored) state — the funnel requires screening first.
+var ErrNotScreened = errors.New("interview: AI interview is only available after screening")
+
 type positionReader interface {
 	FindByID(ctx context.Context, id uuid.UUID) (*positions.Position, error)
 }
@@ -77,6 +85,15 @@ func (s *Service) Invite(ctx context.Context, applicationID uuid.UUID) (*Session
 	if existing != nil {
 		return existing, nil
 	}
+	// State-machine guard: the AI interview is the only action allowed from the
+	// screened (scored) state. Block invites from any other status.
+	app, err := s.apps.FindByID(ctx, applicationID)
+	if err != nil {
+		return nil, err
+	}
+	if app.Status != applications.StatusScored {
+		return nil, ErrNotScreened
+	}
 	token, err := newAccessToken()
 	if err != nil {
 		return nil, err
@@ -89,6 +106,10 @@ func (s *Service) Invite(ctx context.Context, applicationID uuid.UUID) (*Session
 	}
 	if err != nil {
 		return nil, err
+	}
+	// Advance the funnel: screened → ai_interview (best-effort; the session exists).
+	if serr := s.apps.SetStatus(ctx, applicationID, applications.StatusAIInterview); serr != nil {
+		log.Warn().Err(serr).Str("application", applicationID.String()).Msg("interview invite: set ai_interview status failed (non-fatal)")
 	}
 	s.notifyInvite(ctx, applicationID, token)
 	return session, nil
@@ -203,7 +224,29 @@ func (s *Service) Respond(ctx context.Context, token, answer string) (*Session, 
 	}
 	applyEvaluation(session, ev)
 	session.Status = StatusCompleted
+	// Advance the funnel: ai_interview → ai_interviewed, opening up Shortlist /
+	// Interview / Reject for HR. Best-effort and idempotent: only advance if the
+	// application is still in ai_interview (don't clobber a later manual state).
+	s.advanceToInterviewed(ctx, session.ApplicationID)
 	return session, nil
+}
+
+// advanceToInterviewed moves the application to ai_interviewed on AI-interview
+// completion, but only from ai_interview (so a re-completed session or an
+// already-moved application is never clobbered). Best-effort — a failure here
+// must not fail the candidate's final answer.
+func (s *Service) advanceToInterviewed(ctx context.Context, applicationID uuid.UUID) {
+	app, err := s.apps.FindByID(ctx, applicationID)
+	if err != nil {
+		log.Warn().Err(err).Str("application", applicationID.String()).Msg("interview complete: load application failed (non-fatal)")
+		return
+	}
+	if app.Status != applications.StatusAIInterview {
+		return
+	}
+	if serr := s.apps.SetStatus(ctx, applicationID, applications.StatusAIInterviewed); serr != nil {
+		log.Warn().Err(serr).Str("application", applicationID.String()).Msg("interview complete: set ai_interviewed status failed (non-fatal)")
+	}
 }
 
 // expire flips an out-of-date session to the expired status, best-effort, so the

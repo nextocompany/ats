@@ -3,6 +3,7 @@ package applications
 import (
 	"context"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -127,10 +128,15 @@ func (h *DashboardHandler) List(c *fiber.Ctx) error {
 type bulkReq struct {
 	IDs    []string `json:"ids"`
 	Action string   `json:"action"` // status | reject
-	Value  string   `json:"value"`  // target status when action=status
+	Value  string   `json:"value"`  // target status when action=status (only "shortlisted")
+	Reason string   `json:"reason"` // required when action=reject
 }
 
-// Bulk handles POST /api/v1/applications/bulk.
+// Bulk handles POST /api/v1/applications/bulk. Bulk only supports the two
+// transitions that need no per-candidate payload: shortlist and reject (with a
+// shared reason). Interview (needs a schedule) and hire/offer are single-record
+// actions. Each id is gated individually by the state machine — ids not in a
+// valid source state are counted as failed rather than forced.
 func (h *DashboardHandler) Bulk(c *fiber.Ctx) error {
 	var req bulkReq
 	if err := c.BodyParser(&req); err != nil {
@@ -143,14 +149,19 @@ func (h *DashboardHandler) Bulk(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, "too many ids (max 100)")
 	}
 
-	target := req.Value
+	var target, reason string
 	switch req.Action {
 	case "reject":
 		target = StatusRejected
-	case "status":
-		if !allowedStatuses[target] {
-			return fiber.NewError(fiber.StatusBadRequest, "unsupported target status")
+		reason = strings.TrimSpace(req.Reason)
+		if reason == "" {
+			return fiber.NewError(fiber.StatusBadRequest, "a rejection reason is required")
 		}
+	case "status":
+		if req.Value != StatusShortlisted {
+			return fiber.NewError(fiber.StatusBadRequest, "bulk status only supports shortlisting")
+		}
+		target = StatusShortlisted
 	default:
 		return fiber.NewError(fiber.StatusBadRequest, "unsupported action")
 	}
@@ -162,16 +173,25 @@ func (h *DashboardHandler) Bulk(c *fiber.Ctx) error {
 			failed++
 			continue
 		}
-		if err := h.apps.SetStatus(c.UserContext(), id, target); err != nil {
+		// Per-id state-machine gate: skip ids not in a valid source state.
+		app, ferr := h.apps.FindByID(c.UserContext(), id)
+		if ferr != nil || !CanTransition(app.Status, target) {
+			failed++
+			continue
+		}
+		if target == StatusRejected {
+			if err := h.apps.SetRejection(c.UserContext(), id, reason); err != nil {
+				failed++
+				continue
+			}
+		} else if err := h.apps.SetStatus(c.UserContext(), id, target); err != nil {
 			failed++
 			continue
 		}
 		_ = h.activity.Record(c.UserContext(), activity.ActionBulkAction, "application", id, fiber.Map{"status": target})
 		// Keep the search index fresh — best-effort, never fails the bulk action.
-		if app, ferr := h.apps.FindByID(c.UserContext(), id); ferr == nil {
-			_ = h.indexer.Index(c.UserContext(), app.CandidateID)
-		}
-		// Notify the candidate — best-effort, never fails the bulk action.
+		_ = h.indexer.Index(c.UserContext(), app.CandidateID)
+		// Notify the candidate — best-effort (rejections are never notified).
 		h.notifyDeps.notifyStatusChange(c.UserContext(), h.apps, id, target)
 		updated++
 	}

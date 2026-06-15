@@ -21,6 +21,7 @@ import (
 	"github.com/nexto/hr-ats/internal/activity"
 	"github.com/nexto/hr-ats/internal/applications"
 	"github.com/nexto/hr-ats/internal/auth"
+	"github.com/nexto/hr-ats/internal/calendar"
 	"github.com/nexto/hr-ats/internal/candidateauth"
 	"github.com/nexto/hr-ats/internal/candidates"
 	"github.com/nexto/hr-ats/internal/fit"
@@ -284,6 +285,12 @@ func main() {
 	dashboardHandler.SetIndexer(search.NewCandidateSync(pool, searchIndexer))
 	dashboardHandler.SetNotifier(notifier, candidateRepo, cfg.PortalBaseURL)
 	applications.RegisterDashboardRoutes(app, dashboardHandler)
+	// Human interview scheduling (state-machine feature): sets status=interview and,
+	// for an online interview, creates a Teams meeting + calendar invite via Graph
+	// (mock log-only by default; real behind GRAPH_PROVIDER=real).
+	scheduleHandler := applications.NewScheduleHandler(appRepo, calendar.NewProvider(cfg), candidateRepo, positionRepo)
+	scheduleHandler.SetNotifier(notifier, candidateRepo, cfg.PortalBaseURL)
+	applications.RegisterScheduleRoutes(app, scheduleHandler)
 	interview.RegisterDashboardRoutes(app, interviewHandler)
 	// AI cross-position fit analysis: HR-triggered verdict combining the CV-screening
 	// result + the AI pre-interview, matched against the whole Master JD catalogue.

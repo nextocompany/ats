@@ -3,9 +3,11 @@ package applications
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/nexto/hr-ats/internal/rbac"
@@ -20,7 +22,13 @@ type Repository interface {
 	SetRawFile(ctx context.Context, id uuid.UUID, blobURL string) error
 	SetQueueTaskID(ctx context.Context, id uuid.UUID, taskID string) error
 	SetStatus(ctx context.Context, id uuid.UUID, status string) error
+	// SetRejection sets status=rejected with an internal reason (never sent to the
+	// candidate). The reason is mandatory at the handler layer.
+	SetRejection(ctx context.Context, id uuid.UUID, reason string) error
 	SetParseResults(ctx context.Context, id uuid.UUID, r ParseResult) error
+	// Interview appointments (human interview scheduling, state-machine feature).
+	CreateAppointment(ctx context.Context, a Appointment) (Appointment, error)
+	FindAppointment(ctx context.Context, applicationID uuid.UUID) (*Appointment, error)
 	// Sprint 2:
 	SetCanonicalCandidate(ctx context.Context, id, candidateID uuid.UUID) error
 	SetDedupState(ctx context.Context, id uuid.UUID, state string, confidence float64) error
@@ -70,7 +78,7 @@ func (r *pgRepository) FindByID(ctx context.Context, id uuid.UUID) (*Application
 		       ai_score, must_have_passed, assigned_store_id,
 		       COALESCE(talent_pool,false), COALESCE(dedup_state,''), created_at,
 		       ai_score_breakdown, COALESCE(ai_summary,''), COALESCE(ai_red_flags,''),
-		       ai_suggested_positions
+		       ai_suggested_positions, COALESCE(rejection_reason,'')
 		FROM applications WHERE id = $1`
 	var a Application
 	var breakdownRaw, suggestedRaw []byte
@@ -79,7 +87,7 @@ func (r *pgRepository) FindByID(ctx context.Context, id uuid.UUID) (*Application
 		&a.RawFileBlobURL, &a.RawFileType, &a.OCRTextBlobURL, &a.ParsedProfileBlobURL,
 		&a.OCRConfidence, &a.NeedsManualReview, &a.QueueTaskID, &a.ParsedAt,
 		&a.AIScore, &a.MustHavePassed, &a.AssignedStoreID, &a.TalentPool, &a.DedupState, &a.CreatedAt,
-		&breakdownRaw, &a.AISummary, &a.AIRedFlags, &suggestedRaw,
+		&breakdownRaw, &a.AISummary, &a.AIRedFlags, &suggestedRaw, &a.RejectionReason,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("applications: find by id: %w", err)
@@ -120,6 +128,53 @@ func (r *pgRepository) SetStatus(ctx context.Context, id uuid.UUID, status strin
 		return fmt.Errorf("applications: set status: %w", err)
 	}
 	return nil
+}
+
+func (r *pgRepository) SetRejection(ctx context.Context, id uuid.UUID, reason string) error {
+	const q = `UPDATE applications SET status = $2, rejection_reason = $3, updated_at = NOW() WHERE id = $1`
+	if _, err := r.pool.Exec(ctx, q, id, StatusRejected, reason); err != nil {
+		return fmt.Errorf("applications: set rejection: %w", err)
+	}
+	return nil
+}
+
+func (r *pgRepository) CreateAppointment(ctx context.Context, a Appointment) (Appointment, error) {
+	const q = `
+		INSERT INTO interview_appointments
+			(application_id, scheduled_at, duration_min, mode, location_text, online_join_url, calendar_event_id, created_by)
+		VALUES ($1, $2, $3, $4, NULLIF($5,''), NULLIF($6,''), NULLIF($7,''), $8)
+		RETURNING id, created_at`
+	err := r.pool.QueryRow(ctx, q,
+		a.ApplicationID, a.ScheduledAt, a.DurationMin, a.Mode,
+		a.LocationText, a.OnlineJoinURL, a.CalendarEventID, a.CreatedBy,
+	).Scan(&a.ID, &a.CreatedAt)
+	if err != nil {
+		return Appointment{}, fmt.Errorf("applications: create appointment: %w", err)
+	}
+	return a, nil
+}
+
+func (r *pgRepository) FindAppointment(ctx context.Context, applicationID uuid.UUID) (*Appointment, error) {
+	const q = `
+		SELECT id, application_id, scheduled_at, duration_min, mode,
+		       COALESCE(location_text,''), COALESCE(online_join_url,''),
+		       COALESCE(calendar_event_id,''), created_at
+		FROM interview_appointments
+		WHERE application_id = $1
+		ORDER BY created_at DESC
+		LIMIT 1`
+	var a Appointment
+	err := r.pool.QueryRow(ctx, q, applicationID).Scan(
+		&a.ID, &a.ApplicationID, &a.ScheduledAt, &a.DurationMin, &a.Mode,
+		&a.LocationText, &a.OnlineJoinURL, &a.CalendarEventID, &a.CreatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil // no appointment yet — not an error
+	}
+	if err != nil {
+		return nil, fmt.Errorf("applications: find appointment: %w", err)
+	}
+	return &a, nil
 }
 
 func (r *pgRepository) SetParseResults(ctx context.Context, id uuid.UUID, res ParseResult) error {
