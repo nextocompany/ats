@@ -25,12 +25,13 @@ type ConsentRecorder interface {
 	Record(ctx context.Context, c pdpa.Consent, ip string) error
 }
 
-// AccountResolver resolves a member account from a session token and reads its
-// saved resume — satisfied by candidateauth.Service. Optional (nil ⇒ legacy
-// LINE-only apply).
+// AccountResolver resolves a member account from a session token, reads its saved
+// resume, and persists PDPA consent — satisfied by candidateauth.Service. Optional
+// (nil ⇒ legacy LINE-only apply).
 type AccountResolver interface {
 	AccountFromSession(ctx context.Context, token string) (*candidateauth.Account, error)
 	SavedResumeBytes(ctx context.Context, acct *candidateauth.Account) ([]byte, error)
+	SaveConsent(ctx context.Context, accountID uuid.UUID, version string) error
 }
 
 const maxResumeBytes = 10 * 1024 * 1024
@@ -161,11 +162,22 @@ func (h *Handler) Apply(c *fiber.Ctx) error {
 		consentVersion = "1.0"
 	}
 	if acct != nil {
-		if !acct.PDPAConsent {
-			return fiber.NewError(fiber.StatusBadRequest, "PDPA consent required — complete your profile first")
-		}
-		if acct.PDPAVersion != "" {
-			consentVersion = acct.PDPAVersion
+		switch {
+		case acct.PDPAConsent:
+			// Consented at signup — reuse the recorded version.
+			if acct.PDPAVersion != "" {
+				consentVersion = acct.PDPAVersion
+			}
+		case c.FormValue("consent_given") == "true":
+			// Member consenting now (e.g. signed up via OAuth, which skips the signup
+			// consent step). Persist it so later applies don't re-prompt. A failure
+			// to persist must not lose the application — the legal record is still
+			// written by finalizeApplication below.
+			if err := h.accounts.SaveConsent(c.UserContext(), acct.ID, consentVersion); err != nil {
+				log.Warn().Err(err).Str("account_id", acct.ID.String()).Msg("failed to persist member PDPA consent")
+			}
+		default:
+			return fiber.NewError(fiber.StatusBadRequest, "PDPA consent is required")
 		}
 	} else if c.FormValue("consent_given") != "true" {
 		return fiber.NewError(fiber.StatusBadRequest, "PDPA consent is required")
@@ -215,11 +227,9 @@ func (h *Handler) QuickApply(c *fiber.Ctx) error {
 	if !acct.HasResume() {
 		return fiber.NewError(fiber.StatusBadRequest, "no saved resume — upload one first")
 	}
-	if !acct.PDPAConsent {
-		return fiber.NewError(fiber.StatusBadRequest, "PDPA consent required — complete your profile first")
-	}
 	var body struct {
-		PositionID string `json:"position_id"`
+		PositionID   string `json:"position_id"`
+		ConsentGiven bool   `json:"consent_given"`
 	}
 	if err := c.BodyParser(&body); err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "invalid request body")
@@ -227,6 +237,20 @@ func (h *Handler) QuickApply(c *fiber.Ctx) error {
 	positionID, err := uuid.Parse(body.PositionID)
 	if err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "valid position_id is required")
+	}
+	consentVersion := acct.PDPAVersion
+	if consentVersion == "" {
+		consentVersion = "1.0"
+	}
+	if !acct.PDPAConsent {
+		// Not consented at signup — require an explicit consent on this apply, then
+		// persist it (so the member isn't re-prompted next time).
+		if !body.ConsentGiven {
+			return fiber.NewError(fiber.StatusBadRequest, "PDPA consent is required")
+		}
+		if err := h.accounts.SaveConsent(c.UserContext(), acct.ID, consentVersion); err != nil {
+			log.Warn().Err(err).Str("account_id", acct.ID.String()).Msg("failed to persist member PDPA consent")
+		}
 	}
 	meta, ok := fileTypeToContent[acct.ResumeFileType]
 	if !ok {
@@ -253,10 +277,6 @@ func (h *Handler) QuickApply(c *fiber.Ctx) error {
 	})
 	if err != nil {
 		return err
-	}
-	consentVersion := acct.PDPAVersion
-	if consentVersion == "" {
-		consentVersion = "1.0"
 	}
 	return h.finalizeApplication(c, result, consentVersion)
 }

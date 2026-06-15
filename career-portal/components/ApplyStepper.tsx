@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { Button, buttonVariants } from "@/components/ui/button";
+import { ConsentStep } from "@/components/ConsentStep";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useApplyMutation, useQuickApply } from "@/lib/queries";
@@ -46,6 +47,13 @@ export function ApplyStepper({ positionId, positionTitle, account }: ApplySteppe
   const [statusToken, setStatusToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
+  // A member who signed up via OAuth (or before consent was captured) may not yet
+  // have given PDPA consent. In that case we must collect it here before applying
+  // — otherwise the backend rejects the application with no way to consent.
+  const needsConsent = !account.pdpa_consent;
+  const [consent, setConsent] = useState(account.pdpa_consent);
+  const consentOk = !needsConsent || consent;
+
   const quick = useQuickApply();
   const apply = useApplyMutation();
   const pending = quick.isPending || apply.isPending;
@@ -64,11 +72,15 @@ export function ApplyStepper({ positionId, positionTitle, account }: ApplySteppe
   }
 
   function submitQuick() {
-    quick.mutate(positionId, { onSuccess: (d) => setStatusToken(d.status_token) });
+    if (!consentOk) return;
+    quick.mutate(
+      { positionId, consentGiven: consent },
+      { onSuccess: (d) => setStatusToken(d.status_token) },
+    );
   }
 
   function submitForm() {
-    if (fullName.trim().length === 0 || !file || fileError) return;
+    if (fullName.trim().length === 0 || !file || fileError || !consentOk) return;
     apply.mutate(
       {
         positionId,
@@ -152,6 +164,8 @@ export function ApplyStepper({ positionId, positionTitle, account }: ApplySteppe
             </div>
           </dl>
 
+          {needsConsent ? <ConsentStep checked={consent} onChange={setConsent} /> : null}
+
           {errorMessage ? (
             <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
               ส่งใบสมัครไม่สำเร็จ: {errorMessage}
@@ -159,7 +173,7 @@ export function ApplyStepper({ positionId, positionTitle, account }: ApplySteppe
           ) : null}
 
           {account.has_resume ? (
-            <Button type="button" size="tap" onClick={submitQuick} disabled={pending} className="w-full">
+            <Button type="button" size="tap" onClick={submitQuick} disabled={pending || !consentOk} className="w-full">
               {quick.isPending ? "กำลังส่ง…" : "สมัครด้วยเรซูเม่ที่บันทึกไว้"}
             </Button>
           ) : null}
@@ -206,6 +220,8 @@ export function ApplyStepper({ positionId, positionTitle, account }: ApplySteppe
             </div>
           </div>
 
+          {needsConsent ? <ConsentStep checked={consent} onChange={setConsent} /> : null}
+
           {errorMessage ? (
             <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
               ส่งใบสมัครไม่สำเร็จ: {errorMessage}
@@ -220,7 +236,7 @@ export function ApplyStepper({ positionId, positionTitle, account }: ApplySteppe
               type="button"
               size="tap"
               onClick={submitForm}
-              disabled={fullName.trim().length === 0 || !file || !!fileError || pending}
+              disabled={fullName.trim().length === 0 || !file || !!fileError || pending || !consentOk}
               className="flex-1"
             >
               {apply.isPending ? "กำลังส่ง…" : "ส่งใบสมัคร"}

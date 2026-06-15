@@ -55,10 +55,17 @@ export function useApplyMutation() {
 }
 
 // useQuickApply applies to a position using the member's saved profile + resume.
+// consentGiven is sent for members who haven't already consented (the backend
+// records + persists it on this apply); harmless when they consented at signup.
 export function useQuickApply() {
-  return useMutation<QuickApplyResult, Error, string>({
-    mutationFn: (positionId) =>
-      api.post<QuickApplyResult>("/api/v1/public/apply/quick", { position_id: positionId }).then((r) => r.data),
+  return useMutation<QuickApplyResult, Error, { positionId: string; consentGiven?: boolean }>({
+    mutationFn: ({ positionId, consentGiven }) =>
+      api
+        .post<QuickApplyResult>("/api/v1/public/apply/quick", {
+          position_id: positionId,
+          consent_given: consentGiven ?? false,
+        })
+        .then((r) => r.data),
   });
 }
 
