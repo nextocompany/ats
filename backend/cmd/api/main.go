@@ -291,6 +291,9 @@ func main() {
 	scheduleHandler := applications.NewScheduleHandler(appRepo, calendar.NewProvider(cfg), candidateRepo, positionRepo)
 	scheduleHandler.SetNotifier(notifier, candidateRepo, cfg.PortalBaseURL)
 	applications.RegisterScheduleRoutes(app, scheduleHandler)
+	// Structured interview feedback recorded by the hiring panel (sgm/hr_manager/
+	// super_admin) during the interview stage; many entries per application.
+	applications.RegisterFeedbackRoutes(app, applications.NewFeedbackHandler(appRepo))
 	interview.RegisterDashboardRoutes(app, interviewHandler)
 	// AI cross-position fit analysis: HR-triggered verdict combining the CV-screening
 	// result + the AI pre-interview, matched against the whole Master JD catalogue.

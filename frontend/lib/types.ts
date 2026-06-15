@@ -72,6 +72,43 @@ export interface InterviewAppointment {
   created_at: string;
 }
 
+// InterviewCompetencies mirrors applications.InterviewCompetencies — per-dimension
+// 0..5 ratings (0 = not rated).
+export interface InterviewCompetencies {
+  communication: number;
+  technical: number;
+  experience: number;
+  culture_fit: number;
+}
+
+export type InterviewRecommendation = "pass" | "hold" | "fail";
+
+// InterviewFeedback mirrors applications.InterviewFeedback — a structured outcome a
+// hiring panel records during the interview stage (many per application).
+export interface InterviewFeedback {
+  id: string;
+  application_id: string;
+  appointment_id?: string;
+  interviewer_name?: string;
+  overall_rating: number;
+  recommendation: InterviewRecommendation;
+  competencies: InterviewCompetencies;
+  strengths?: string;
+  concerns?: string;
+  notes?: string;
+  created_at: string;
+}
+
+// InterviewFeedbackInput is the create payload (POST .../interview-feedback).
+export interface InterviewFeedbackInput {
+  overall_rating: number;
+  recommendation: InterviewRecommendation;
+  competencies: InterviewCompetencies;
+  strengths?: string;
+  concerns?: string;
+  notes?: string;
+}
+
 export interface Candidate {
   id: string;
   full_name: string;

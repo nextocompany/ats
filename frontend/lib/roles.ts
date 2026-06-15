@@ -13,6 +13,16 @@ export function isSuperAdmin(role?: string): boolean {
   return role === "super_admin";
 }
 
+// INTERVIEW_FEEDBACK_ROLES may record structured interview feedback. Mirrors the
+// backend `feedbackRecordRoles` allowlist in internal/applications/feedback_handler.go
+// (sgm ≈ line manager who runs the interview). The server is the real gate; this
+// only decides whether to render the form.
+export const INTERVIEW_FEEDBACK_ROLES = ["super_admin", "hr_manager", "sgm"];
+
+export function canRecordInterviewFeedback(role?: string): boolean {
+  return !!role && INTERVIEW_FEEDBACK_ROLES.includes(role);
+}
+
 // HR_ROLES are the roles a local password account may hold. Mirrors the backend
 // `allowedRoles` set in internal/hrauth/model.go; the label is what super_admins
 // pick from when provisioning an account.

@@ -7,6 +7,7 @@ import { ArrowLeft } from "lucide-react";
 import { AiSummaryPanel } from "@/components/resume/AiSummaryPanel";
 import { FitAnalysisPanel } from "@/components/resume/FitAnalysisPanel";
 import { InterviewPanel } from "@/components/resume/InterviewPanel";
+import { InterviewFeedbackPanel } from "@/components/resume/InterviewFeedbackPanel";
 import { ResumeViewer } from "@/components/resume/ResumeViewer";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useApplication } from "@/lib/queries";
@@ -46,6 +47,7 @@ export default function ApplicationDetailPage() {
           >
             <AiSummaryPanel app={app} />
             <InterviewPanel applicationId={app.id} />
+            <InterviewFeedbackPanel applicationId={app.id} status={app.status} />
             <FitAnalysisPanel applicationId={app.id} app={app} />
           </aside>
         </div>
