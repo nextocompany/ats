@@ -37,10 +37,10 @@ export default function AccountPage() {
 
   return (
     <PortalShell backHref="/jobs" narrow>
-      <div className="space-y-8">
-        <header className="flex items-center justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-semibold">บัญชีของฉัน</h1>
+      <div className="flex flex-col gap-10">
+        <header className="flex items-start justify-between gap-3 border-b border-line pb-6">
+          <div className="flex flex-col gap-1.5">
+            <h1 className="[font-size:var(--text-h2)] font-semibold leading-tight text-foreground">บัญชีของฉัน</h1>
             <p className="text-sm text-muted-foreground">{candidate.email || candidate.line_display_id || "สมาชิก"}</p>
           </div>
           <Button type="button" size="sm" variant="ghost" onClick={doLogout}>
@@ -48,27 +48,32 @@ export default function AccountPage() {
           </Button>
         </header>
 
-        <section className="space-y-4">
-          <h2 className="text-sm font-semibold text-foreground/70">ข้อมูลส่วนตัว</h2>
-          <ProfileForm account={candidate} submitLabel="บันทึกข้อมูล" onSaved={() => undefined} />
+        <section className="flex flex-col gap-4">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-foreground">ข้อมูลส่วนตัว</h2>
+          <div className="rounded-xl border border-line bg-card p-6">
+            <ProfileForm account={candidate} submitLabel="บันทึกข้อมูล" onSaved={() => undefined} />
+          </div>
         </section>
 
-        {!candidate.line_linked ? (
-          <section className="space-y-3">
-            <h2 className="text-sm font-semibold text-foreground/70">การแจ้งเตือนผ่าน LINE</h2>
-            <p className="text-sm text-muted-foreground">เชื่อมบัญชี LINE เพื่อรับการแจ้งเตือนสถานะใบสมัคร</p>
-            <LinkLineButton />
-          </section>
-        ) : (
-          <section className="space-y-2">
-            <h2 className="text-sm font-semibold text-foreground/70">การแจ้งเตือนผ่าน LINE</h2>
-            <p className="text-sm text-[oklch(50%_0.16_150)]">เชื่อมบัญชี LINE แล้ว</p>
-          </section>
-        )}
+        <section className="flex flex-col gap-4">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-foreground">การแจ้งเตือนผ่าน LINE</h2>
+          {!candidate.line_linked ? (
+            <div className="flex flex-col gap-3 rounded-xl border border-line bg-card p-6">
+              <p className="text-sm text-muted-foreground">เชื่อมบัญชี LINE เพื่อรับการแจ้งเตือนสถานะใบสมัคร</p>
+              <LinkLineButton />
+            </div>
+          ) : (
+            <div className="rounded-xl border border-line bg-card p-6">
+              <p className="text-sm text-[oklch(45%_0.14_150)]">เชื่อมบัญชี LINE แล้ว</p>
+            </div>
+          )}
+        </section>
 
-        <section className="space-y-4">
-          <h2 className="text-sm font-semibold text-foreground/70">เรซูเม่</h2>
-          <ResumeUploadStep account={candidate} submitLabel="อัปเดตเรซูเม่" onUploaded={() => undefined} />
+        <section className="flex flex-col gap-4">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-foreground">เรซูเม่</h2>
+          <div className="rounded-xl border border-line bg-card p-6">
+            <ResumeUploadStep account={candidate} submitLabel="อัปเดตเรซูเม่" onUploaded={() => undefined} />
+          </div>
         </section>
       </div>
     </PortalShell>

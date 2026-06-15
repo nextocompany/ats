@@ -43,19 +43,27 @@ function LoginFlow() {
       : "/login";
 
   return (
-    <div className="space-y-6">
-      <header className="space-y-2 text-center">
-        <h1 className="text-xl font-semibold">เข้าสู่ระบบ</h1>
-        <p className="text-sm text-muted-foreground">เข้าสู่ระบบเพื่อสมัครงานได้รวดเร็วด้วยข้อมูลที่บันทึกไว้</p>
+    <div className="flex flex-col gap-6">
+      <header className="flex flex-col gap-2">
+        <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">บัญชีผู้สมัคร</p>
+        <h1 className="[font-size:var(--text-h2)] font-semibold leading-tight text-foreground">เข้าสู่ระบบ</h1>
+        <p className="[font-size:var(--text-lead)] text-muted-foreground">
+          เข้าสู่ระบบเพื่อสมัครงานได้รวดเร็วด้วยข้อมูลที่บันทึกไว้
+        </p>
       </header>
-      {emailMode ? (
-        <EmailOtpForm onVerified={() => router.replace(returnTo)} onBack={() => setEmailMode(false)} />
-      ) : (
-        <AuthMethods returnUrl={oauthReturn} onChooseEmail={() => setEmailMode(true)} />
-      )}
+      <div className="rounded-xl border border-line bg-card p-6 sm:p-8">
+        {emailMode ? (
+          <EmailOtpForm onVerified={() => router.replace(returnTo)} onBack={() => setEmailMode(false)} />
+        ) : (
+          <AuthMethods returnUrl={oauthReturn} onChooseEmail={() => setEmailMode(true)} />
+        )}
+      </div>
       <p className="text-center text-sm text-muted-foreground">
         ยังไม่มีบัญชี?{" "}
-        <Link href={`/signup?return=${encodeURIComponent(returnTo)}`} className="font-medium text-accent underline-offset-4 hover:underline">
+        <Link
+          href={`/signup?return=${encodeURIComponent(returnTo)}`}
+          className="font-medium text-primary underline-offset-4 hover:underline"
+        >
           สมัครสมาชิก
         </Link>
       </p>

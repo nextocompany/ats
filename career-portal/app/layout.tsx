@@ -1,17 +1,25 @@
 import type { Metadata, Viewport } from "next";
-import { Noto_Sans_Thai, Inter } from "next/font/google";
+import { Anuphan, IBM_Plex_Sans_Thai_Looped } from "next/font/google";
 import "./globals.css";
 
 import { Providers } from "./providers";
 
-// Thai-first: Noto Sans Thai is the primary face; Inter covers Latin/numerals.
-// Two families total, both with display: swap (perf rules).
-const notoThai = Noto_Sans_Thai({
-  variable: "--font-thai",
-  subsets: ["thai"],
+// Institutional type — one neutral superfamily, Thai+Latin parity. Anuphan
+// (loopless, modern) carries display headings; IBM Plex Sans Thai Looped (looped
+// for Thai reading comfort, IBM's corporate face) carries body/UI. Both ship
+// Thai+Latin on the Plex/Cadson-Demak lineage, both display: swap.
+const display = Anuphan({
+  variable: "--font-display",
+  subsets: ["thai", "latin"],
+  weight: ["400", "500", "600", "700"],
   display: "swap",
 });
-const inter = Inter({ variable: "--font-latin", subsets: ["latin"], display: "swap" });
+const body = IBM_Plex_Sans_Thai_Looped({
+  variable: "--font-body",
+  subsets: ["thai", "latin"],
+  weight: ["300", "400", "500", "600"],
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "ร่วมงานกับเรา | สมัครงาน",
@@ -37,10 +45,10 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="th" className={`${notoThai.variable} ${inter.variable} h-full antialiased`}>
+    <html lang="th" className={`${display.variable} ${body.variable} h-full antialiased`}>
       <body
         className="min-h-full bg-background text-foreground"
-        style={{ fontFamily: "var(--font-thai), var(--font-latin), system-ui, sans-serif" }}
+        style={{ fontFamily: "var(--font-body), system-ui, sans-serif" }}
       >
         <Providers>{children}</Providers>
       </body>

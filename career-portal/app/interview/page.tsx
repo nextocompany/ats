@@ -29,7 +29,7 @@ function InterviewContent() {
 
   if (!token) {
     return (
-      <div className="rounded-2xl border border-border bg-card p-6 text-center">
+      <div className="rounded-xl border border-line bg-card p-6 text-center">
         <p className="text-base font-medium text-foreground">ไม่พบรหัสสัมภาษณ์</p>
         <p className="mt-2 text-sm text-muted-foreground">กรุณาเปิดลิงก์สัมภาษณ์ที่ได้รับจากทีม HR</p>
       </div>

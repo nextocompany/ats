@@ -99,7 +99,7 @@ export function ApplyStepper({ positionId, positionTitle, account }: ApplySteppe
   if (statusToken) {
     return (
       <div className="space-y-6 text-center">
-        <div className="mx-auto grid size-16 place-content-center rounded-full bg-brand-soft text-accent">
+        <div className="mx-auto grid size-16 place-content-center rounded-full bg-accent-soft text-primary">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
@@ -111,7 +111,7 @@ export function ApplyStepper({ positionId, positionTitle, account }: ApplySteppe
         <div className="space-y-2 text-left">
           <Label htmlFor="status-token">รหัสติดตาม</Label>
           <div className="flex items-center gap-2">
-            <code id="status-token" className="min-w-0 flex-1 truncate rounded-lg bg-muted px-3 py-3 font-mono text-sm">
+            <code id="status-token" className="min-w-0 flex-1 truncate rounded-lg border border-line bg-surface-muted px-3 py-3 font-mono text-sm">
               {statusToken}
             </code>
             <Button type="button" size="tap" variant="outline" onClick={copyLink} className="shrink-0">
@@ -135,7 +135,7 @@ export function ApplyStepper({ positionId, positionTitle, account }: ApplySteppe
 
       {mode === "review" ? (
         <div className="space-y-5">
-          <dl className="space-y-3 rounded-2xl bg-muted/50 p-4 text-sm">
+          <dl className="space-y-3 rounded-xl border border-line bg-surface-muted p-4 text-sm">
             <div className="flex justify-between gap-3">
               <dt className="text-muted-foreground">ชื่อ-นามสกุล</dt>
               <dd className="font-medium">{account.full_name || "—"}</dd>

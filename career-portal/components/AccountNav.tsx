@@ -12,7 +12,7 @@ export function AccountNav({ compact }: { compact?: boolean }) {
   const { candidate, isAuthenticated, isLoading } = useCandidate();
 
   if (isLoading) {
-    return <span className="size-8 animate-pulse rounded-full bg-muted" aria-hidden="true" />;
+    return <span className="size-9 animate-pulse rounded-full bg-surface-muted" aria-hidden="true" />;
   }
 
   if (isAuthenticated && candidate) {
@@ -20,9 +20,9 @@ export function AccountNav({ compact }: { compact?: boolean }) {
     return (
       <Link
         href="/account"
-        className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-foreground/80 transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+        className="inline-flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium text-foreground/80 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
       >
-        <span className="grid size-7 place-content-center rounded-full bg-accent/15 text-xs font-bold text-accent">
+        <span className="grid size-8 place-content-center rounded-full border border-line bg-secondary text-xs font-semibold text-foreground">
           {label.charAt(0).toUpperCase()}
         </span>
         {!compact ? <span className="max-w-[8rem] truncate">{label}</span> : null}
@@ -31,7 +31,7 @@ export function AccountNav({ compact }: { compact?: boolean }) {
   }
 
   return (
-    <Link href="/login" className={cn(buttonVariants({ size: compact ? "sm" : "tap", variant: "outline" }))}>
+    <Link href="/login" className={cn(buttonVariants({ size: compact ? "sm" : "default", variant: "outline" }))}>
       เข้าสู่ระบบ
     </Link>
   );
