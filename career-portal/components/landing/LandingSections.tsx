@@ -34,6 +34,7 @@ const BLOCKS = [
     imageSide: "left" as const,
   },
   {
+    id: "culture",
     eyebrow: "วัฒนธรรมองค์กร",
     heading: "วัฒนธรรมที่ให้เกียรติและร่วมมือ",
     body: "เราสร้างที่ทำงานที่เปิดรับความหลากหลาย เคารพซึ่งกันและกัน และส่งเสริมการทำงานเป็นทีม เพื่อให้ทุกคนรู้สึกเป็นเจ้าขององค์กรร่วมกัน",
@@ -42,6 +43,7 @@ const BLOCKS = [
     imageSide: "right" as const,
   },
   {
+    id: "esg",
     eyebrow: "ความยั่งยืน",
     heading: "ขับเคลื่อนธุรกิจอย่างรับผิดชอบ",
     body: "ในฐานะองค์กรค้าปลีกขนาดใหญ่ เรามุ่งมั่นลดผลกระทบต่อสิ่งแวดล้อม สนับสนุนชุมชน และดำเนินธุรกิจตามหลักบรรษัทภิบาล (ESG) อย่างจริงจัง",
@@ -76,6 +78,7 @@ export function LandingSections() {
           {BLOCKS.map((block) => (
             <MediaBlock
               key={block.heading}
+              id={"id" in block ? block.id : undefined}
               eyebrow={block.eyebrow}
               heading={block.heading}
               body={block.body}

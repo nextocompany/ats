@@ -30,7 +30,7 @@ export function StatBand({ stats, className, tone = "default" }: StatBandProps) 
     >
       {stats.map((stat) => (
         <div
-          key={stat.label}
+          key={`${stat.value}-${stat.label}`}
           className={cn(
             "flex flex-col gap-1.5 px-6 py-8 sm:py-10",
             invert ? "bg-primary" : "bg-background",

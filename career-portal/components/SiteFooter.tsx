@@ -3,7 +3,14 @@ import Link from "next/link";
 import { Container } from "@/components/ds";
 import { Wordmark } from "@/components/Wordmark";
 
-const NAV_GROUPS: { title: string; links: { href: string; label: string }[] }[] = [
+interface FooterLink {
+  href: string;
+  label: string;
+  // external links open in a new tab via a plain <a> with rel="noreferrer".
+  external?: boolean;
+}
+
+const NAV_GROUPS: { title: string; links: FooterLink[] }[] = [
   {
     title: "ร่วมงาน",
     links: [
@@ -15,9 +22,11 @@ const NAV_GROUPS: { title: string; links: { href: string; label: string }[] }[] 
   {
     title: "องค์กร",
     links: [
-      { href: "/", label: "เกี่ยวกับ CP Axtra" },
-      { href: "/", label: "ความยั่งยืน (ESG)" },
-      { href: "/", label: "วัฒนธรรมองค์กร" },
+      // Each org link has a distinct, real destination (not a placeholder "/"):
+      // the corporate site, and in-page anchors to the ESG + culture sections.
+      { href: "https://www.cpaxtra.com", label: "เกี่ยวกับ CP Axtra", external: true },
+      { href: "/#esg", label: "ความยั่งยืน (ESG)" },
+      { href: "/#culture", label: "วัฒนธรรมองค์กร" },
     ],
   },
 ];
@@ -46,16 +55,23 @@ export function SiteFooter() {
           <nav key={group.title} aria-label={group.title} className="flex flex-col gap-4 text-sm">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-foreground">{group.title}</p>
             <ul className="flex flex-col gap-3 text-muted-foreground">
-              {group.links.map((link, i) => (
-                <li key={`${link.label}-${i}`}>
-                  <Link
-                    href={link.href}
-                    className="transition-colors hover:text-foreground focus-visible:outline-none focus-visible:text-foreground"
-                  >
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
+              {group.links.map((link) => {
+                const className =
+                  "transition-colors hover:text-foreground focus-visible:outline-none focus-visible:text-foreground";
+                return (
+                  <li key={link.label}>
+                    {link.external ? (
+                      <a href={link.href} target="_blank" rel="noreferrer" className={className}>
+                        {link.label}
+                      </a>
+                    ) : (
+                      <Link href={link.href} className={className}>
+                        {link.label}
+                      </Link>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           </nav>
         ))}

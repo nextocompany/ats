@@ -67,14 +67,14 @@ export function JobFilters({
             const count = levelCounts[level] ?? 0;
             return (
               <li key={level}>
+                {/* The wrapping <label> provides the checkbox's accessible name
+                    (level + count), so no aria-label on the control itself. */}
                 <label className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-secondary">
-                  <Checkbox
-                    checked={checked}
-                    onCheckedChange={() => onToggleLevel(level)}
-                    aria-label={levelLabel(level)}
-                  />
+                  <Checkbox checked={checked} onCheckedChange={() => onToggleLevel(level)} />
                   <span className="flex-1 text-sm text-foreground">{levelLabel(level)}</span>
-                  <span className="num text-xs text-muted-foreground">{count}</span>
+                  <span className="num text-xs text-muted-foreground" aria-label={`${count} ตำแหน่ง`}>
+                    {count}
+                  </span>
                 </label>
               </li>
             );
