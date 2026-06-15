@@ -402,7 +402,7 @@ function EmptyStateBody({ filtered, onClear }: { filtered: boolean; onClear: () 
           Clear filters
         </Button>
       )}
-      <span className="dot-rule mx-auto mt-6 opacity-70" aria-hidden />
+      <span className="mx-auto mt-6 block h-px w-10 bg-hairline" aria-hidden />
     </>
   );
 }

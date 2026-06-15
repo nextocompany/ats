@@ -16,8 +16,8 @@ export default function DashboardPage() {
 
   return (
     <div className="settle space-y-8">
-      {/* Page masthead — a calm title and one supporting line. One brass keyline
-          under the eyebrow is the single accent; no dot-cluster atmosphere. */}
+      {/* Page masthead — a calm title and one supporting line. One keyline
+          under the eyebrow is the single accent. */}
       <header className="border-b border-hairline pb-7">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="max-w-prose">

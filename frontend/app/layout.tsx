@@ -1,13 +1,24 @@
 import type { Metadata } from "next";
-import { Geist, Noto_Sans_Thai } from "next/font/google";
+import { Anuphan, IBM_Plex_Sans_Thai_Looped } from "next/font/google";
 import "./globals.css";
 
 import { Providers } from "./providers";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 
-const geist = Geist({ variable: "--font-geist-sans", subsets: ["latin"], display: "swap" });
-// Thai support is the deliberate exception to the two-font rule.
-const notoThai = Noto_Sans_Thai({ variable: "--font-thai", subsets: ["thai"], display: "swap" });
+// Institutional type, shared with the career portal: Anuphan (display headings) +
+// IBM Plex Sans Thai Looped (body/UI). One neutral superfamily, Thai+Latin parity.
+const display = Anuphan({
+  variable: "--font-display",
+  subsets: ["thai", "latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+});
+const body = IBM_Plex_Sans_Thai_Looped({
+  variable: "--font-body",
+  subsets: ["thai", "latin"],
+  weight: ["300", "400", "500", "600"],
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "HR ATS — Recruitment Console",
@@ -16,10 +27,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${geist.variable} ${notoThai.variable} h-full antialiased`}>
+    <html lang="en" className={`${display.variable} ${body.variable} h-full antialiased`}>
       <body
-        className="min-h-full flex flex-col bg-background text-foreground paper-grain"
-        style={{ fontFamily: "var(--font-geist-sans), var(--font-thai), system-ui, sans-serif" }}
+        className="min-h-full flex flex-col bg-background text-foreground"
+        style={{ fontFamily: "var(--font-body), system-ui, sans-serif" }}
       >
         <Providers>
           <AuthProvider>{children}</AuthProvider>

@@ -1,6 +1,6 @@
 <svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
   <rect width="64" height="64" rx="14" fill="#0B47B8"/>
-  <text x="32" y="33" font-family="Geist, Arial, system-ui, sans-serif" font-size="30" font-weight="700"
+  <text x="32" y="33" font-family="system-ui, -apple-system, Arial, sans-serif" font-size="30" font-weight="700"
         fill="#ffffff" text-anchor="middle" dominant-baseline="central" letter-spacing="-1">HR</text>
   <circle cx="50" cy="14" r="6" fill="#FFC02E"/>
 </svg>

@@ -113,8 +113,8 @@ export function SideNav() {
           })}
         </ul>
 
-        {/* Signature dot-rule — the CP Axtra motif quietly closing the nav block */}
-        <div className="dot-rule mt-7 ml-3 opacity-70" aria-hidden />
+        {/* Hairline closing the nav block */}
+        <div className="mt-7 ml-3 h-px w-10 bg-sidebar-border" aria-hidden />
       </nav>
 
       {/* Identity + sign-out */}

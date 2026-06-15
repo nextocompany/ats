@@ -7,7 +7,7 @@ import type { Funnel, KPI, Source } from "@/lib/types";
 const fmt = new Intl.NumberFormat("en-US");
 
 /* ──────────────────────────────────────────────────────────────────────
-   KPI band — editorial hierarchy: one dominant primary metric (emerald),
+   KPI band — editorial hierarchy: one dominant primary metric (CP Axtra blue),
    three supporting metrics demoted to a hairline-divided strip.
    ────────────────────────────────────────────────────────────────────── */
 
@@ -22,7 +22,7 @@ export function KpiCards({
   variant = "hero",
 }: {
   kpi: KPI;
-  /** "hero" = bold filled-emerald band (Overview). "reporting" = compact outline strip (Analytics). */
+  /** "hero" = bold filled CP Axtra blue band (Overview). "reporting" = compact outline strip (Analytics). */
   variant?: "hero" | "reporting";
 }) {
   // Derived, presentational deltas (share of pipeline) — no data changes.
@@ -44,7 +44,7 @@ export function KpiCards({
       aria-label="Key metrics"
       className="grid gap-px overflow-hidden rounded-xl bg-hairline ring-1 ring-hairline lg:grid-cols-[1.35fr_2fr]"
     >
-      {/* Primary — dominant, emerald, with a brass keyline as the premium accent.
+      {/* Primary — dominant, CP Axtra blue, with a keyline as the premium accent.
           Padding + corner tick + left keyline share one optical inset scale so the
           brass marks line up consistently from 320 → 1440 (no cramped wrap at 320). */}
       <div className="relative flex flex-col justify-between bg-brand px-5 py-6 text-brand-foreground sm:px-7">
@@ -58,7 +58,7 @@ export function KpiCards({
           Total applications
         </p>
         <div className="mt-3 pl-3.5">
-          <span className="block font-semibold tabular-nums leading-none [font-size:var(--text-stat)] tracking-tight">
+          <span className="num block font-semibold tabular-nums leading-none [font-size:var(--text-stat)] tracking-tight">
             {fmt.format(kpi.applied)}
           </span>
           <p className="mt-3 text-sm text-brand-foreground/80">
@@ -75,7 +75,7 @@ export function KpiCards({
               {m.label}
             </p>
             <div className="mt-2">
-              <span className="block text-3xl font-semibold tabular-nums leading-none tracking-tight text-foreground">
+              <span className="num block text-3xl font-semibold tabular-nums leading-none tracking-tight text-foreground">
                 {fmt.format(m.value)}
               </span>
               <p className="mt-2 text-xs text-muted-foreground">{m.hint}</p>
@@ -89,7 +89,7 @@ export function KpiCards({
 
 /* ──────────────────────────────────────────────────────────────────────
    Reporting stat strip (Analytics) — a compact, hairline, outline variant
-   of the KPI band. No big emerald fill; reads as a report header with a
+   of the KPI band. No big color fill; reads as a report header with a
    cycle/period label and "vs previous cycle" framing, so Analytics never
    shares Overview's bold hero treatment.
    ────────────────────────────────────────────────────────────────────── */
@@ -118,7 +118,7 @@ function KpiStrip({ kpi, supporting }: { kpi: KPI; supporting: Metric[] }) {
           </p>
         </div>
         <div className="mt-4 pl-3.5">
-          <span className="block font-semibold tabular-nums leading-none [font-size:var(--text-stat)] tracking-tight text-foreground">
+          <span className="num block font-semibold tabular-nums leading-none [font-size:var(--text-stat)] tracking-tight text-foreground">
             {fmt.format(kpi.applied)}
           </span>
           <div className="mt-4 flex items-center gap-2.5">
@@ -144,7 +144,7 @@ function KpiStrip({ kpi, supporting }: { kpi: KPI; supporting: Metric[] }) {
               {m.label}
             </dt>
             <dd className="mt-2">
-              <span className="block text-3xl font-semibold tabular-nums leading-none tracking-tight text-foreground">
+              <span className="num block text-3xl font-semibold tabular-nums leading-none tracking-tight text-foreground">
                 {fmt.format(m.value)}
               </span>
               <span className="mt-2 block text-xs text-muted-foreground">{m.hint}</span>
@@ -375,7 +375,7 @@ export function SourcesChart({ sources }: { sources: Source[] }) {
             Channel performance appears here once applications carry a source. Walk-in,
             website, and campaign volumes will rank below.
           </p>
-          <span className="dot-rule mt-5 opacity-70" aria-hidden />
+          <span className="mx-auto mt-5 block h-px w-10 bg-hairline" aria-hidden />
         </div>
       ) : (
         <div className="flex flex-col">

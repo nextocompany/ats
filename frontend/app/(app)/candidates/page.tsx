@@ -83,7 +83,7 @@ function CandidatesInner() {
             <p className="mx-auto mt-1.5 max-w-xs text-sm text-muted-foreground">
               Records appear here automatically as applications are received and parsed.
             </p>
-            <span className="dot-rule mx-auto mt-6 opacity-70" aria-hidden />
+            <span className="mx-auto mt-6 block h-px w-10 bg-hairline" aria-hidden />
           </li>
         )}
         {items.map((c) => (
@@ -160,7 +160,7 @@ function CandidatesInner() {
                       Records appear here automatically as applications are received and parsed by the
                       screening engine.
                     </p>
-                    <span className="dot-rule mx-auto mt-6 opacity-70" aria-hidden />
+                    <span className="mx-auto mt-6 block h-px w-10 bg-hairline" aria-hidden />
                   </td>
                 </tr>
               )}

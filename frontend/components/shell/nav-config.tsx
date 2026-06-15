@@ -40,33 +40,20 @@ export function navForRole(role?: string): NavItem[] {
 // ALL_NAV is every possible item, for pathname→item lookups (e.g. header title).
 export const ALL_NAV: NavItem[] = [...NAV, MEMBERS_NAV, ADMIN_NAV];
 
-// Brand lockup — blue monogram + wordmark, shared portal identity.
-// The monogram carries a brass corner-dot: a micro CP Axtra signature.
+// Brand lockup — text-only institutional wordmark, no monogram tile or dot mark.
+// "CP AXTRA" tracked uppercase over an "ATS Console" line (HSBC/JPM register),
+// matching the careers Wordmark.
 export function BrandMark({ tone = "light" }: { tone?: "light" | "dark" }) {
   const ink = tone === "dark" ? "text-sidebar-foreground" : "text-foreground";
-  const ringColor = tone === "dark" ? "var(--sidebar)" : "var(--card)";
+  const muted = tone === "dark" ? "text-sidebar-foreground/60" : "text-muted-foreground";
   return (
-    <div className="flex items-center gap-2.5">
-      <span
-        aria-hidden
-        className="relative grid size-8 shrink-0 place-items-center rounded-[0.6rem] bg-brand font-semibold text-brand-foreground"
-        style={{ boxShadow: "inset 0 0 0 1px oklch(100% 0 0 / 0.14), 0 2px 6px -2px oklch(46% 0.18 264 / 0.5)" }}
-      >
-        <span className="text-[0.95rem] leading-none tracking-tight">HR</span>
-        {/* Brass dot — the brand signature, tucked at the corner */}
-        <span
-          className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-brass"
-          style={{ boxShadow: `0 0 0 2px ${ringColor}` }}
-        />
+    <span className={`flex flex-col leading-none ${ink}`}>
+      <span className="text-[0.625rem] font-semibold uppercase tracking-[0.22em] text-brand">
+        CP&nbsp;Axtra
       </span>
-      <span className={`flex flex-col leading-none ${ink}`}>
-        <span className="text-[0.95rem] font-semibold tracking-tight">
-          ATS Console
-        </span>
-        <span className="mt-0.5 text-[0.625rem] font-medium uppercase tracking-[0.18em] text-brass">
-          Recruitment
-        </span>
+      <span className={`mt-1 text-[0.95rem] font-semibold tracking-tight ${muted}`}>
+        ATS Console
       </span>
-    </div>
+    </span>
   );
 }
