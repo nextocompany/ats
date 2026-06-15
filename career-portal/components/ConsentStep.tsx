@@ -19,7 +19,7 @@ export function ConsentStep({ checked, onChange }: ConsentStepProps) {
         </p>
       </div>
 
-      <div className="space-y-3 rounded-2xl bg-muted/60 p-4 text-sm leading-relaxed text-foreground/80">
+      <div className="space-y-3 rounded-xl border border-line bg-surface-muted p-4 text-sm leading-relaxed text-foreground/80">
         <p>
           <span className="font-medium text-foreground">วัตถุประสงค์:</span>{" "}
           เพื่อพิจารณาใบสมัครงาน คัดกรองคุณสมบัติ และติดต่อกลับเกี่ยวกับตำแหน่งที่คุณสมัคร
@@ -34,7 +34,7 @@ export function ConsentStep({ checked, onChange }: ConsentStepProps) {
         </p>
       </div>
 
-      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border p-4 transition-colors has-data-checked:border-accent has-data-checked:bg-brand-soft/50">
+      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-line p-4 transition-colors has-data-checked:border-primary has-data-checked:bg-accent-soft">
         <Checkbox
           checked={checked}
           onCheckedChange={(value) => onChange(value === true)}

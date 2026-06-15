@@ -15,8 +15,8 @@ export const metadata: Metadata = {
 export default function OfflinePage() {
   return (
     <PortalShell narrow>
-      <div className="flex flex-col items-center gap-5 rounded-2xl border border-border bg-card px-6 py-12 text-center">
-        <span className="grid size-16 place-content-center rounded-full bg-brand-soft text-accent" aria-hidden="true">
+      <div className="flex flex-col items-center gap-5 rounded-xl border border-line bg-card px-6 py-12 text-center">
+        <span className="grid size-16 place-content-center rounded-full bg-accent-soft text-primary" aria-hidden="true">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
             <path d="M1 1l22 22" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             <path

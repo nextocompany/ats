@@ -48,31 +48,40 @@ function SignupFlow() {
 
   if (!isAuthenticated || !candidate) {
     return (
-      <div className="space-y-6">
-        <header className="space-y-2 text-center">
-          <h1 className="text-xl font-semibold">สมัครสมาชิก</h1>
-          <p className="text-sm text-muted-foreground">สมัครครั้งเดียว ใช้สมัครงานได้รวดเร็วทุกตำแหน่ง</p>
+      <div className="flex flex-col gap-6">
+        <header className="flex flex-col gap-2">
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">บัญชีผู้สมัคร</p>
+          <h1 className="[font-size:var(--text-h2)] font-semibold leading-tight text-foreground">สมัครสมาชิก</h1>
+          <p className="[font-size:var(--text-lead)] text-muted-foreground">สมัครครั้งเดียว ใช้สมัครงานได้รวดเร็วทุกตำแหน่ง</p>
         </header>
-        {emailMode ? (
-          <EmailOtpForm onVerified={() => setEmailMode(false)} onBack={() => setEmailMode(false)} />
-        ) : (
-          <AuthMethods returnUrl={oauthReturn} onChooseEmail={() => setEmailMode(true)} />
-        )}
+        <div className="rounded-xl border border-line bg-card p-6 sm:p-8">
+          {emailMode ? (
+            <EmailOtpForm onVerified={() => setEmailMode(false)} onBack={() => setEmailMode(false)} />
+          ) : (
+            <AuthMethods returnUrl={oauthReturn} onChooseEmail={() => setEmailMode(true)} />
+          )}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <header className="space-y-2">
-        <p className="text-sm text-muted-foreground">ขั้นตอนที่ {setupStep === "profile" ? "1" : "2"} จาก 2</p>
-        <h1 className="text-xl font-semibold">{setupStep === "profile" ? "กรอกข้อมูลเบื้องต้น" : "อัปโหลดเรซูเม่"}</h1>
+    <div className="flex flex-col gap-6">
+      <header className="flex flex-col gap-2">
+        <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+          ขั้นตอนที่ {setupStep === "profile" ? "1" : "2"} จาก 2
+        </p>
+        <h1 className="[font-size:var(--text-h2)] font-semibold leading-tight text-foreground">
+          {setupStep === "profile" ? "กรอกข้อมูลเบื้องต้น" : "อัปโหลดเรซูเม่"}
+        </h1>
       </header>
-      {setupStep === "profile" ? (
-        <ProfileForm account={candidate} requireConsent submitLabel="ถัดไป" onSaved={() => setSetupStep("resume")} />
-      ) : (
-        <ResumeUploadStep account={candidate} submitLabel="เสร็จสิ้นการสมัคร" onUploaded={() => router.replace(returnTo)} />
-      )}
+      <div className="rounded-xl border border-line bg-card p-6 sm:p-8">
+        {setupStep === "profile" ? (
+          <ProfileForm account={candidate} requireConsent submitLabel="ถัดไป" onSaved={() => setSetupStep("resume")} />
+        ) : (
+          <ResumeUploadStep account={candidate} submitLabel="เสร็จสิ้นการสมัคร" onUploaded={() => router.replace(returnTo)} />
+        )}
+      </div>
     </div>
   );
 }

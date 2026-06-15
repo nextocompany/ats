@@ -68,12 +68,12 @@ export function InstallPrompt() {
 
   return (
     <div
-      className="flex items-center gap-3 rounded-2xl bg-brand-soft px-4 py-3 ring-1 ring-primary/15"
+      className="flex items-center gap-3 rounded-xl border border-line bg-accent-soft px-4 py-3"
       role="region"
       aria-label="ติดตั้งแอป"
     >
-      <span className="grid size-9 shrink-0 place-content-center rounded-xl bg-primary text-sm font-bold text-primary-foreground" aria-hidden="true">
-        N
+      <span className="grid size-9 shrink-0 place-content-center rounded-lg bg-primary text-[0.7rem] font-bold tracking-tight text-primary-foreground" aria-hidden="true">
+        CP
       </span>
       <p className="min-w-0 flex-1 text-sm text-foreground/80">เพิ่มแอปลงหน้าจอหลักเพื่อเปิดได้เร็วขึ้น</p>
       <div className="flex shrink-0 items-center gap-1">

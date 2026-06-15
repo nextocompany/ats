@@ -27,10 +27,10 @@ function StatusContent() {
 
   return (
     <div className="space-y-6">
-      <header className="space-y-3">
-        <p className="text-sm font-medium uppercase tracking-[0.2em] text-accent">ติดตามใบสมัคร</p>
-        <h1 className="text-[length:var(--text-display)] font-bold leading-tight tracking-tight">ตรวจสอบสถานะใบสมัคร</h1>
-        <p className="text-base text-muted-foreground">กรอกรหัสติดตามที่คุณได้รับหลังสมัครงาน</p>
+      <header className="flex flex-col gap-3">
+        <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">ติดตามใบสมัคร</p>
+        <h1 className="[font-size:var(--text-h2)] font-semibold leading-tight text-foreground">ตรวจสอบสถานะใบสมัคร</h1>
+        <p className="[font-size:var(--text-lead)] text-muted-foreground">กรอกรหัสติดตามที่คุณได้รับหลังสมัครงาน</p>
       </header>
 
       <form onSubmit={handleSubmit} className="space-y-3">
@@ -53,7 +53,7 @@ function StatusContent() {
       {token && isLoading ? <Skeleton className="h-48 w-full rounded-2xl" /> : null}
 
       {token && isError ? (
-        <div className="rounded-2xl border border-border bg-card p-6 text-center">
+        <div className="rounded-xl border border-line bg-card p-6 text-center">
           <p className="text-sm text-muted-foreground">ไม่พบใบสมัครสำหรับรหัสนี้ กรุณาตรวจสอบรหัสอีกครั้ง</p>
         </div>
       ) : null}

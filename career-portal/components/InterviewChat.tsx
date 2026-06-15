@@ -46,7 +46,7 @@ export function InterviewChat({ token }: InterviewChatProps) {
 
   if (isError) {
     return (
-      <div className="rounded-2xl border border-border bg-card p-6 text-center">
+      <div className="rounded-xl border border-line bg-card p-6 text-center">
         <p className="text-base font-medium text-foreground">ไม่พบการสัมภาษณ์นี้</p>
         <p className="mt-2 text-sm text-muted-foreground">ลิงก์อาจหมดอายุหรือไม่ถูกต้อง กรุณาติดต่อทีม HR</p>
       </div>
@@ -77,13 +77,13 @@ export function InterviewChat({ token }: InterviewChatProps) {
 
   return (
     <div className="space-y-6">
-      <header className="space-y-3">
-        <p className="text-sm font-medium uppercase tracking-[0.2em] text-accent">สัมภาษณ์ AI เบื้องต้น</p>
-        <h1 className="text-[length:var(--text-display)] font-bold leading-tight tracking-tight">พูดคุยกับ HR ผู้ช่วย AI</h1>
-        <p className="text-base text-muted-foreground">ตอบคำถามสั้น ๆ ตามจริง ใช้เวลาประมาณ 5 นาที</p>
+      <header className="flex flex-col gap-3">
+        <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">สัมภาษณ์ AI เบื้องต้น</p>
+        <h1 className="[font-size:var(--text-h2)] font-semibold leading-tight text-foreground">พูดคุยกับ HR ผู้ช่วย AI</h1>
+        <p className="[font-size:var(--text-lead)] text-muted-foreground">ตอบคำถามสั้น ๆ ตามจริง ใช้เวลาประมาณ 5 นาที</p>
       </header>
 
-      <div className="space-y-4 rounded-2xl border border-border bg-card p-4 sm:p-6">
+      <div className="space-y-4 rounded-xl border border-line bg-card p-4 sm:p-6">
         <ul className="space-y-4" aria-live="polite" aria-label="บทสนทนาสัมภาษณ์">
           {turns.map((t, i) => (
             <li key={`${i}-${t.role}`} className={t.role === "user" ? "flex justify-end" : "flex justify-start"}>
@@ -116,7 +116,7 @@ export function InterviewChat({ token }: InterviewChatProps) {
       )}
 
       {isDone ? (
-        <div className="rounded-2xl border border-accent/40 bg-accent/10 p-6 text-center">
+        <div className="rounded-xl border border-line bg-accent-soft p-6 text-center">
           <p className="text-base font-semibold text-foreground">ขอบคุณค่ะ การสัมภาษณ์เสร็จสิ้นแล้ว</p>
           <p className="mt-2 text-sm text-muted-foreground">ทีม HR จะพิจารณาและติดต่อกลับเร็ว ๆ นี้</p>
         </div>
@@ -139,7 +139,7 @@ export function InterviewChat({ token }: InterviewChatProps) {
             }}
             rows={2}
             placeholder="พิมพ์คำตอบของคุณ…"
-            className="min-h-12 flex-1 resize-none rounded-xl border border-border bg-background px-4 py-3 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            className="min-h-12 flex-1 resize-none rounded-lg border border-input bg-card px-4 py-3 text-base outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
             disabled={respond.isPending}
             aria-label="คำตอบ"
           />

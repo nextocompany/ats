@@ -3,3 +3,6 @@ shots/
 feedback/
 prototype/
 *.prev.md
+institutional/shots/
+institutional/*.log
+admin-shots/

@@ -4,18 +4,31 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ────────────────────────────────────────────────────────────────────────
+   CP Axtra Careers — "Institutional" design system.
+   A restrained, big-corporate employer brand for a SET-listed retail group:
+   near-monochrome canvas (navy ink on white), CP Axtra blue (#0B47B8) as the
+   SINGLE semantic accent (CTAs, links, active/focus, key figures). No yellow,
+   no dot motif, no decoration. Discipline through scale, grid, and whitespace.
+   ──────────────────────────────────────────────────────────────────────── */
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-mono);
-  --font-heading: var(--font-sans);
+
+  /* One neutral superfamily: Anuphan display headings, IBM Plex Sans Thai
+     Looped body/UI. Thai+Latin parity; hierarchy comes from scale, not type. */
+  --font-sans: var(--font-body), system-ui, sans-serif;
+  --font-mono: ui-monospace, monospace;
+  --font-heading: var(--font-display), var(--font-body), system-ui, sans-serif;
+
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
   --color-muted-foreground: var(--muted-foreground);
   --color-muted: var(--muted);
   --color-secondary-foreground: var(--secondary-foreground);
@@ -26,64 +39,60 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --color-brand-soft: var(--brand-soft);
-  --color-gold: var(--gold);
-  --color-dot-1: var(--dot-1);
-  --color-dot-2: var(--dot-2);
-  --color-dot-3: var(--dot-3);
-  --color-dot-4: var(--dot-4);
-  --color-dot-5: var(--dot-5);
-  --color-dot-6: var(--dot-6);
+  --color-line: var(--line);
+  --color-surface-muted: var(--surface-muted);
+
+  /* Modest, institutional radii — flat, not playful. */
   --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
+  --radius-md: calc(var(--radius) * 0.85);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  /* Fluid scale + layout tokens (clean-luxury). */
-  --text-hero: clamp(2.5rem, 1.2rem + 5.5vw, 5rem);
-  --text-display: clamp(1.9rem, 1.2rem + 3vw, 3rem);
-  --space-section: clamp(4rem, 3rem + 5vw, 9rem);
+  --radius-xl: calc(var(--radius) * 1.5);
+  --radius-2xl: calc(var(--radius) * 2);
+
+  /* Scale-discipline type ramp (clamp). Big but quiet. */
+  --text-display: clamp(2.4rem, 1.4rem + 3.6vw, 4.25rem);
+  --text-h2: clamp(1.6rem, 1.1rem + 1.8vw, 2.5rem);
+  --text-h3: clamp(1.2rem, 1.02rem + 0.7vw, 1.6rem);
+  --text-lead: clamp(1.05rem, 0.98rem + 0.4vw, 1.25rem);
+  --text-stat: clamp(2.1rem, 1.4rem + 2.4vw, 3.25rem);
+
+  --space-section: clamp(4.5rem, 3rem + 6vw, 9rem);
   --container: 1200px;
 }
 
-/* Career Portal — CP Axtra identity (light): bright white canvas, navy-ink type,
-   deep CP Axtra blue as the brand/CTA, warm yellow for emphasis, and a
-   multicolour dot motif as the signature. Corporate-warm and welcoming; the
-   candidate-facing face of the brand, distinct from the HR console. */
 :root {
-  --background: oklch(98.8% 0.004 250); /* bright near-white */
-  --foreground: oklch(23% 0.03 264); /* navy ink */
-  --card: oklch(100% 0 0); /* crisp white surface */
-  --card-foreground: oklch(23% 0.03 264);
+  /* ── Surfaces: white canvas, near-white muted band, navy ink ── */
+  --background: oklch(99% 0.002 250);        /* white-ish canvas */
+  --surface-muted: oklch(98% 0.003 250);     /* faint band for alternating sections */
+  --foreground: oklch(22% 0.03 264);         /* navy near-black ink */
+  --card: oklch(100% 0 0);                   /* crisp white surface */
+  --card-foreground: oklch(22% 0.03 264);
   --popover: oklch(100% 0 0);
-  --popover-foreground: oklch(23% 0.03 264);
-  --primary: oklch(46% 0.18 264); /* CP Axtra deep blue CTA (#0B47B8) */
+  --popover-foreground: oklch(22% 0.03 264);
+
+  /* ── The single accent: CP Axtra deep blue (#0B47B8) ── */
+  --primary: oklch(46% 0.18 264);
   --primary-foreground: oklch(99% 0.01 250);
-  --secondary: oklch(96% 0.006 250);
-  --secondary-foreground: oklch(30% 0.02 264);
-  --muted: oklch(96.5% 0.005 250);
-  --muted-foreground: oklch(46% 0.02 260);
-  --accent: oklch(46% 0.18 264); /* CP Axtra blue (brand) */
+  --accent: oklch(46% 0.18 264);             /* alias of primary for link/active */
   --accent-foreground: oklch(99% 0.01 250);
+  --accent-soft: oklch(96% 0.028 258);       /* rare tint for hover/active surfaces */
+
+  /* ── Neutrals (cool, quiet) ── */
+  --secondary: oklch(96.5% 0.004 250);
+  --secondary-foreground: oklch(30% 0.02 264);
+  --muted: oklch(97% 0.004 250);
+  --muted-foreground: oklch(48% 0.018 260);
+
   --destructive: oklch(56% 0.2 27);
-  --border: oklch(91% 0.006 255); /* hairline */
-  --input: oklch(91% 0.006 255);
-  --ring: oklch(46% 0.18 264);
-  --radius: 0.75rem;
-  --brand-soft: oklch(95% 0.04 258); /* light blue surface for atmosphere */
-  --gold: oklch(83% 0.155 85); /* warm yellow emphasis (#FFC02E) */
+  --border: oklch(91% 0.005 255);            /* hairline */
+  --line: oklch(91% 0.005 255);
+  --input: oklch(89% 0.006 255);
+  --ring: oklch(46% 0.18 264);               /* on-brand focus ring */
 
-  /* CP Axtra multicolour dot motif — the brand signature */
-  --dot-1: oklch(46% 0.18 264); /* blue */
-  --dot-2: oklch(83% 0.155 85); /* yellow */
-  --dot-3: oklch(66% 0.19 18); /* coral */
-  --dot-4: oklch(70% 0.12 200); /* cyan */
-  --dot-5: oklch(64% 0.16 150); /* green */
-  --dot-6: oklch(72% 0.16 55); /* orange */
-
+  --radius: 0.5rem;
   --tap-min: 44px;
   --duration-fast: 150ms;
+  --duration: 400ms;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -97,12 +106,22 @@
   html {
     @apply font-sans;
   }
-  /* Luxury heading treatment: tight tracking, balanced wrapping. */
+  /* Institutional headings: Anuphan display, balanced wrap, tight tracking, but
+     enough line-height that Thai never clips. Quiet authority, not loud. */
   h1,
   h2,
-  h3 {
+  h3,
+  h4 {
+    font-family: var(--font-heading);
     text-wrap: balance;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.015em;
+    line-height: 1.14;
+  }
+  /* Tabular display numerals (scale band, counts). */
+  .num {
+    font-family: var(--font-display);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
   }
 }
 
@@ -116,12 +135,12 @@
   }
 }
 
-/* Subtle, compositor-only reveal for landing sections. Opt-in via .reveal; the
-   reduced-motion block above neutralizes it for users who ask. */
+/* The ONLY motion: a subtle compositor-only reveal for sections. Opt-in via
+   .reveal; the reduced-motion block above neutralizes it for users who ask. */
 @keyframes reveal-up {
   from {
     opacity: 0;
-    transform: translate3d(0, 16px, 0);
+    transform: translate3d(0, 14px, 0);
   }
   to {
     opacity: 1;
@@ -130,44 +149,4 @@
 }
 .reveal {
   animation: reveal-up 0.6s var(--ease-out) both;
-}
-
-/* ── CP Axtra dot motif ───────────────────────────────────────────────────
-   The brand signature: a scatter of multicolour dots used as decorative
-   atmosphere behind the hero and section heads. pointer-events:none, and the
-   host element should carry aria-hidden. */
-.dot-cluster {
-  --d: 9px;
-  width: calc(var(--d) * 9);
-  height: calc(var(--d) * 5);
-  background-repeat: no-repeat;
-  background-image:
-    radial-gradient(circle, var(--dot-1) 50%, transparent 52%),
-    radial-gradient(circle, var(--dot-2) 50%, transparent 52%),
-    radial-gradient(circle, var(--dot-3) 50%, transparent 52%),
-    radial-gradient(circle, var(--dot-4) 50%, transparent 52%),
-    radial-gradient(circle, var(--dot-5) 50%, transparent 52%),
-    radial-gradient(circle, var(--dot-6) 50%, transparent 52%),
-    radial-gradient(circle, var(--dot-1) 50%, transparent 52%),
-    radial-gradient(circle, var(--dot-2) 50%, transparent 52%);
-  background-size: var(--d) var(--d);
-  background-position:
-    0 0, calc(var(--d) * 2) calc(var(--d) * 2),
-    calc(var(--d) * 4) 0, calc(var(--d) * 6) calc(var(--d) * 3),
-    calc(var(--d) * 8) calc(var(--d) * 1), calc(var(--d) * 1) calc(var(--d) * 4),
-    calc(var(--d) * 5) calc(var(--d) * 4), calc(var(--d) * 7) 0;
-}
-
-/* Horizontal multicolour dot rule — a playful CP Axtra accent that replaces or
-   accompanies the single gold keyline under an eyebrow. */
-.dot-rule {
-  height: 10px;
-  width: 5rem;
-  background-repeat: repeat-x;
-  background-image:
-    radial-gradient(circle at 5px 5px, var(--dot-1) 3.5px, transparent 4px),
-    radial-gradient(circle at 20px 5px, var(--dot-2) 3.5px, transparent 4px),
-    radial-gradient(circle at 35px 5px, var(--dot-3) 3.5px, transparent 4px),
-    radial-gradient(circle at 50px 5px, var(--dot-5) 3.5px, transparent 4px);
-  background-size: 60px 10px;
 }

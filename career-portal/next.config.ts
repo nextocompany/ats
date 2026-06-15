@@ -12,13 +12,19 @@ const apiOrigin = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 // them), so we allow 'unsafe-inline' for scripts — Next's inline scripts are
 // framework-generated and same-origin. worker-src/manifest-src 'self' permit the
 // PWA service worker + manifest (Sprint 6c).
+// `next dev --webpack` relies on eval() for HMR/source-maps, which a strict
+// script-src blocks (pages render but never hydrate). Allow 'unsafe-eval' in
+// development ONLY; production stays strict. Dev also widens connect-src to local
+// origins so a mock API on any localhost port works during design work.
+const isDev = process.env.NODE_ENV === "development";
+
 const csp = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'",
+  isDev ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'" : "script-src 'self' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self'",
-  `connect-src 'self' ${apiOrigin}`,
+  isDev ? `connect-src 'self' ${apiOrigin} http://localhost:* ws://localhost:*` : `connect-src 'self' ${apiOrigin}`,
   "worker-src 'self'",
   "manifest-src 'self'",
   "frame-ancestors 'none'",

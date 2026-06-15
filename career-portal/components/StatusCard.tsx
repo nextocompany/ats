@@ -20,9 +20,9 @@ const STATUS_META: Record<string, StatusMeta> = {
 };
 
 const TONE_CLASS: Record<StatusMeta["tone"], string> = {
-  neutral: "bg-muted text-foreground/70",
-  progress: "bg-accent text-accent-foreground",
-  good: "bg-brand-soft text-accent",
+  neutral: "bg-secondary text-foreground/70",
+  progress: "bg-primary text-primary-foreground",
+  good: "bg-accent-soft text-primary",
   ended: "bg-destructive/10 text-destructive",
 };
 
@@ -39,12 +39,12 @@ function formatThaiDate(iso: string): string {
 export function StatusCard({ status }: { status: ApplicationStatus }) {
   const meta = metaFor(status.status);
   return (
-    <div className="space-y-5 rounded-2xl border border-border bg-card p-6">
+    <div className="space-y-5 rounded-xl border border-line bg-card p-6">
       <span className={`inline-flex rounded-full px-3 py-1 text-sm font-medium ${TONE_CLASS[meta.tone]}`}>
         {meta.label}
       </span>
       <p className="text-sm leading-relaxed text-muted-foreground">{meta.detail}</p>
-      <dl className="space-y-3 border-t border-border pt-4 text-sm">
+      <dl className="space-y-3 border-t border-line pt-4 text-sm">
         {status.position ? (
           <div className="flex justify-between gap-4">
             <dt className="text-muted-foreground">ตำแหน่ง</dt>

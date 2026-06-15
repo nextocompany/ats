@@ -39,7 +39,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
       ) : null}
 
       {isError || (!isLoading && !position) ? (
-        <div className="space-y-4 rounded-2xl border border-border bg-card p-8 text-center">
+        <div className="space-y-4 rounded-xl border border-line bg-card p-8 text-center">
           <p className="text-sm text-muted-foreground">ไม่พบตำแหน่งงานนี้</p>
           <Link href="/jobs" className={buttonVariants({ variant: "outline", size: "tap" })}>
             กลับไปดูตำแหน่งงานทั้งหมด
@@ -48,7 +48,7 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
       ) : null}
 
       {position && isAuthenticated && candidate ? (
-        <div className="rounded-2xl border border-border bg-card p-6 sm:p-8">
+        <div className="rounded-xl border border-line bg-card p-6 sm:p-8">
           <ApplyStepper positionId={position.id} positionTitle={position.title_th} account={candidate} />
         </div>
       ) : null}

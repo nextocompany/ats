@@ -6,28 +6,25 @@ import { use } from "react";
 import { PortalShell } from "@/components/PortalShell";
 import { buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { levelLabel } from "@/lib/levels";
 import { usePublicPosition } from "@/lib/queries";
 import { cn } from "@/lib/utils";
 
-const LEVEL_LABELS: Record<string, string> = {
-  entry: "ระดับเริ่มต้น",
-  experienced: "มีประสบการณ์",
-  senior: "ระดับอาวุโส",
-  management: "ระดับบริหาร",
-};
-
 // The public API exposes only title/level, so role content is intentionally
 // generic, reassuring copy (no fabricated job-specific requirements).
-const ABOUT = [
-  "ร่วมเป็นส่วนหนึ่งของทีมที่ใส่ใจการบริการและการเติบโตไปด้วยกัน เรามองหาผู้ที่มีความตั้งใจ ใจรักงานบริการ และพร้อมเรียนรู้สิ่งใหม่",
-];
+const ABOUT =
+  "ร่วมเป็นส่วนหนึ่งของทีมที่ใส่ใจการบริการและการเติบโตไปด้วยกัน เรามองหาผู้ที่มีความตั้งใจ ใจรักงานบริการ และพร้อมเรียนรู้สิ่งใหม่ เพื่อส่งมอบประสบการณ์ที่ดีให้กับลูกค้าในทุกสาขา";
 const OFFER = [
   "ค่าตอบแทนและโบนัสตามผลงาน",
   "ประกันสุขภาพและสวัสดิการพนักงาน",
   "เส้นทางก้าวหน้าในสายอาชีพที่ชัดเจน",
   "การอบรมและพัฒนาทักษะอย่างต่อเนื่อง",
 ];
-const STEPS = ["กดปุ่ม “สมัครงาน” แล้วให้ความยินยอม PDPA", "กรอกข้อมูลและแนบเรซูเม่", "ยืนยันตัวตนด้วย LINE แล้วส่งใบสมัคร"];
+const STEPS = [
+  "เข้าสู่ระบบหรือสมัครสมาชิก แล้วให้ความยินยอม PDPA",
+  "ตรวจสอบข้อมูลและแนบเรซูเม่ของคุณ",
+  "ส่งใบสมัคร แล้วติดตามสถานะได้ทุกเมื่อ",
+];
 
 export default function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -36,15 +33,16 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   return (
     <PortalShell backHref="/jobs">
       {isLoading ? (
-        <div className="space-y-4">
-          <Skeleton className="h-10 w-2/3" />
+        <div className="flex flex-col gap-5">
+          <Skeleton className="h-4 w-28" />
+          <Skeleton className="h-12 w-2/3" />
           <Skeleton className="h-5 w-1/3" />
-          <Skeleton className="h-48 w-full rounded-2xl" />
+          <Skeleton className="mt-4 h-48 w-full" />
         </div>
       ) : null}
 
       {isError || (!isLoading && !position) ? (
-        <div className="mx-auto max-w-md space-y-4 rounded-2xl border border-border bg-card p-8 text-center">
+        <div className="mx-auto flex max-w-md flex-col items-center gap-4 rounded-xl border border-line bg-card p-10 text-center">
           <p className="text-sm text-muted-foreground">ไม่พบตำแหน่งงานนี้</p>
           <Link href="/jobs" className={buttonVariants({ variant: "outline", size: "tap" })}>
             กลับไปดูตำแหน่งงานทั้งหมด
@@ -53,75 +51,75 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       ) : null}
 
       {position ? (
-        <div className="grid gap-10 lg:grid-cols-3 lg:gap-12">
-          {/* Content */}
-          <article className="space-y-10 lg:col-span-2">
-            <header className="space-y-4">
+        <article className="grid gap-12 lg:grid-cols-[1fr_320px] lg:gap-16">
+          <div className="flex max-w-2xl flex-col gap-12">
+            <header className="flex flex-col gap-4 border-b border-line pb-8">
               {position.level ? (
-                <span className="inline-flex items-center gap-2 rounded-full bg-brand-soft px-3 py-1 text-xs font-semibold text-accent">
-                  {LEVEL_LABELS[position.level.toLowerCase()] ?? position.level}
-                </span>
+                <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                  {levelLabel(position.level)}
+                </p>
               ) : null}
-              <h1 className="text-[length:var(--text-display)] font-bold leading-tight tracking-tight">
+              <h1 className="[font-size:var(--text-display)] font-bold leading-[1.1] text-foreground">
                 {position.title_th}
               </h1>
-              {position.title_en ? <p className="text-base text-muted-foreground">{position.title_en}</p> : null}
+              {position.title_en ? (
+                <p className="[font-size:var(--text-lead)] text-muted-foreground">{position.title_en}</p>
+              ) : null}
             </header>
 
-            <section className="space-y-3">
-              <h2 className="text-lg font-semibold">เกี่ยวกับตำแหน่งนี้</h2>
-              {ABOUT.map((p) => (
-                <p key={p} className="leading-relaxed text-foreground/80">
-                  {p}
-                </p>
-              ))}
+            <section className="flex flex-col gap-3">
+              <h2 className="[font-size:var(--text-h3)] font-semibold text-foreground">เกี่ยวกับตำแหน่งนี้</h2>
+              <p className="leading-relaxed text-foreground/80">{ABOUT}</p>
             </section>
 
-            <section className="space-y-4">
-              <h2 className="text-lg font-semibold">สิ่งที่เรามอบให้</h2>
-              <ul className="grid gap-3 sm:grid-cols-2">
+            <section className="flex flex-col gap-4">
+              <h2 className="[font-size:var(--text-h3)] font-semibold text-foreground">สิ่งที่เรามอบให้</h2>
+              <ul className="divide-y divide-line border-y border-line">
                 {OFFER.map((o) => (
-                  <li key={o} className="flex items-start gap-3 rounded-xl border border-border bg-card p-4 text-sm">
-                    <span className="mt-0.5 grid size-5 shrink-0 place-content-center rounded-full bg-accent/10 text-accent" aria-hidden="true">
+                  <li key={o} className="flex items-start gap-3 py-4 text-foreground/85">
+                    <span
+                      aria-hidden="true"
+                      className="mt-0.5 grid size-5 shrink-0 place-content-center rounded-full bg-primary/10 text-primary"
+                    >
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
                         <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                     </span>
-                    <span className="text-foreground/80">{o}</span>
+                    {o}
                   </li>
                 ))}
               </ul>
             </section>
 
-            <section className="space-y-4">
-              <h2 className="text-lg font-semibold">ขั้นตอนการสมัคร</h2>
-              <ol className="space-y-3">
+            <section className="flex flex-col gap-4">
+              <h2 className="[font-size:var(--text-h3)] font-semibold text-foreground">ขั้นตอนการสมัคร</h2>
+              <ol className="flex flex-col gap-4">
                 {STEPS.map((s, i) => (
-                  <li key={s} className="flex items-start gap-3 text-sm text-foreground/80">
-                    <span className="grid size-6 shrink-0 place-content-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+                  <li key={s} className="flex items-start gap-3.5 text-foreground/85">
+                    <span className="num grid size-7 shrink-0 place-content-center rounded-full border border-line bg-secondary text-sm font-semibold text-foreground">
                       {i + 1}
                     </span>
-                    {s}
+                    <span className="pt-0.5">{s}</span>
                   </li>
                 ))}
               </ol>
             </section>
-          </article>
+          </div>
 
-          {/* Apply card — sticky on desktop, inline on mobile */}
-          <aside className="lg:col-span-1">
-            <div className="space-y-4 rounded-2xl border border-border bg-card p-6 lg:sticky lg:top-24">
-              <div className="space-y-1">
+          {/* Apply card — sticky on desktop, inline on mobile. */}
+          <aside className="lg:col-start-2">
+            <div className="flex flex-col gap-4 rounded-xl border border-line bg-card p-6 lg:sticky lg:top-24">
+              <div className="flex flex-col gap-1">
                 <p className="text-sm text-muted-foreground">สนใจตำแหน่งนี้?</p>
-                <p className="text-lg font-semibold">สมัครได้เลยวันนี้</p>
+                <p className="text-lg font-semibold text-foreground">สมัครได้เลยวันนี้</p>
               </div>
               <Link href={`/jobs/${position.id}/apply`} className={cn(buttonVariants({ size: "tap" }), "w-full")}>
                 สมัครงาน
               </Link>
-              <p className="text-center text-xs text-muted-foreground">ใช้เวลาไม่กี่นาที · ทีม HR จะติดต่อกลับ</p>
+              <p className="text-center text-xs text-muted-foreground">ใช้เวลาไม่กี่นาที &middot; ทีม HR จะติดต่อกลับ</p>
             </div>
           </aside>
-        </div>
+        </article>
       ) : null}
     </PortalShell>
   );
