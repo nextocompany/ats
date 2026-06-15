@@ -9,13 +9,27 @@ import (
 )
 
 // Status values.
+//
+// Pipeline statuses (set by the system) and the HR funnel statuses form one
+// VARCHAR column; the legal FROM→TO progression is enforced by the state machine
+// in transitions.go (not the DB). "scored" is the funnel entry — the UI labels it
+// "Screened". The funnel terminal action is now "offer" (the Offer Package itself
+// is a future feature); StatusHired is retained for backward compatibility.
 const (
 	StatusPending  = "pending"  // S1: created, awaiting pipeline
 	StatusParsed   = "parsed"   // S1: OCR + parse done
 	StatusFailed   = "failed"   // pipeline error
-	StatusScored   = "scored"   // S2: passed gate, scored + assigned
-	StatusRejected = "rejected" // S2: failed must-have gate
-	StatusHired    = "hired"    // S3: HR hired → pushed to PeopleSoft
+	StatusScored   = "scored"   // S2: passed gate, scored + assigned == "screened"
+	StatusRejected = "rejected" // failed must-have gate, or HR reject (with reason)
+	StatusHired    = "hired"    // legacy terminal (superseded by StatusOffer)
+
+	// HR funnel statuses (manual transitions, gated by transitions.go).
+	StatusAIInterview   = "ai_interview"   // AI pre-interview invited / in progress
+	StatusAIInterviewed = "ai_interviewed" // AI pre-interview completed (system-set)
+	StatusShortlisted   = "shortlisted"    // HR shortlisted
+	StatusInterview     = "interview"      // human interview scheduled (carries appointment)
+	StatusInterviewed   = "interviewed"    // human interview completed
+	StatusOffer         = "offer"          // entered Offer Package process (future)
 )
 
 // Application maps the applications table (columns used in Sprint 1).
@@ -24,6 +38,7 @@ type Application struct {
 	CandidateID          uuid.UUID  `json:"candidate_id"`
 	PositionID           uuid.UUID  `json:"position_id"`
 	Status               string     `json:"status"`
+	RejectionReason      string     `json:"rejection_reason,omitempty"` // internal; never sent to the candidate
 	RawFileBlobURL       string     `json:"raw_file_blob_url"`
 	RawFileType          string     `json:"raw_file_type"`
 	OCRTextBlobURL       string     `json:"ocr_text_blob_url"`
@@ -68,6 +83,28 @@ type ScoreBreakdown struct {
 	Language   int `json:"language"`
 	Location   int `json:"location"`
 }
+
+// Appointment is a scheduled human interview for an application (onsite or
+// online). For online interviews OnlineJoinURL holds the Teams join link and
+// CalendarEventID the Graph event id (for a future cancel/reschedule).
+type Appointment struct {
+	ID              uuid.UUID  `json:"id"`
+	ApplicationID   uuid.UUID  `json:"application_id"`
+	ScheduledAt     time.Time  `json:"scheduled_at"`
+	DurationMin     int        `json:"duration_min"`
+	Mode            string     `json:"mode"` // "onsite" | "online"
+	LocationText    string     `json:"location_text,omitempty"`
+	OnlineJoinURL   string     `json:"online_join_url,omitempty"`
+	CalendarEventID string     `json:"-"` // internal Graph id, never serialized
+	CreatedBy       *uuid.UUID `json:"-"`
+	CreatedAt       time.Time  `json:"created_at"`
+}
+
+// Interview modes.
+const (
+	ModeOnsite = "onsite"
+	ModeOnline = "online"
+)
 
 // Score carries scoring results in a repository-friendly (pre-serialized) form,
 // so this package does not depend on the scoring package.

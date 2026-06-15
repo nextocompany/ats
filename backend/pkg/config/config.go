@@ -92,6 +92,16 @@ type Config struct {
 	NotifyLINEToken string // LINE Messaging API channel access token (push)
 	NotifyEmailFrom string // from-address for email delivery (real)
 
+	// Interview calendar (Microsoft Graph) — "mock" (default) or "real". When real,
+	// online interviews create a Teams meeting + a calendar event on the service
+	// mailbox with the candidate as an email attendee (app-only client credentials).
+	GraphProvider         string
+	GraphTenantID         string
+	GraphClientID         string
+	GraphClientSecret     string
+	GraphOrganizerMailbox string // service mailbox the event is created on (e.g. interviews@…)
+	GraphTimeZone         string // Windows tz name for event start/end (default "SE Asia Standard Time")
+
 	// Google Login (candidate membership) — "mock" (default) or "real". The OAuth
 	// web flow mirrors LINE Login; the client secret signs the code→token exchange
 	// and the callback URL must exactly match the one registered in Google Cloud.
@@ -221,6 +231,13 @@ func Load() (*Config, error) {
 		NotifyLINEToken: os.Getenv("NOTIFY_LINE_TOKEN"),
 		NotifyEmailFrom: os.Getenv("NOTIFY_EMAIL_FROM"),
 
+		GraphProvider:         getenv("GRAPH_PROVIDER", "mock"),
+		GraphTenantID:         os.Getenv("GRAPH_TENANT_ID"),
+		GraphClientID:         os.Getenv("GRAPH_CLIENT_ID"),
+		GraphClientSecret:     os.Getenv("GRAPH_CLIENT_SECRET"),
+		GraphOrganizerMailbox: os.Getenv("GRAPH_ORGANIZER_MAILBOX"),
+		GraphTimeZone:         getenv("GRAPH_TIMEZONE", "SE Asia Standard Time"),
+
 		GoogleProvider:     getenv("GOOGLE_PROVIDER", "mock"),
 		GoogleClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
 		GoogleClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
@@ -282,6 +299,7 @@ func Load() (*Config, error) {
 		{"NOTIFY_PROVIDER", c.NotifyProvider, []string{"mock", ProviderReal}},
 		{"GOOGLE_PROVIDER", c.GoogleProvider, []string{"mock", ProviderReal}},
 		{"EMAIL_PROVIDER", c.EmailProvider, []string{"mock", ProviderReal}},
+		{"GRAPH_PROVIDER", c.GraphProvider, []string{"mock", ProviderReal}},
 	} {
 		if !isOneOf(p.val, p.allowed) {
 			return nil, fmt.Errorf("config: %s must be one of %v, got %q", p.name, p.allowed, p.val)
@@ -298,6 +316,11 @@ func Load() (*Config, error) {
 	}
 	if c.UsesGeminiAI() && c.GeminiAPIKey == "" {
 		return nil, fmt.Errorf("config: GEMINI_API_KEY is required when AI_PROVIDER=gemini")
+	}
+	if c.UsesRealGraph() {
+		if c.GraphTenantID == "" || c.GraphClientID == "" || c.GraphClientSecret == "" || c.GraphOrganizerMailbox == "" {
+			return nil, fmt.Errorf("config: GRAPH_TENANT_ID, GRAPH_CLIENT_ID, GRAPH_CLIENT_SECRET, GRAPH_ORGANIZER_MAILBOX are required when GRAPH_PROVIDER=real")
+		}
 	}
 	if c.UsesRealPeopleSoft() {
 		if c.PSIBBaseURL == "" || c.PSIBTokenURL == "" || c.PSIBClientID == "" || c.PSIBClientSecret == "" {
@@ -381,6 +404,10 @@ func (c *Config) IsMultiTenantAuth() bool { return len(c.AllowedTenantList()) > 
 // UsesRealNotify reports whether the real notifier (LINE push / email) should be
 // constructed. Mock (log-only) is the default so local/CI need no credentials.
 func (c *Config) UsesRealNotify() bool { return c.NotifyProvider == ProviderReal }
+
+// UsesRealGraph reports whether the real Microsoft Graph calendar provider should
+// be constructed. Mock (log-only, returns a fake join URL) is the default.
+func (c *Config) UsesRealGraph() bool { return c.GraphProvider == ProviderReal }
 
 // UsesRealGoogle reports whether the real Google Login OAuth flow should be used
 // for candidate membership. Mock (stub bounce) is the default.

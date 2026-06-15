@@ -165,6 +165,8 @@ func mapError(err error) error {
 		return fiber.NewError(fiber.StatusConflict, "interview was updated concurrently, please retry")
 	case errors.Is(err, ErrEmptyAnswer):
 		return fiber.NewError(fiber.StatusBadRequest, "answer must not be empty")
+	case errors.Is(err, ErrNotScreened):
+		return fiber.NewError(fiber.StatusConflict, "AI interview is only available after screening")
 	default:
 		return err
 	}

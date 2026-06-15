@@ -10,9 +10,11 @@ interface BulkActionBarProps {
   onDone: () => void;
 }
 
+// Bulk only supports transitions that need no per-candidate payload. Interview
+// (needs a schedule) and Hire are single-record actions. The state machine gates
+// each id server-side, so ids not in a valid source state are reported as failed.
 const ACTIONS: { label: string; action: string; value: string }[] = [
   { label: "Shortlist", action: "status", value: "shortlisted" },
-  { label: "Interview", action: "status", value: "interview" },
   { label: "Reject", action: "reject", value: "rejected" },
 ];
 
@@ -21,8 +23,18 @@ export function BulkActionBar({ selected, onDone }: BulkActionBarProps) {
   if (selected.length === 0) return null;
 
   const run = (action: string, value: string, label: string) => {
+    // Reject requires a reason (stored internally; never sent to candidates).
+    let reason: string | undefined;
+    if (action === "reject") {
+      const entered = window.prompt(`Reason for rejecting ${selected.length} candidate(s)?`)?.trim();
+      if (!entered) {
+        toast.error("A rejection reason is required");
+        return;
+      }
+      reason = entered;
+    }
     bulk.mutate(
-      { ids: selected, action, value },
+      { ids: selected, action, value, reason },
       {
         onSuccess: () => {
           toast.success(`${label}: ${selected.length} updated`);

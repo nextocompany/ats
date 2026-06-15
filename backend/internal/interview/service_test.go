@@ -106,6 +106,15 @@ func (s stubApps) FindByID(_ context.Context, _ uuid.UUID) (*applications.Applic
 	return s.app, nil
 }
 
+// SetStatus mutates the held application so tests can assert funnel advancement
+// (scored → ai_interview → ai_interviewed).
+func (s stubApps) SetStatus(_ context.Context, _ uuid.UUID, status string) error {
+	if s.app != nil {
+		s.app.Status = status
+	}
+	return nil
+}
+
 type stubPositions struct{ pos *positions.Position }
 
 func (s stubPositions) FindByID(_ context.Context, _ uuid.UUID) (*positions.Position, error) {
@@ -128,7 +137,7 @@ func (r *recordingNotifier) Send(_ context.Context, _ notify.Message) error {
 func newTestService(t *testing.T, repo Repository, n notify.Notifier, maxTurns int) (*Service, uuid.UUID) {
 	t.Helper()
 	appID := uuid.New()
-	app := &applications.Application{ID: appID, CandidateID: uuid.New(), PositionID: uuid.New(), AISummary: "ผู้สมัครมีประสบการณ์ค้าปลีก"}
+	app := &applications.Application{ID: appID, CandidateID: uuid.New(), PositionID: uuid.New(), Status: applications.StatusScored, AISummary: "ผู้สมัครมีประสบการณ์ค้าปลีก"}
 	pos := &positions.Position{TitleTH: "พนักงานขาย", Responsibilities: "ดูแลหน้าร้าน", Qualifications: "สื่อสารดี"}
 	cand := &candidates.Candidate{FullName: "สมชาย ใจดี", LineUserID: "U123"}
 	svc := NewService(repo, mockInterviewer{}, stubApps{app}, stubPositions{pos}, stubCands{cand}, n, "http://portal", maxTurns)
@@ -136,6 +145,41 @@ func newTestService(t *testing.T, repo Repository, n notify.Notifier, maxTurns i
 }
 
 // --- tests ---
+
+func TestInvite_SetsAIInterviewStatus(t *testing.T) {
+	app := &applications.Application{ID: uuid.New(), CandidateID: uuid.New(), PositionID: uuid.New(), Status: applications.StatusScored}
+	svc := NewService(newMemRepo(), mockInterviewer{}, stubApps{app}, stubPositions{&positions.Position{}}, stubCands{&candidates.Candidate{}}, &recordingNotifier{}, "http://portal", 3)
+	if _, err := svc.Invite(context.Background(), app.ID); err != nil {
+		t.Fatalf("invite: %v", err)
+	}
+	if app.Status != applications.StatusAIInterview {
+		t.Fatalf("expected status ai_interview after invite, got %q", app.Status)
+	}
+}
+
+func TestInvite_NotScreenedRejected(t *testing.T) {
+	app := &applications.Application{ID: uuid.New(), CandidateID: uuid.New(), PositionID: uuid.New(), Status: applications.StatusShortlisted}
+	svc := NewService(newMemRepo(), mockInterviewer{}, stubApps{app}, stubPositions{&positions.Position{}}, stubCands{&candidates.Candidate{}}, &recordingNotifier{}, "http://portal", 3)
+	if _, err := svc.Invite(context.Background(), app.ID); !errors.Is(err, ErrNotScreened) {
+		t.Fatalf("want ErrNotScreened from a non-screened app, got %v", err)
+	}
+}
+
+func TestRespond_AdvancesAppToInterviewed(t *testing.T) {
+	app := &applications.Application{ID: uuid.New(), CandidateID: uuid.New(), PositionID: uuid.New(), Status: applications.StatusScored}
+	svc := NewService(newMemRepo(), mockInterviewer{}, stubApps{app}, stubPositions{&positions.Position{}}, stubCands{&candidates.Candidate{}}, &recordingNotifier{}, "http://portal", 1)
+	ctx := context.Background()
+	invited, _ := svc.Invite(ctx, app.ID) // → ai_interview
+	if _, err := svc.Start(ctx, invited.AccessToken); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	if _, err := svc.Respond(ctx, invited.AccessToken, "คำตอบสุดท้าย"); err != nil {
+		t.Fatalf("respond: %v", err)
+	}
+	if app.Status != applications.StatusAIInterviewed {
+		t.Fatalf("expected status ai_interviewed after completion, got %q", app.Status)
+	}
+}
 
 func TestInvite_Idempotent(t *testing.T) {
 	repo := newMemRepo()
@@ -163,7 +207,7 @@ func TestInvite_NoLineHandle_NoNotify(t *testing.T) {
 	repo := newMemRepo()
 	n := &recordingNotifier{}
 	appID := uuid.New()
-	app := &applications.Application{ID: appID, CandidateID: uuid.New(), PositionID: uuid.New()}
+	app := &applications.Application{ID: appID, CandidateID: uuid.New(), PositionID: uuid.New(), Status: applications.StatusScored}
 	pos := &positions.Position{TitleTH: "พนักงานขาย"}
 	cand := &candidates.Candidate{FullName: "ไม่มีไลน์"} // empty LineUserID
 	svc := NewService(repo, mockInterviewer{}, stubApps{app}, stubPositions{pos}, stubCands{cand}, n, "http://portal", 3)

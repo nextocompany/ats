@@ -25,7 +25,7 @@ import { Button } from "@/components/ui/button";
 import { useApplications } from "@/lib/queries";
 import type { Application } from "@/lib/types";
 
-const STATUSES = ["", "pending", "parsed", "scored", "shortlisted", "interview", "hired", "rejected"];
+const STATUSES = ["", "pending", "parsed", "scored", "ai_interview", "ai_interviewed", "shortlisted", "interview", "interviewed", "offer", "hired", "rejected"];
 const LIMIT = 20;
 
 // Friendly relative time so "Applied" reads as recency, not an ISO timestamp.
