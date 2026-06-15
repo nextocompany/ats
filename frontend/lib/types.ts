@@ -190,6 +190,41 @@ export interface AdminSettings {
   allow_all_tenants: boolean;
 }
 
+// HRUser mirrors internal/hrauth.User — a local password account managed by a
+// super_admin (alongside Entra SSO users).
+export interface HRUser {
+  id: string;
+  email: string;
+  full_name: string;
+  role: string;
+  store_id?: number | null;
+  subregion?: string;
+  is_active: boolean;
+  has_password: boolean;
+  last_login_at?: string | null;
+  created_at: string;
+}
+
+// CreateHRUserInput is the super_admin payload to provision a local account.
+export interface CreateHRUserInput {
+  email: string;
+  full_name: string;
+  role: string;
+  store_id?: number | null;
+  subregion?: string;
+  password: string;
+}
+
+// UpdateHRUserInput patches an account (sparse: omitted fields are unchanged).
+export interface UpdateHRUserInput {
+  full_name?: string;
+  role?: string;
+  store_id?: number | null;
+  subregion?: string;
+  is_active?: boolean;
+  password?: string;
+}
+
 export interface ApplicationFilter {
   status?: string;
   min_score?: number;

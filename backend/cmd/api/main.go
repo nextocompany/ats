@@ -25,6 +25,7 @@ import (
 	"github.com/nexto/hr-ats/internal/candidates"
 	"github.com/nexto/hr-ats/internal/fit"
 	"github.com/nexto/hr-ats/internal/health"
+	"github.com/nexto/hr-ats/internal/hrauth"
 	"github.com/nexto/hr-ats/internal/interview"
 	"github.com/nexto/hr-ats/internal/lineauth"
 	"github.com/nexto/hr-ats/internal/members"
@@ -150,11 +151,19 @@ func main() {
 	// Settings service backs the runtime "allow all Entra tenants" admin toggle,
 	// read by the auth middleware (cached) and managed via /api/v1/admin/settings.
 	settingsSvc := settings.NewService(settings.NewRepository(pool))
-	authMW, err := middleware.Auth(ctx, cfg, settingsSvc)
+	// HR password sign-in (local accounts alongside Entra SSO): the service both
+	// validates session cookies for the auth middleware and serves login/logout +
+	// super_admin account management. secureCookie ⇒ Secure + SameSite=None in prod.
+	hrAuthSvc := hrauth.NewService(hrauth.NewRepository(pool), cfg.HRSessionTTL)
+	authMW, err := middleware.Auth(ctx, cfg, settingsSvc, hrAuthSvc)
 	if err != nil {
 		log.Fatal().Err(err).Msg("auth middleware init failed")
 	}
 	app.Use(authMW)
+	// CSRF guard for cookie-authed mutations: once the hr_auth cookie exists
+	// (SameSite=None in prod), state-changing requests must carry an allowed Origin.
+	// Safe methods, no-Origin machine calls, and bearer-authed requests pass.
+	app.Use(middleware.EnforceOrigin(cfg.CORSAllowOrigins))
 
 	checkers := []health.Checker{
 		health.NewChecker("postgres", func(ctx context.Context) error { return pool.Ping(ctx) }),
@@ -298,6 +307,21 @@ func main() {
 	reports.RegisterRoutes(app, reports.NewHandler(reportRepo, reportExporter, blobClient))
 	pdpa.RegisterRoutes(app, pdpa.NewHandler(pdpaRepo))
 	users.RegisterRoutes(app, users.NewHandler())
+	// HR password sign-in + super_admin account management (alongside Entra SSO).
+	// login/logout are unauthenticated (see middleware.isUnauthedPath); the
+	// /admin/users CRUD is gated to super_admin in-handler. The login endpoint is
+	// the credential-stuffing surface, so it gets its own tight per-IP rate limit
+	// (Redis-backed for cross-replica parity, like the public limiter above).
+	app.Use("/api/v1/auth/login", limiter.New(limiter.Config{
+		Max:          cfg.RateLimitLoginMax,
+		Expiration:   publicRateWindow,
+		Storage:      ratelimit.New(rdb),
+		KeyGenerator: func(c *fiber.Ctx) string { return c.IP() },
+		LimitReached: func(c *fiber.Ctx) error {
+			return fiber.NewError(fiber.StatusTooManyRequests, "too many login attempts")
+		},
+	}))
+	hrauth.RegisterRoutes(app, hrauth.NewHandler(hrAuthSvc, !cfg.IsDevelopment()))
 
 	go func() {
 		addr := "0.0.0.0:" + cfg.HTTPPort

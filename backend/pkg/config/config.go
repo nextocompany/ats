@@ -114,6 +114,11 @@ type Config struct {
 	SessionCookieName   string        // cookie name (default "cp_session")
 	EmailOTPTTL         time.Duration // OTP validity window (default 10m)
 
+	// HR password sign-in (local accounts, alongside Entra SSO). Sessions are
+	// httpOnly cookies with a server-side opaque token — shorter-lived than the
+	// candidate session as the admin console is higher-privilege.
+	HRSessionTTL time.Duration // how long an HR password login stays valid (default 12h)
+
 	// PortalBaseURL is the public Career Portal origin used to build apply links
 	// in outbound notifications.
 	PortalBaseURL string
@@ -142,6 +147,10 @@ type Config struct {
 	// Public API rate limit (Sprint 7): max requests per IP per minute on
 	// /api/v1/public/*. Enforced cluster-wide via the Redis-backed store.
 	RateLimitPublicMax int
+
+	// Login rate limit: max POST /api/v1/auth/login attempts per IP per minute —
+	// the credential-stuffing surface. Deliberately tight.
+	RateLimitLoginMax int
 
 	// CORSAllowOrigins is the comma-separated allowlist for browser clients.
 	CORSAllowOrigins string
@@ -225,6 +234,7 @@ func Load() (*Config, error) {
 		CandidateSessionTTL: getenvDuration("CANDIDATE_SESSION_TTL", 720*time.Hour), // 30 days
 		SessionCookieName:   getenv("CANDIDATE_SESSION_COOKIE", "cp_session"),
 		EmailOTPTTL:         getenvDuration("EMAIL_OTP_TTL", 10*time.Minute),
+		HRSessionTTL:        getenvDuration("HR_SESSION_TTL", 12*time.Hour),
 
 		PortalBaseURL: getenv("PORTAL_BASE_URL", "http://localhost:3001"),
 
@@ -241,6 +251,7 @@ func Load() (*Config, error) {
 		AuthCleanupBatch:   getenvInt("AUTH_CLEANUP_BATCH", 500),
 
 		RateLimitPublicMax: getenvInt("RATE_LIMIT_PUBLIC_MAX", 30),
+		RateLimitLoginMax:  getenvInt("RATE_LIMIT_LOGIN_MAX", 10),
 
 		CORSAllowOrigins: getenv("CORS_ALLOW_ORIGINS", "http://localhost:3000,http://localhost:3001"),
 		TrustedProxies:   os.Getenv("TRUSTED_PROXIES"),

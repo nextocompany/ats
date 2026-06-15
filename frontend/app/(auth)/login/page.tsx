@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Building2, ShieldCheck } from "lucide-react";
+import { ArrowRight, Building2, Loader2, ShieldCheck } from "lucide-react";
 
-import { isEntraConfigured, signIn } from "@/lib/auth";
+import { isEntraConfigured, signIn, signInWithPassword } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 // Confident, branded proof points on the front door — reads as a real platform.
 const PROOF = [
@@ -16,6 +18,25 @@ const PROOF = [
 export default function LoginPage() {
   const router = useRouter();
   const entra = isEntraConfigured();
+
+  // Local password sign-in state (the second auth path, alongside Microsoft SSO).
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function onPasswordSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      await signInWithPassword(email.trim(), password);
+      router.push("/applications");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Sign-in failed");
+      setSubmitting(false);
+    }
+  }
 
   return (
     <main className="grid min-h-dvh lg:grid-cols-[1.4fr_minmax(26rem,0.85fr)]">
@@ -109,16 +130,80 @@ export default function LoginPage() {
           </p>
 
           {entra ? (
-            <Button
-              className="mt-8 h-11 w-full gap-2 text-sm shadow-sm"
-              onClick={() => {
-                // Redirect to Microsoft; AuthProvider routes onward post-login.
-                void signIn();
-              }}
-            >
-              <Building2 className="size-4" />
-              Sign in with Microsoft
-            </Button>
+            <>
+              <Button
+                className="mt-8 h-11 w-full gap-2 text-sm shadow-sm"
+                onClick={() => {
+                  // Redirect to Microsoft; AuthProvider routes onward post-login.
+                  void signIn();
+                }}
+              >
+                <Building2 className="size-4" />
+                Sign in with Microsoft
+              </Button>
+
+              {/* Divider between SSO and the local password path */}
+              <div className="my-6 flex items-center gap-3">
+                <span className="h-px flex-1 bg-hairline" aria-hidden />
+                <span className="text-[0.6875rem] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                  or sign in with email
+                </span>
+                <span className="h-px flex-1 bg-hairline" aria-hidden />
+              </div>
+
+              <form onSubmit={onPasswordSubmit} className="space-y-3" noValidate>
+                <div className="space-y-1.5">
+                  <label htmlFor="email" className="text-xs font-medium text-foreground">
+                    Email
+                  </label>
+                  <Input
+                    id="email"
+                    type="email"
+                    autoComplete="username"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@cpaxtra.com"
+                    className="h-10"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="password" className="text-xs font-medium text-foreground">
+                    Password
+                  </label>
+                  <Input
+                    id="password"
+                    type="password"
+                    autoComplete="current-password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="h-10"
+                  />
+                </div>
+
+                {error && (
+                  <p role="alert" className="text-xs font-medium text-destructive">
+                    {error}
+                  </p>
+                )}
+
+                <Button
+                  type="submit"
+                  variant="outline"
+                  disabled={submitting || !email || !password}
+                  className="h-10 w-full gap-2 text-sm"
+                >
+                  {submitting ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <ArrowRight className="size-4" />
+                  )}
+                  Sign in
+                </Button>
+              </form>
+            </>
           ) : (
             <Button
               className="mt-8 h-11 w-full gap-2 text-sm shadow-sm"
@@ -135,8 +220,8 @@ export default function LoginPage() {
           <div className="mt-6 rounded-lg border border-hairline bg-card p-4">
             <p className="text-xs leading-relaxed text-muted-foreground">
               {entra
-                ? "Single sign-on via Microsoft Entra ID. Access and role permissions are managed by your organization."
-                : "Development sign-in for the screening team. Production access will move to Azure AD single sign-on with role-based permissions."}
+                ? "Sign in with your Microsoft organization account, or with an email and password provisioned by your administrator. Access and role permissions are managed centrally."
+                : "Development sign-in for the screening team. Production access uses Microsoft Entra ID single sign-on or an administrator-provisioned password."}
             </p>
           </div>
         </div>

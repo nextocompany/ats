@@ -17,6 +17,15 @@ import type {
 
 export const SESSION_COOKIE = "hr_session";
 
+// Marker values written to SESSION_COOKIE. The cookie is a readable UI marker only
+// (route gating + which credential the API client should attach); real security is
+// the backend bearer/cookie check.
+const MARKER_ENTRA = "entra";
+const MARKER_PASSWORD = "pw";
+const MARKER_DEV = "dev";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+
 // Scopes for an ID token only — no Graph/API access tokens needed; the ID token
 // itself is the bearer (aud = client ID) the Go backend validates.
 const LOGIN_SCOPES = ["openid", "profile"];
@@ -87,12 +96,29 @@ export async function getMsalInstance(): Promise<PublicClientApplicationType | n
 // --- Marker cookie ---------------------------------------------------------
 
 /** Sets the UI marker cookie so server middleware keeps gating routes. */
-export function setSessionMarker(value = "entra") {
+export function setSessionMarker(value = MARKER_ENTRA) {
   document.cookie = `${SESSION_COOKIE}=${value}; path=/; max-age=43200; samesite=lax`;
 }
 
 function clearSessionMarker() {
   document.cookie = `${SESSION_COOKIE}=; path=/; max-age=0; samesite=lax`;
+}
+
+/** Reads the current session marker, or null when signed out / on the server. */
+function readMarker(): string | null {
+  if (typeof document === "undefined") return null;
+  const m = document.cookie.match(new RegExp(`(?:^|;\\s*)${SESSION_COOKIE}=([^;]+)`));
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+/**
+ * True when the active session is a local password login. Such a session is
+ * authenticated by the backend's httpOnly `hr_auth` cookie, so the API client
+ * must NOT attach an Entra bearer (which would override it / fail when no MSAL
+ * account exists).
+ */
+export function isPasswordSession(): boolean {
+  return readMarker() === MARKER_PASSWORD;
 }
 
 // --- Public API ------------------------------------------------------------
@@ -105,10 +131,46 @@ export async function signIn() {
     return;
   }
   // DEV: 12h dev session.
-  document.cookie = `${SESSION_COOKIE}=dev; path=/; max-age=43200; samesite=lax`;
+  setSessionMarker(MARKER_DEV);
+}
+
+/**
+ * Signs in with a local username/password. The backend verifies the credentials,
+ * sets the httpOnly `hr_auth` session cookie, and we record a readable "pw" marker
+ * so route gating + the API client know this is a password (non-Entra) session.
+ * Throws with the server message on failure so the form can surface it.
+ */
+export async function signInWithPassword(email: string, password: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+    credentials: "include",
+  });
+  let env: { success?: boolean; error?: string } = {};
+  try {
+    env = await res.json();
+  } catch {
+    throw new Error(`Sign-in failed (${res.status})`);
+  }
+  if (!res.ok || !env.success) {
+    throw new Error(env.error ?? "Invalid email or password");
+  }
+  setSessionMarker(MARKER_PASSWORD);
 }
 
 export async function signOut() {
+  // Password session: revoke server-side + clear cookies, then return to login.
+  if (isPasswordSession()) {
+    try {
+      await fetch(`${API_BASE}/api/v1/auth/logout`, { method: "POST", credentials: "include" });
+    } catch {
+      // best-effort: clearing the local marker still logs the UI out
+    }
+    clearSessionMarker();
+    if (typeof window !== "undefined") window.location.href = "/login";
+    return;
+  }
   if (isEntraConfigured()) {
     clearSessionMarker();
     const instance = await getMsalInstance();
@@ -131,6 +193,9 @@ function activeAccount(instance: PublicClientApplicationType): AccountInfo | nul
  */
 export async function getIdToken(): Promise<string | null> {
   if (!isEntraConfigured()) return null;
+  // A password session authenticates via the httpOnly cookie — never attach an
+  // Entra bearer (there is no MSAL account, and a stale token would 401).
+  if (isPasswordSession()) return null;
   const instance = await getMsalInstance();
   if (!instance) return null;
 

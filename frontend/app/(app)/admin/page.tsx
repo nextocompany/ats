@@ -3,6 +3,7 @@
 import { ShieldAlert, ShieldCheck } from "lucide-react";
 
 import { PageHeader } from "@/components/shell/PageHeader";
+import { UserManagement } from "@/components/admin/UserManagement";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { useAdminSettings, useMe, useUpdateAdminSettings } from "@/lib/queries";
@@ -117,6 +118,8 @@ export default function AdminPage() {
           )}
         </div>
       </section>
+
+      <UserManagement />
     </div>
   );
 }
