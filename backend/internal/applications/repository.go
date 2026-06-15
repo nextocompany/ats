@@ -29,6 +29,9 @@ type Repository interface {
 	// Interview appointments (human interview scheduling, state-machine feature).
 	CreateAppointment(ctx context.Context, a Appointment) (Appointment, error)
 	FindAppointment(ctx context.Context, applicationID uuid.UUID) (*Appointment, error)
+	// Interview feedback (structured panel outcome; many rows per application).
+	CreateFeedback(ctx context.Context, f InterviewFeedback) (InterviewFeedback, error)
+	ListFeedback(ctx context.Context, applicationID uuid.UUID) ([]InterviewFeedback, error)
 	// Sprint 2:
 	SetCanonicalCandidate(ctx context.Context, id, candidateID uuid.UUID) error
 	SetDedupState(ctx context.Context, id uuid.UUID, state string, confidence float64) error
@@ -175,6 +178,65 @@ func (r *pgRepository) FindAppointment(ctx context.Context, applicationID uuid.U
 		return nil, fmt.Errorf("applications: find appointment: %w", err)
 	}
 	return &a, nil
+}
+
+func (r *pgRepository) CreateFeedback(ctx context.Context, f InterviewFeedback) (InterviewFeedback, error) {
+	comp, err := json.Marshal(f.Competencies)
+	if err != nil {
+		return InterviewFeedback{}, fmt.Errorf("applications: marshal competencies: %w", err)
+	}
+	const q = `
+		INSERT INTO interview_feedback
+			(application_id, appointment_id, interviewer_id, overall_rating, recommendation,
+			 competencies, strengths, concerns, notes)
+		VALUES ($1, $2, $3, $4, $5, $6, NULLIF($7,''), NULLIF($8,''), NULLIF($9,''))
+		RETURNING id, created_at`
+	err = r.pool.QueryRow(ctx, q,
+		f.ApplicationID, f.AppointmentID, f.InterviewerID, f.OverallRating, f.Recommendation,
+		comp, f.Strengths, f.Concerns, f.Notes,
+	).Scan(&f.ID, &f.CreatedAt)
+	if err != nil {
+		return InterviewFeedback{}, fmt.Errorf("applications: create feedback: %w", err)
+	}
+	return f, nil
+}
+
+func (r *pgRepository) ListFeedback(ctx context.Context, applicationID uuid.UUID) ([]InterviewFeedback, error) {
+	const q = `
+		SELECT f.id, f.application_id, f.appointment_id, f.overall_rating, f.recommendation,
+		       f.competencies, COALESCE(f.strengths,''), COALESCE(f.concerns,''), COALESCE(f.notes,''),
+		       COALESCE(u.full_name, u.email, ''), f.created_at
+		FROM interview_feedback f
+		LEFT JOIN users u ON u.id = f.interviewer_id
+		WHERE f.application_id = $1
+		ORDER BY f.created_at DESC`
+	rows, err := r.pool.Query(ctx, q, applicationID)
+	if err != nil {
+		return nil, fmt.Errorf("applications: list feedback: %w", err)
+	}
+	defer rows.Close()
+
+	out := make([]InterviewFeedback, 0)
+	for rows.Next() {
+		var f InterviewFeedback
+		var comp []byte
+		if err := rows.Scan(
+			&f.ID, &f.ApplicationID, &f.AppointmentID, &f.OverallRating, &f.Recommendation,
+			&comp, &f.Strengths, &f.Concerns, &f.Notes, &f.InterviewerName, &f.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("applications: scan feedback: %w", err)
+		}
+		if len(comp) > 0 {
+			if err := json.Unmarshal(comp, &f.Competencies); err != nil {
+				return nil, fmt.Errorf("applications: decode competencies: %w", err)
+			}
+		}
+		out = append(out, f)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("applications: iterate feedback: %w", err)
+	}
+	return out, nil
 }
 
 func (r *pgRepository) SetParseResults(ctx context.Context, id uuid.UUID, res ParseResult) error {

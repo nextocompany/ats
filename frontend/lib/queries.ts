@@ -13,6 +13,8 @@ import type {
   Funnel,
   HRUser,
   InterviewAppointment,
+  InterviewFeedback,
+  InterviewFeedbackInput,
   InterviewInviteResult,
   InterviewView,
   KPI,
@@ -211,6 +213,28 @@ export function useScheduleInterview(id: string) {
       qc.invalidateQueries({ queryKey: ["application", id] });
       qc.invalidateQueries({ queryKey: ["applications"] });
     },
+  });
+}
+
+// useInterviewFeedback loads the structured interview feedback entries (newest
+// first) recorded by the hiring panel for an application.
+export function useInterviewFeedback(id: string) {
+  return useQuery({
+    queryKey: ["interview-feedback", id],
+    queryFn: () =>
+      api.get<InterviewFeedback[]>(`/api/v1/applications/${id}/interview-feedback`).then((r) => r.data),
+    enabled: !!id,
+  });
+}
+
+// useAddInterviewFeedback records a new interview-feedback entry and refreshes the
+// list. Write access is server-gated to sgm/hr_manager/super_admin.
+export function useAddInterviewFeedback(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: InterviewFeedbackInput) =>
+      api.post<InterviewFeedback>(`/api/v1/applications/${id}/interview-feedback`, vars).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["interview-feedback", id] }),
   });
 }
 
