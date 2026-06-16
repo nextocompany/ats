@@ -14,14 +14,17 @@ import (
 // Config holds every runtime setting. It is constructed once via Load and then
 // treated as immutable — callers read from it, never mutate it.
 type Config struct {
-	Env            string
-	HTTPPort       string
-	WorkerPort     string
-	DatabaseURL    string
-	RedisURL       string
-	BlobConnString string
-	BlobContainer  string
-	JWTSecret      string
+	Env        string
+	HTTPPort   string
+	WorkerPort string
+	// WorkerConcurrency caps in-flight pipeline tasks (asynq). Raising it past the
+	// Azure AI TPM ceiling causes 429s, not speedups — tune alongside TPM.
+	WorkerConcurrency int
+	DatabaseURL       string
+	RedisURL          string
+	BlobConnString    string
+	BlobContainer     string
+	JWTSecret         string
 
 	// AIProvider selects the OCR/parse implementation: "mock" (default), "azure",
 	// or "gemini" (Google Gemini REST API, free-tier friendly).
@@ -190,14 +193,15 @@ const (
 // Required variables (DB_URL, REDIS_URL) cause a clear error when absent.
 func Load() (*Config, error) {
 	c := &Config{
-		Env:            getenv("ENV", "development"),
-		HTTPPort:       getenv("HTTP_PORT", "8080"),
-		WorkerPort:     getenv("WORKER_PORT", "8081"),
-		DatabaseURL:    os.Getenv("DB_URL"),
-		RedisURL:       os.Getenv("REDIS_URL"),
-		BlobConnString: os.Getenv("AZURE_BLOB_CONNECTION_STRING"),
-		BlobContainer:  getenv("AZURE_BLOB_CONTAINER", "resumes"),
-		JWTSecret:      os.Getenv("JWT_SECRET"),
+		Env:               getenv("ENV", "development"),
+		HTTPPort:          getenv("HTTP_PORT", "8080"),
+		WorkerPort:        getenv("WORKER_PORT", "8081"),
+		WorkerConcurrency: getenvInt("WORKER_CONCURRENCY", 10),
+		DatabaseURL:       os.Getenv("DB_URL"),
+		RedisURL:          os.Getenv("REDIS_URL"),
+		BlobConnString:    os.Getenv("AZURE_BLOB_CONNECTION_STRING"),
+		BlobContainer:     getenv("AZURE_BLOB_CONTAINER", "resumes"),
+		JWTSecret:         os.Getenv("JWT_SECRET"),
 
 		AIProvider:            getenv("AI_PROVIDER", "mock"),
 		AzureOpenAIEndpoint:   os.Getenv("AZURE_OPENAI_ENDPOINT"),

@@ -23,6 +23,14 @@ export function canRecordInterviewFeedback(role?: string): boolean {
   return !!role && INTERVIEW_FEEDBACK_ROLES.includes(role);
 }
 
+// BULK_UPLOAD_ROLES may bulk-upload CVs. Mirrors the backend `bulkIntakeRoles`
+// allowlist in internal/applications/bulk_handler.go (auditor is read-only).
+export const BULK_UPLOAD_ROLES = ["super_admin", "hr_manager", "sgm", "hr_staff"];
+
+export function canBulkUpload(role?: string): boolean {
+  return !!role && BULK_UPLOAD_ROLES.includes(role);
+}
+
 // HR_ROLES are the roles a local password account may hold. Mirrors the backend
 // `allowedRoles` set in internal/hrauth/model.go; the label is what super_admins
 // pick from when provisioning an account.

@@ -7,6 +7,7 @@ import type {
   AdminSettings,
   Application,
   ApplicationFilter,
+  BulkIntakeResult,
   Candidate,
   CreateHRUserInput,
   FitAnalysis,
@@ -24,6 +25,7 @@ import type {
   MemberNote,
   MemberStats,
   OpenRole,
+  Position,
   ReportExport,
   SearchFilter,
   SearchHit,
@@ -100,6 +102,29 @@ export function useApplications(filter: ApplicationFilter) {
             limit: filter.limit,
           }),
       ),
+  });
+}
+
+// usePositions loads the active positions for the bulk-upload picker.
+export function usePositions() {
+  return useQuery({
+    queryKey: ["positions"],
+    queryFn: () => api.get<Position[]>("/api/v1/positions").then((r) => r.data),
+  });
+}
+
+// useBulkIntake uploads many resume files for one position. Builds the multipart
+// body (position_id + repeated resumes) and refreshes the inbox on success.
+export function useBulkIntake() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { positionId: string; files: File[] }) => {
+      const form = new FormData();
+      form.append("position_id", vars.positionId);
+      for (const f of vars.files) form.append("resumes", f);
+      return api.postForm<BulkIntakeResult>("/api/v1/applications/bulk-intake", form).then((r) => r.data);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["applications"] }),
   });
 }
 

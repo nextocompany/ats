@@ -3,11 +3,14 @@ import {
   Inbox,
   Users,
   UserCog,
+  UploadCloud,
   Search,
   BarChart3,
   Settings,
   type LucideIcon,
 } from "lucide-react";
+
+import { canBulkUpload } from "@/lib/roles";
 
 export interface NavItem {
   href: string;
@@ -24,21 +27,28 @@ export const NAV: NavItem[] = [
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
 ];
 
+// Bulk upload is for HR roles that add candidates (super_admin/hr_manager/sgm/
+// hr_staff) — gated via canBulkUpload, mirroring the backend allowlist.
+export const BULK_NAV: NavItem = { href: "/applications/bulk", label: "Bulk upload", icon: UploadCloud };
+
 // Members is super_admin + hr_manager — career-portal member management.
 export const MEMBERS_NAV: NavItem = { href: "/members", label: "Members", icon: UserCog };
 
 // Admin is super_admin-only — appended via navForRole, never in the base NAV.
 export const ADMIN_NAV: NavItem = { href: "/admin", label: "Admin", icon: Settings };
 
-// navForRole returns the nav items visible to a given role. super_admin + hr_manager
-// see Members; super_admin also sees Admin; everyone else gets the base workspace nav.
+// navForRole returns the nav items visible to a given role. Bulk upload for HR
+// uploader roles; super_admin + hr_manager see Members; super_admin also sees Admin.
 export function navForRole(role?: string): NavItem[] {
-  const base = role === "super_admin" || role === "hr_manager" ? [...NAV, MEMBERS_NAV] : NAV;
-  return role === "super_admin" ? [...base, ADMIN_NAV] : base;
+  const items = [...NAV];
+  if (canBulkUpload(role)) items.push(BULK_NAV);
+  if (role === "super_admin" || role === "hr_manager") items.push(MEMBERS_NAV);
+  if (role === "super_admin") items.push(ADMIN_NAV);
+  return items;
 }
 
 // ALL_NAV is every possible item, for pathname→item lookups (e.g. header title).
-export const ALL_NAV: NavItem[] = [...NAV, MEMBERS_NAV, ADMIN_NAV];
+export const ALL_NAV: NavItem[] = [...NAV, BULK_NAV, MEMBERS_NAV, ADMIN_NAV];
 
 // Brand lockup — text-only institutional wordmark, no monogram tile or dot mark.
 // "CP AXTRA" tracked uppercase over an "ATS Console" line (HSBC/JPM register),
