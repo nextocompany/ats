@@ -31,6 +31,15 @@ export function canBulkUpload(role?: string): boolean {
   return !!role && BULK_UPLOAD_ROLES.includes(role);
 }
 
+// EXECUTIVE_ROLES may view the company-wide Executive Overview. Mirrors the
+// backend `executiveRolesAllowed` allowlist in internal/executive/handler.go —
+// the company-wide (KindAll) roles. The server is the real gate.
+export const EXECUTIVE_ROLES = ["super_admin", "regional_director", "auditor"];
+
+export function canViewExecutive(role?: string): boolean {
+  return !!role && EXECUTIVE_ROLES.includes(role);
+}
+
 // HR_ROLES are the roles a local password account may hold. Mirrors the backend
 // `allowedRoles` set in internal/hrauth/model.go; the label is what super_admins
 // pick from when provisioning an account.

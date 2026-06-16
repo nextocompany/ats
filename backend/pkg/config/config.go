@@ -108,6 +108,11 @@ type Config struct {
 	GraphOrganizerMailbox string // service mailbox the event is created on (e.g. interviews@…)
 	GraphTimeZone         string // Windows tz name for event start/end (default "SE Asia Standard Time")
 
+	// ExecutiveProvider selects the Executive Overview data source: "mock"
+	// (default — deterministic synthetic figures over real store/position names
+	// for the leadership demo) or "real" (ATS-derived; budget pending PeopleSoft).
+	ExecutiveProvider string
+
 	// Google Login (candidate membership) — "mock" (default) or "real". The OAuth
 	// web flow mirrors LINE Login; the client secret signs the code→token exchange
 	// and the callback URL must exactly match the one registered in Google Cloud.
@@ -251,6 +256,8 @@ func Load() (*Config, error) {
 		GraphOrganizerMailbox: os.Getenv("GRAPH_ORGANIZER_MAILBOX"),
 		GraphTimeZone:         getenv("GRAPH_TIMEZONE", "SE Asia Standard Time"),
 
+		ExecutiveProvider: getenv("EXECUTIVE_PROVIDER", "mock"),
+
 		GoogleProvider:     getenv("GOOGLE_PROVIDER", "mock"),
 		GoogleClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
 		GoogleClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
@@ -314,6 +321,7 @@ func Load() (*Config, error) {
 		{"GOOGLE_PROVIDER", c.GoogleProvider, []string{"mock", ProviderReal}},
 		{"EMAIL_PROVIDER", c.EmailProvider, []string{"mock", ProviderReal}},
 		{"GRAPH_PROVIDER", c.GraphProvider, []string{"mock", ProviderReal}},
+		{"EXECUTIVE_PROVIDER", c.ExecutiveProvider, []string{"mock", ProviderReal}},
 	} {
 		if !isOneOf(p.val, p.allowed) {
 			return nil, fmt.Errorf("config: %s must be one of %v, got %q", p.name, p.allowed, p.val)
@@ -385,6 +393,10 @@ func Load() (*Config, error) {
 
 // UsesRealPeopleSoft reports whether the real PS Integration Broker client should be used.
 func (c *Config) UsesRealPeopleSoft() bool { return c.PSProvider == ProviderReal }
+
+// UsesRealExecutive reports whether the executive overview should compute from
+// real ATS data instead of the demo mock.
+func (c *Config) UsesRealExecutive() bool { return c.ExecutiveProvider == ProviderReal }
 
 // UsesRealLINE reports whether real LINE id-token verification should be used.
 func (c *Config) UsesRealLINE() bool { return c.LINEProvider == ProviderReal }

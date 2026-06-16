@@ -253,6 +253,50 @@ export interface Me {
   subregion: string;
 }
 
+// --- Executive Overview (company-wide leadership dashboard) ---
+// Mirrors the Go internal/executive payload. data_source is "mock" (demo) or
+// "live" (ATS-derived; budget pending PeopleSoft → budget_available=false).
+
+export interface ExecutiveCompany {
+  budget_headcount: number;
+  actual_headcount: number;
+  vacancy: number;
+  fill_rate_pct: number;
+  budget_available: boolean;
+}
+
+// ExecutiveStoreFill: one branch's staffing for the "most short-staffed" ranking.
+export interface ExecutiveStoreFill {
+  store_no: number;
+  store_name: string;
+  subregion: string;
+  budget_headcount: number;
+  actual_headcount: number;
+  heads_short: number;
+  fill_rate_pct: number;
+}
+
+// ExecutivePipelinePosition: recruitment funnel for one position company-wide.
+export interface ExecutivePipelinePosition {
+  position_id: string;
+  title: string;
+  applied: number;
+  screening: number;
+  interview: number;
+  offer: number;
+  hired: number;
+  openings: number;
+}
+
+export interface ExecutiveOverview {
+  data_source: "mock" | "live";
+  generated_at: string;
+  company: ExecutiveCompany;
+  stores: ExecutiveStoreFill[]; // sorted asc by fill_rate (most short-staffed first)
+  pipeline: ExecutivePipelinePosition[];
+  sourcing: Source[];
+}
+
 // AdminSettings mirrors the Go settings handler dto — runtime, admin-managed flags.
 export interface AdminSettings {
   allow_all_tenants: boolean;

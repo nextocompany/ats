@@ -24,6 +24,7 @@ import (
 	"github.com/nexto/hr-ats/internal/calendar"
 	"github.com/nexto/hr-ats/internal/candidateauth"
 	"github.com/nexto/hr-ats/internal/candidates"
+	"github.com/nexto/hr-ats/internal/executive"
 	"github.com/nexto/hr-ats/internal/fit"
 	"github.com/nexto/hr-ats/internal/health"
 	"github.com/nexto/hr-ats/internal/hrauth"
@@ -322,6 +323,7 @@ func main() {
 	reportRepo := reports.New(pool)
 	reportExporter := reports.NewExportService(reportRepo, blobClient, notifier, cfg.ReportRecipientList())
 	reports.RegisterRoutes(app, reports.NewHandler(reportRepo, reportExporter, blobClient))
+	executive.RegisterRoutes(app, executive.NewHandler(executive.NewService(pool, cfg.ExecutiveProvider)))
 	pdpa.RegisterRoutes(app, pdpa.NewHandler(pdpaRepo))
 	users.RegisterRoutes(app, users.NewHandler())
 	// HR password sign-in + super_admin account management (alongside Entra SSO).

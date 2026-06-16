@@ -10,6 +10,7 @@ import type {
   BulkIntakeResult,
   Candidate,
   CreateHRUserInput,
+  ExecutiveOverview,
   FitAnalysis,
   Funnel,
   HRUser,
@@ -184,6 +185,16 @@ export function useWaitingByStore() {
 }
 export function useOpenRoles() {
   return useQuery({ queryKey: ["open-roles"], queryFn: () => api.get<OpenRole[]>("/api/v1/reports/open-roles").then((r) => r.data) });
+}
+
+// Executive overview (company-wide). 403s for non-leadership roles, so gate the
+// page on canViewExecutive(me.role) before rendering.
+export function useExecutiveOverview(enabled = true) {
+  return useQuery({
+    queryKey: ["executive-overview"],
+    queryFn: () => api.get<ExecutiveOverview>("/api/v1/executive/overview").then((r) => r.data),
+    enabled,
+  });
 }
 
 export function useCandidateSearch(filter: SearchFilter) {
