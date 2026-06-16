@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 
 import { AccountNav } from "@/components/AccountNav";
 import { Container } from "@/components/ds";
+import { LocaleSwitcher } from "@/components/LocaleSwitcher";
 import { Wordmark } from "@/components/Wordmark";
 
 interface SiteHeaderProps {
@@ -10,22 +12,22 @@ interface SiteHeaderProps {
   backHref?: string;
 }
 
-const NAV = [
-  { href: "/jobs", label: "ตำแหน่งงาน" },
-  { href: "/status", label: "ตรวจสอบสถานะ" },
-];
-
 // SiteHeader is the slim institutional top chrome: a text wordmark on the left,
 // a restrained nav + account affordance on the right. Sticky with a single
 // hairline rule and a quiet backdrop — no shadow, no blur drama.
-export function SiteHeader({ backHref }: SiteHeaderProps) {
+export async function SiteHeader({ backHref }: SiteHeaderProps) {
+  const t = await getTranslations("nav");
+  const nav = [
+    { href: "/jobs", label: t("jobs") },
+    { href: "/status", label: t("status") },
+  ];
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-background/90 backdrop-blur-sm">
       <Container className="flex h-16 items-center gap-4">
         {backHref ? (
           <Link
             href={backHref}
-            aria-label="ย้อนกลับ"
+            aria-label={t("back")}
             className="-ml-1.5 inline-flex size-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -38,8 +40,8 @@ export function SiteHeader({ backHref }: SiteHeaderProps) {
 
         {!backHref ? (
           <>
-            <nav aria-label="เมนูหลัก" className="ml-auto hidden items-center gap-1 md:flex">
-              {NAV.map((item) => (
+            <nav aria-label={t("menu")} className="ml-auto hidden items-center gap-1 md:flex">
+              {nav.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
@@ -49,6 +51,7 @@ export function SiteHeader({ backHref }: SiteHeaderProps) {
                 </Link>
               ))}
               <span aria-hidden="true" className="mx-1 h-5 w-px bg-line" />
+              <LocaleSwitcher />
               <AccountNav />
             </nav>
 
@@ -58,8 +61,9 @@ export function SiteHeader({ backHref }: SiteHeaderProps) {
                 href="/jobs"
                 className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
               >
-                ตำแหน่งงาน
+                {t("jobs")}
               </Link>
+              <LocaleSwitcher />
               <AccountNav compact />
             </div>
           </>

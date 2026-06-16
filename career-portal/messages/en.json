@@ -1,0 +1,13 @@
+{
+  "common": {
+    "language": "Language",
+    "thai": "ไทย",
+    "english": "English"
+  },
+  "nav": {
+    "jobs": "Jobs",
+    "status": "Check status",
+    "back": "Back",
+    "menu": "Main menu"
+  }
+}

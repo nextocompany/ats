@@ -1,0 +1,40 @@
+{
+  "common": {
+    "language": "Language",
+    "thai": "ไทย",
+    "english": "English"
+  },
+  "nav": {
+    "overview": "Overview",
+    "inbox": "Inbox",
+    "candidates": "Candidates",
+    "search": "Search",
+    "analytics": "Analytics",
+    "bulkUpload": "Bulk upload",
+    "members": "Members",
+    "admin": "Admin"
+  },
+  "login": {
+    "platformEyebrow": "National recruitment platform",
+    "heroLine1": "One pipeline,",
+    "heroLine2": "every hire.",
+    "heroDesc": "AI-assisted screening, ranked inboxes, and a single source of truth — from application to onboarding, across every store.",
+    "proofStores": "Stores nationwide",
+    "proofEngine": "Screening engine",
+    "proofTruth": "Source of truth",
+    "secured": "Secured access · Azure AD SSO",
+    "mobileTagline": "AI-assisted screening across 42 stores nationwide",
+    "welcome": "Welcome back",
+    "title": "Sign in to the console",
+    "subtitle": "Continue to the recruitment command center.",
+    "microsoft": "Sign in with Microsoft",
+    "orEmail": "or sign in with email",
+    "email": "Email",
+    "password": "Password",
+    "signIn": "Sign in",
+    "signInFailed": "Sign-in failed",
+    "devSignIn": "Sign in as HR (dev)",
+    "helpEntra": "Sign in with your Microsoft organization account, or with an email and password provisioned by your administrator. Access and role permissions are managed centrally.",
+    "helpDev": "Development sign-in for the screening team. Production access uses Microsoft Entra ID single sign-on or an administrator-provisioned password."
+  }
+}

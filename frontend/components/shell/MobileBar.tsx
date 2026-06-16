@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { Menu, X, LogOut } from "lucide-react";
 
@@ -13,6 +14,7 @@ import { navForRole, BrandMark } from "./nav-config";
 export function MobileBar() {
   const pathname = usePathname();
   const router = useRouter();
+  const tNav = useTranslations("nav");
   const { data: me } = useMe();
   const [open, setOpen] = useState(false);
 
@@ -73,7 +75,7 @@ export function MobileBar() {
                           className={`size-[1.05rem] ${active ? "text-sidebar-primary" : "text-sidebar-foreground/55"}`}
                           strokeWidth={active ? 2.25 : 1.75}
                         />
-                        {item.label}
+                        {tNav(item.key)}
                       </Link>
                     </li>
                   );

@@ -1,6 +1,10 @@
 import withSerwistInit from "@serwist/next";
+import createNextIntlPlugin from "next-intl/plugin";
 
 import type { NextConfig } from "next";
+
+// next-intl: cookie-based locale (config in i18n/request.ts), no URL routing.
+const withNextIntl = createNextIntlPlugin();
 
 // API origin the candidate's browser calls; allowed in CSP connect-src.
 const apiOrigin = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
@@ -58,4 +62,4 @@ const withSerwist = withSerwistInit({
   disable: process.env.NODE_ENV === "development",
 });
 
-export default withSerwist(nextConfig);
+export default withSerwist(withNextIntl(nextConfig));

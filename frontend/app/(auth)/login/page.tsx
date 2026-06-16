@@ -2,22 +2,25 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { ArrowRight, Building2, Loader2, ShieldCheck } from "lucide-react";
 
 import { isEntraConfigured, signIn, signInWithPassword } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-
-// Confident, branded proof points on the front door — reads as a real platform.
-const PROOF = [
-  { value: "42", label: "Stores nationwide" },
-  { value: "AI", label: "Screening engine" },
-  { value: "1", label: "Source of truth" },
-] as const;
+import { LocaleSwitcher } from "@/components/LocaleSwitcher";
 
 export default function LoginPage() {
   const router = useRouter();
+  const t = useTranslations("login");
   const entra = isEntraConfigured();
+
+  // Confident, branded proof points on the front door — reads as a real platform.
+  const proof = [
+    { value: "42", label: t("proofStores") },
+    { value: "AI", label: t("proofEngine") },
+    { value: "1", label: t("proofTruth") },
+  ];
 
   // Local password sign-in state (the second auth path, alongside Microsoft SSO).
   const [email, setEmail] = useState("");
@@ -33,7 +36,7 @@ export default function LoginPage() {
       await signInWithPassword(email.trim(), password);
       router.push("/applications");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Sign-in failed");
+      setError(err instanceof Error ? err.message : t("signInFailed"));
       setSubmitting(false);
     }
   }
@@ -59,20 +62,19 @@ export default function LoginPage() {
         </div>
 
         <div className="relative max-w-md">
-          <p className="eyebrow text-brass">National recruitment platform</p>
+          <p className="eyebrow text-brass">{t("platformEyebrow")}</p>
           <h2 className="mt-3 font-heading text-[3rem] font-semibold leading-[1.02] tracking-tight">
-            One pipeline,
+            {t("heroLine1")}
             <br />
-            <span className="text-brass">every hire.</span>
+            <span className="text-brass">{t("heroLine2")}</span>
           </h2>
           <p className="mt-5 text-sm leading-relaxed text-sidebar-foreground/70">
-            AI-assisted screening, ranked inboxes, and a single source of truth — from
-            application to onboarding, across every store.
+            {t("heroDesc")}
           </p>
 
           {/* Proof ticker — confident, tabular, brand-tinted */}
           <dl className="mt-9 flex divide-x divide-sidebar-border">
-            {PROOF.map((p, i) => (
+            {proof.map((p, i) => (
               <div key={p.label} className={i === 0 ? "pr-7" : "px-7"}>
                 <dt className="num text-2xl font-semibold tabular-nums tracking-tight text-sidebar-foreground">
                   {p.value}
@@ -87,7 +89,7 @@ export default function LoginPage() {
 
         <div className="relative flex items-center gap-2 text-xs text-sidebar-foreground/55">
           <ShieldCheck className="size-4 text-brass" />
-          Secured access · Azure AD SSO wired in a later sprint
+          {t("secured")}
         </div>
       </section>
 
@@ -100,6 +102,7 @@ export default function LoginPage() {
           className="absolute inset-y-12 left-0 hidden w-px lg:block"
           style={{ background: "linear-gradient(to bottom, transparent, var(--brass) 18%, var(--brass) 82%, transparent)" }}
         />
+        <LocaleSwitcher className="absolute right-6 top-6" />
         <div className="w-full max-w-sm">
           {/* Mobile brand hero — a compact version of the desktop "front door" so
               the brand holds at 390 instead of dropping a form into white space.
@@ -113,20 +116,20 @@ export default function LoginPage() {
               <span className="mt-1 text-sm font-semibold tracking-tight">ATS Console</span>
             </div>
             <h2 className="relative mt-5 font-heading text-2xl font-semibold leading-[1.05] tracking-tight">
-              One pipeline, <span className="text-brass">every hire.</span>
+              {t("heroLine1")} <span className="text-brass">{t("heroLine2")}</span>
             </h2>
             <p className="relative mt-3 flex items-center gap-2 text-xs text-sidebar-foreground/65">
               <span className="h-px w-5 shrink-0 bg-sidebar-border" aria-hidden />
-              AI-assisted screening across 42 stores nationwide
+              {t("mobileTagline")}
             </p>
           </div>
 
-          <p className="eyebrow brass-underline inline-block">Welcome back</p>
+          <p className="eyebrow brass-underline inline-block">{t("welcome")}</p>
           <h1 className="mt-4 font-heading text-2xl font-semibold tracking-tight">
-            Sign in to the console
+            {t("title")}
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Continue to the recruitment command center.
+            {t("subtitle")}
           </p>
 
           {entra ? (
@@ -139,14 +142,14 @@ export default function LoginPage() {
                 }}
               >
                 <Building2 className="size-4" />
-                Sign in with Microsoft
+                {t("microsoft")}
               </Button>
 
               {/* Divider between SSO and the local password path */}
               <div className="my-6 flex items-center gap-3">
                 <span className="h-px flex-1 bg-hairline" aria-hidden />
                 <span className="text-[0.6875rem] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                  or sign in with email
+                  {t("orEmail")}
                 </span>
                 <span className="h-px flex-1 bg-hairline" aria-hidden />
               </div>
@@ -154,7 +157,7 @@ export default function LoginPage() {
               <form onSubmit={onPasswordSubmit} className="space-y-3" noValidate>
                 <div className="space-y-1.5">
                   <label htmlFor="email" className="text-xs font-medium text-foreground">
-                    Email
+                    {t("email")}
                   </label>
                   <Input
                     id="email"
@@ -169,7 +172,7 @@ export default function LoginPage() {
                 </div>
                 <div className="space-y-1.5">
                   <label htmlFor="password" className="text-xs font-medium text-foreground">
-                    Password
+                    {t("password")}
                   </label>
                   <Input
                     id="password"
@@ -200,7 +203,7 @@ export default function LoginPage() {
                   ) : (
                     <ArrowRight className="size-4" />
                   )}
-                  Sign in
+                  {t("signIn")}
                 </Button>
               </form>
             </>
@@ -212,16 +215,14 @@ export default function LoginPage() {
                 router.push("/applications");
               }}
             >
-              Sign in as HR (dev)
+              {t("devSignIn")}
               <ArrowRight className="size-4" />
             </Button>
           )}
 
           <div className="mt-6 rounded-lg border border-hairline bg-card p-4">
             <p className="text-xs leading-relaxed text-muted-foreground">
-              {entra
-                ? "Sign in with your Microsoft organization account, or with an email and password provisioned by your administrator. Access and role permissions are managed centrally."
-                : "Development sign-in for the screening team. Production access uses Microsoft Entra ID single sign-on or an administrator-provisioned password."}
+              {entra ? t("helpEntra") : t("helpDev")}
             </p>
           </div>
         </div>
