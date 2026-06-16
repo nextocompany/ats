@@ -45,6 +45,32 @@ func TestApplicationsClause(t *testing.T) {
 	}
 }
 
+func TestCandidatesClause(t *testing.T) {
+	store := 7
+
+	// All-scope roles → no clause.
+	if c, args := New("super_admin", nil, "").CandidatesClause(1); c != "" || args != nil {
+		t.Errorf("admin should have no candidates clause, got %q %v", c, args)
+	}
+
+	// Subregion role → subregion = $N.
+	c, args := New("operation_director", nil, "Upper North").CandidatesClause(2)
+	if c == "" || len(args) != 1 || args[0] != "Upper North" || !contains(c, "$2") {
+		t.Errorf("subregion candidates clause wrong: %q %v", c, args)
+	}
+
+	// Store role → subquery on applications.assigned_store_id.
+	c, args = New("hr_manager", &store, "").CandidatesClause(1)
+	if c == "" || len(args) != 1 || args[0] != store || !contains(c, "assigned_store_id") {
+		t.Errorf("store candidates clause wrong: %q %v", c, args)
+	}
+
+	// Store role without a store → fail closed (matches nothing).
+	if c, _ := New("hr_staff", nil, "").CandidatesClause(1); c != "1=0" {
+		t.Errorf("store-scoped user without store should match no candidates, got %q", c)
+	}
+}
+
 func contains(s, sub string) bool {
 	return len(s) >= len(sub) && (indexOf(s, sub) >= 0)
 }
