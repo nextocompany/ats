@@ -1,5 +1,7 @@
+"use client";
+
 import Link from "next/link";
-import { getTranslations } from "next-intl/server";
+import { useTranslations } from "next-intl";
 
 import { AccountNav } from "@/components/AccountNav";
 import { Container } from "@/components/ds";
@@ -14,9 +16,10 @@ interface SiteHeaderProps {
 
 // SiteHeader is the slim institutional top chrome: a text wordmark on the left,
 // a restrained nav + account affordance on the right. Sticky with a single
-// hairline rule and a quiet backdrop — no shadow, no blur drama.
-export async function SiteHeader({ backHref }: SiteHeaderProps) {
-  const t = await getTranslations("nav");
+// hairline rule and a quiet backdrop — no shadow, no blur drama. Client component
+// (useTranslations) so it works inside both server and client pages.
+export function SiteHeader({ backHref }: SiteHeaderProps) {
+  const t = useTranslations("nav");
   const nav = [
     { href: "/jobs", label: t("jobs") },
     { href: "/status", label: t("status") },
