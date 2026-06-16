@@ -14,12 +14,13 @@ import (
 const (
 	ChannelLINE  = "line"
 	ChannelEmail = "email"
+	ChannelTeams = "teams" // MS Teams Incoming Webhook (Recipient unused — webhook is the target)
 )
 
 // Message is a single outbound notification.
 type Message struct {
-	Channel   string // ChannelLINE | ChannelEmail
-	Recipient string // LINE user id or email address
+	Channel   string // ChannelLINE | ChannelEmail | ChannelTeams
+	Recipient string // LINE user id or email address (unused for Teams)
 	Subject   string
 	Body      string
 }

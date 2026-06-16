@@ -96,6 +96,34 @@ func TestNotifyStatusChange_SkipsNonNotifiableStatus(t *testing.T) {
 	}
 }
 
+func TestNotifyStatusChange_SendsEmailWhenEmailPresent(t *testing.T) {
+	rn := &recNotifier{}
+	d := deps(rn, &candidates.Candidate{FullName: "ก", Email: "a@b.com"}) // no LINE id
+	apps := stubApps{app: &Application{CandidateID: uuid.New()}}
+
+	d.notifyStatusChange(context.Background(), apps, uuid.New(), StatusHired)
+
+	if len(rn.sent) != 1 || rn.sent[0].Channel != notify.ChannelEmail || rn.sent[0].Recipient != "a@b.com" {
+		t.Fatalf("expected 1 email send, got %+v", rn.sent)
+	}
+}
+
+func TestNotifyStatusChange_SendsBothChannels(t *testing.T) {
+	rn := &recNotifier{}
+	d := deps(rn, &candidates.Candidate{FullName: "ก", LineUserID: "U-1", Email: "a@b.com"})
+	apps := stubApps{app: &Application{CandidateID: uuid.New()}}
+
+	d.notifyStatusChange(context.Background(), apps, uuid.New(), "interview")
+
+	if len(rn.sent) != 2 {
+		t.Fatalf("expected LINE + email (2 sends), got %d: %+v", len(rn.sent), rn.sent)
+	}
+	channels := map[string]bool{rn.sent[0].Channel: true, rn.sent[1].Channel: true}
+	if !channels[notify.ChannelLINE] || !channels[notify.ChannelEmail] {
+		t.Fatalf("expected both line + email channels, got %+v", rn.sent)
+	}
+}
+
 func TestNotifyStatusChange_NilDepsNoop(t *testing.T) {
 	var d statusNotifyDeps // zero value: nil notifier + nil cands
 	apps := stubApps{app: &Application{CandidateID: uuid.New()}}

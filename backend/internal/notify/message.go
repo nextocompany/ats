@@ -28,6 +28,26 @@ func StatusMessage(lineUserID, fullName, status, portalBaseURL string) Message {
 	}
 }
 
+// StatusEmailMessage builds the email equivalent of StatusMessage for the same
+// candidate-notifiable status set, reusing statusBody so the LINE and email copy
+// never drift. Returns a zero Message (empty Recipient) when the address is empty
+// or the status is not notifiable.
+func StatusEmailMessage(emailAddr, fullName, status, portalBaseURL string) Message {
+	if emailAddr == "" {
+		return Message{}
+	}
+	body, ok := statusBody(fullName, status, portalBaseURL)
+	if !ok {
+		return Message{}
+	}
+	return Message{
+		Channel:   ChannelEmail,
+		Recipient: emailAddr,
+		Subject:   "อัปเดตสถานะใบสมัคร",
+		Body:      body,
+	}
+}
+
 func statusBody(fullName, status, portalBaseURL string) (string, bool) {
 	greeting := "สวัสดีค่ะ"
 	if fullName != "" {

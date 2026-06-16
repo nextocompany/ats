@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http/httptest"
 	"testing"
 
@@ -14,6 +15,8 @@ import (
 	"github.com/nexto/hr-ats/internal/rbac"
 	"github.com/nexto/hr-ats/pkg/httpx"
 )
+
+var errStub = errors.New("notify down")
 
 func validFeedback() InterviewFeedback {
 	return InterviewFeedback{
@@ -150,6 +153,30 @@ func TestCreateFeedback_Validation(t *testing.T) {
 		t.Fatalf("invalid rating should be 400, got %d", got)
 	}
 }
+
+// fakeHRDir returns a fixed recipient set for HR-notify tests.
+type fakeHRDir struct{ emails []string }
+
+func (f fakeHRDir) EmailsForStore(context.Context, *int) ([]string, error) { return f.emails, nil }
+
+func TestCreateFeedback_HRNotifyNonFatal(t *testing.T) {
+	store := &fakeFeedbackStore{inScope: true, app: &Application{Status: StatusInterviewed, AssignedStoreID: ptrInt(5)}}
+	h := NewFeedbackHandler(store)
+	// Notifier always errors → must NOT break the 201.
+	h.SetNotifier(&recNotifier{err: errStub}, fakeHRDir{emails: []string{"hr@x.com"}}, "https://dash", true)
+	app := fiber.New(fiber.Config{ErrorHandler: httpx.ErrorHandler})
+	app.Use(func(c *fiber.Ctx) error {
+		c.Locals(middleware.UserContextKey, middleware.DevUser{ID: uuid.NewString(), Email: "gm@x.com", Role: "sgm"})
+		return c.Next()
+	})
+	RegisterFeedbackRoutes(app, h)
+	got := postFeedback(t, app, uuid.NewString(), validFeedback())
+	if got != fiber.StatusCreated {
+		t.Fatalf("HR-notify failure must not break create; got %d", got)
+	}
+}
+
+func ptrInt(n int) *int { return &n }
 
 func TestCreateFeedback_HappyPath(t *testing.T) {
 	store := &fakeFeedbackStore{inScope: true, app: &Application{Status: StatusInterviewed}}
