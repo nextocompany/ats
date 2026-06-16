@@ -114,6 +114,32 @@ func TestJD_PromptText(t *testing.T) {
 	}
 }
 
+// TestScore_EnglishEducationAndLanguage validates the deterministic rules on an
+// English CV (the Thai path is covered by HappyPath) — English "Bachelor" must
+// clear a diploma gate and an English-only language list scores 5.
+func TestScore_EnglishEducationAndLanguage(t *testing.T) {
+	s := compositeScorer{llm: mockLLM{}}
+	prof := ai.Profile{
+		Personal:   ai.Personal{Name: "John Smith"},
+		Experience: []ai.Experience{{DurationMonths: 24}},
+		Education:  []ai.Education{{Degree: "Bachelor's Degree"}},
+		Languages:  []ai.Language{{Language: "English"}},
+		Skills:     []string{"cashier"},
+	}
+	jd := JD{MinEducationLevel: eduDiploma, MinExperienceMonths: 12}
+
+	res, err := s.Score(context.Background(), prof, jd, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.MustHavePassed {
+		t.Error("English bachelor should clear a diploma gate")
+	}
+	if res.Breakdown.Language != 5 {
+		t.Errorf("English-only language should score 5, got %d", res.Breakdown.Language)
+	}
+}
+
 // --- test doubles ---
 
 type failLLM struct{}

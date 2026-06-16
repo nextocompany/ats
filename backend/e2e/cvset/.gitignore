@@ -1,0 +1,3 @@
+# Real CVs + ground-truth contain PII — never commit.
+*
+!.gitignore
