@@ -1,15 +1,18 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 
 import { ALL_NAV } from "./nav-config";
+import { LocaleSwitcher } from "@/components/LocaleSwitcher";
 
 // Slim desktop context bar above the page — orients the operator without
 // duplicating the sidebar's navigation landmark. Hidden on mobile (MobileBar covers it).
 // A live ticking clock + brand pulse signal a console that's reading the pipeline now.
 export function AppHeader() {
   const pathname = usePathname();
+  const tNav = useTranslations("nav");
   const active = ALL_NAV.find((n) => pathname.startsWith(n.href));
 
   const [now, setNow] = useState<Date | null>(null);
@@ -34,9 +37,10 @@ export function AppHeader() {
       <nav aria-label="Breadcrumb" className="flex items-baseline gap-2 text-sm">
         <span className="text-muted-foreground">Console</span>
         <span className="text-muted-foreground/40">/</span>
-        <span className="font-medium text-foreground">{active?.label ?? "Overview"}</span>
+        <span className="font-medium text-foreground">{active ? tNav(active.key) : tNav("overview")}</span>
       </nav>
       <div className="flex items-center gap-5">
+        <LocaleSwitcher />
         <span className="hidden items-center gap-2 text-xs font-medium tabular-nums text-muted-foreground xl:flex">
           {/* Pulsing brand dot — the console is live */}
           <span className="relative flex size-2" aria-hidden>

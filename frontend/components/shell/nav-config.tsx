@@ -14,28 +14,29 @@ import { canBulkUpload } from "@/lib/roles";
 
 export interface NavItem {
   href: string;
-  label: string;
+  label: string; // English fallback; UI renders t(`nav.${key}`)
+  key: string; // i18n key under the "nav" namespace
   icon: LucideIcon;
 }
 
 // Single source of truth for primary navigation across sidebar + drawer.
 export const NAV: NavItem[] = [
-  { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
-  { href: "/applications", label: "Inbox", icon: Inbox },
-  { href: "/candidates", label: "Candidates", icon: Users },
-  { href: "/search", label: "Search", icon: Search },
-  { href: "/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/dashboard", label: "Overview", key: "overview", icon: LayoutDashboard },
+  { href: "/applications", label: "Inbox", key: "inbox", icon: Inbox },
+  { href: "/candidates", label: "Candidates", key: "candidates", icon: Users },
+  { href: "/search", label: "Search", key: "search", icon: Search },
+  { href: "/analytics", label: "Analytics", key: "analytics", icon: BarChart3 },
 ];
 
 // Bulk upload is for HR roles that add candidates (super_admin/hr_manager/sgm/
 // hr_staff) — gated via canBulkUpload, mirroring the backend allowlist.
-export const BULK_NAV: NavItem = { href: "/applications/bulk", label: "Bulk upload", icon: UploadCloud };
+export const BULK_NAV: NavItem = { href: "/applications/bulk", label: "Bulk upload", key: "bulkUpload", icon: UploadCloud };
 
 // Members is super_admin + hr_manager — career-portal member management.
-export const MEMBERS_NAV: NavItem = { href: "/members", label: "Members", icon: UserCog };
+export const MEMBERS_NAV: NavItem = { href: "/members", label: "Members", key: "members", icon: UserCog };
 
 // Admin is super_admin-only — appended via navForRole, never in the base NAV.
-export const ADMIN_NAV: NavItem = { href: "/admin", label: "Admin", icon: Settings };
+export const ADMIN_NAV: NavItem = { href: "/admin", label: "Admin", key: "admin", icon: Settings };
 
 // navForRole returns the nav items visible to a given role. Bulk upload for HR
 // uploader roles; super_admin + hr_manager see Members; super_admin also sees Admin.

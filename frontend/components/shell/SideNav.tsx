@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { LogOut } from "lucide-react";
 
 import { signOut } from "@/lib/auth";
@@ -39,6 +40,7 @@ function deriveIdentity(me: Me | undefined): { name: string; role: string; initi
 export function SideNav() {
   const pathname = usePathname();
   const router = useRouter();
+  const tNav = useTranslations("nav");
   const { data: me } = useMe();
   const identity = deriveIdentity(me);
 
@@ -106,7 +108,7 @@ export function SideNav() {
                     }`}
                     strokeWidth={active ? 2.25 : 1.75}
                   />
-                  <span className="relative">{item.label}</span>
+                  <span className="relative">{tNav(item.key)}</span>
                 </Link>
               </li>
             );

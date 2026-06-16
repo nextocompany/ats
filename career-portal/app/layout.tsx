@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Anuphan, IBM_Plex_Sans_Thai_Looped } from "next/font/google";
+import { NextIntlClientProvider } from "next-intl";
+import { getLocale } from "next-intl/server";
 import "./globals.css";
 
 import { Providers } from "./providers";
@@ -43,14 +45,17 @@ export const viewport: Viewport = {
   themeColor: "#0B47B8",
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const locale = await getLocale();
   return (
-    <html lang="th" className={`${display.variable} ${body.variable} h-full antialiased`}>
+    <html lang={locale} className={`${display.variable} ${body.variable} h-full antialiased`}>
       <body
         className="min-h-full bg-background text-foreground"
         style={{ fontFamily: "var(--font-body), system-ui, sans-serif" }}
       >
-        <Providers>{children}</Providers>
+        <NextIntlClientProvider>
+          <Providers>{children}</Providers>
+        </NextIntlClientProvider>
       </body>
     </html>
   );
