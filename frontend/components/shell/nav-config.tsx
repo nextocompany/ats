@@ -6,11 +6,12 @@ import {
   UploadCloud,
   Search,
   BarChart3,
+  LineChart,
   Settings,
   type LucideIcon,
 } from "lucide-react";
 
-import { canBulkUpload } from "@/lib/roles";
+import { canBulkUpload, canViewExecutive } from "@/lib/roles";
 
 export interface NavItem {
   href: string;
@@ -32,6 +33,10 @@ export const NAV: NavItem[] = [
 // hr_staff) — gated via canBulkUpload, mirroring the backend allowlist.
 export const BULK_NAV: NavItem = { href: "/applications/bulk", label: "Bulk upload", key: "bulkUpload", icon: UploadCloud };
 
+// Executive is the company-wide leadership overview — super_admin/regional_director/
+// auditor (KindAll roles), gated via canViewExecutive mirroring the backend allowlist.
+export const EXECUTIVE_NAV: NavItem = { href: "/executive", label: "Executive", key: "executive", icon: LineChart };
+
 // Members is super_admin + hr_manager — career-portal member management.
 export const MEMBERS_NAV: NavItem = { href: "/members", label: "Members", key: "members", icon: UserCog };
 
@@ -42,6 +47,7 @@ export const ADMIN_NAV: NavItem = { href: "/admin", label: "Admin", key: "admin"
 // uploader roles; super_admin + hr_manager see Members; super_admin also sees Admin.
 export function navForRole(role?: string): NavItem[] {
   const items = [...NAV];
+  if (canViewExecutive(role)) items.push(EXECUTIVE_NAV);
   if (canBulkUpload(role)) items.push(BULK_NAV);
   if (role === "super_admin" || role === "hr_manager") items.push(MEMBERS_NAV);
   if (role === "super_admin") items.push(ADMIN_NAV);
@@ -49,7 +55,7 @@ export function navForRole(role?: string): NavItem[] {
 }
 
 // ALL_NAV is every possible item, for pathname→item lookups (e.g. header title).
-export const ALL_NAV: NavItem[] = [...NAV, BULK_NAV, MEMBERS_NAV, ADMIN_NAV];
+export const ALL_NAV: NavItem[] = [...NAV, EXECUTIVE_NAV, BULK_NAV, MEMBERS_NAV, ADMIN_NAV];
 
 // Brand lockup — text-only institutional wordmark, no monogram tile or dot mark.
 // "CP AXTRA" tracked uppercase over an "ATS Console" line (HSBC/JPM register),

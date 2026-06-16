@@ -10,9 +10,19 @@
     "candidates": "Candidates",
     "search": "Search",
     "analytics": "Analytics",
+    "executive": "Executive",
     "bulkUpload": "Bulk upload",
     "members": "Members",
     "admin": "Admin"
+  },
+  "executive": {
+    "eyebrow": "Leadership",
+    "title": "Executive Overview",
+    "meta": "Company headcount, vacancies, pipeline & sourcing across all stores.",
+    "demoData": "Demo data",
+    "budgetPending": "Budget: pending HRIS",
+    "notAvailable": "Not available for your role",
+    "notAvailableHint": "The executive overview is limited to company-wide leadership roles."
   },
   "login": {
     "platformEyebrow": "National recruitment platform",
