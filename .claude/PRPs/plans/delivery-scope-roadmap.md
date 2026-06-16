@@ -20,8 +20,8 @@ sequencing; each PRP gets its own `*.plan.md` to implement independently.
 
 | PRP | Title | Priority | Depends on | Complexity | Plan file |
 |---|---|---|---|---|---|
-| **PRP-1** | Notifications: Email (candidate + HR) + MS Teams (HR) | **P0** | none (extends notify seam) | Medium | `notifications-email-teams.plan.md` ✅ |
-| **PRP-2** | Bulk CV intake + load testing | **P0** | none | Large | `bulk-cv-intake-load.plan.md` (to generate) |
+| **PRP-1** | Notifications: Email (candidate + HR) + MS Teams (HR) | **P0** | none (extends notify seam) | Medium | ✅ **DONE + LIVE** (PR #74) |
+| **PRP-2** | Bulk CV intake + load testing | **P0** | none | Large | ✅ **IMPLEMENTED** `completed/bulk-cv-intake-load.plan.md` (load test = operator-run on staging) |
 | **PRP-3** | Validation & UAT hardening (parsing/scoring/branch/RBAC) | **P1** | PRP-2 (feeds 20–30 CVs + load) | Medium (test-heavy) | `validation-uat-hardening.plan.md` (to generate) |
 | **PRP-4** | Bilingual UI (i18n TH/EN with switcher) | **P1–P2** | none (independent) | Large | `bilingual-ui-i18n.plan.md` (to generate) |
 

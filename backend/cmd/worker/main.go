@@ -39,8 +39,6 @@ import (
 	appredis "github.com/nexto/hr-ats/pkg/redis"
 )
 
-const workerConcurrency = 10
-
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
@@ -151,7 +149,7 @@ func main() {
 	// Auth cleanup (candidate membership): purge expired OTP/session rows.
 	authCleanupSvc := candidateauth.NewCleanupService(pool)
 
-	srv := asynq.NewServer(redisOpt, asynq.Config{Concurrency: workerConcurrency})
+	srv := asynq.NewServer(redisOpt, asynq.Config{Concurrency: cfg.WorkerConcurrency})
 	mux := asynq.NewServeMux()
 	mux.HandleFunc(queue.TypeProcessApplication, processor.HandleProcessApplication)
 	mux.HandleFunc(queue.TypeReengageVacancy, reengageSvc.HandleReengageVacancy)

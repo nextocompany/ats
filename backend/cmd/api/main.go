@@ -297,6 +297,10 @@ func main() {
 	feedbackHandler := applications.NewFeedbackHandler(appRepo)
 	feedbackHandler.SetNotifier(notifier, applications.NewHRDirectory(pool), cfg.DashboardBaseURL, cfg.TeamsWebhookURL != "")
 	applications.RegisterFeedbackRoutes(app, feedbackHandler)
+	// Bulk CV upload (HR dashboard): many resumes for one position → one application
+	// + pipeline job each. Positions list powers the picker.
+	applications.RegisterBulkRoutes(app, applications.NewBulkHandler(intakeSvc))
+	positions.RegisterRoutes(app, positions.NewHandler(positionRepo))
 	interview.RegisterDashboardRoutes(app, interviewHandler)
 	// AI cross-position fit analysis: HR-triggered verdict combining the CV-screening
 	// result + the AI pre-interview, matched against the whole Master JD catalogue.

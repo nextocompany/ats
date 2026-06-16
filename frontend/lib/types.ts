@@ -109,6 +109,22 @@ export interface InterviewFeedbackInput {
   notes?: string;
 }
 
+// Position is the slim picker projection (mirrors positions.ListItem).
+export interface Position {
+  id: string;
+  title_th: string;
+  title_en: string;
+}
+
+// BulkIntakeResult mirrors applications.bulkResult (per-file outcome of a bulk upload).
+export interface BulkIntakeResult {
+  total: number;
+  succeeded: number;
+  failed_count: number;
+  created: { filename: string; application_id: string }[];
+  failed: { filename: string; error: string }[];
+}
+
 export interface Candidate {
   id: string;
   full_name: string;
