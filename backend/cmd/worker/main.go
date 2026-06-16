@@ -128,6 +128,10 @@ func main() {
 	}
 	notifier := notify.NewNotifier(cfg)
 
+	// HR notification when an application is scored + assigned (best-effort, email +
+	// Teams). No-op unless NOTIFY/EMAIL/Teams are configured.
+	processor.SetNotifier(notifier, applications.NewHRDirectory(pool), cfg.DashboardBaseURL, cfg.TeamsWebhookURL != "")
+
 	// Re-engagement (Sprint 5a): notify talent-pool / prior candidates on vacancy open.
 	reengageSvc := reengage.NewService(
 		reengage.NewRepository(pool),

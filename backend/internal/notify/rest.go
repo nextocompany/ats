@@ -10,24 +10,28 @@ import (
 	"time"
 
 	"github.com/nexto/hr-ats/pkg/config"
+	"github.com/nexto/hr-ats/pkg/email"
 )
 
 const linePushURL = "https://api.line.me/v2/bot/message/push"
 
-// restNotifier sends real notifications. LINE push is implemented over the
-// Messaging API; email is a deploy-time SMTP wiring point. Constructed only when
-// NOTIFY_PROVIDER=real, so missing creds never affect mock/CI.
+// restNotifier sends real notifications: LINE push over the Messaging API, email
+// via the shared ACS sender (pkg/email — mock when EMAIL_PROVIDER!=real), and MS
+// Teams via an Incoming Webhook. Constructed only when NOTIFY_PROVIDER=real, so
+// missing creds never affect mock/CI.
 type restNotifier struct {
-	lineToken string
-	emailFrom string
-	http      *http.Client
+	lineToken    string
+	email        email.Sender
+	teamsWebhook string
+	http         *http.Client
 }
 
 func newRESTNotifier(cfg *config.Config) restNotifier {
 	return restNotifier{
-		lineToken: cfg.NotifyLINEToken,
-		emailFrom: cfg.NotifyEmailFrom,
-		http:      &http.Client{Timeout: 10 * time.Second},
+		lineToken:    cfg.NotifyLINEToken,
+		email:        email.NewSender(cfg), // ACS (real) or mock log-only — safe in CI
+		teamsWebhook: cfg.TeamsWebhookURL,
+		http:         &http.Client{Timeout: 10 * time.Second},
 	}
 }
 
@@ -36,8 +40,12 @@ func (n restNotifier) Send(ctx context.Context, m Message) error {
 	case ChannelLINE:
 		return n.sendLINE(ctx, m)
 	case ChannelEmail:
-		// SMTP/provider wiring is deploy-time; fail loudly rather than silently drop.
-		return fmt.Errorf("notify: email channel not configured (NOTIFY_EMAIL_FROM=%q)", n.emailFrom)
+		return n.email.Send(ctx, email.Message{To: m.Recipient, Subject: m.Subject, PlainText: m.Body})
+	case ChannelTeams:
+		if n.teamsWebhook == "" {
+			return fmt.Errorf("notify: teams webhook not configured (TEAMS_WEBHOOK_URL empty)")
+		}
+		return sendTeams(ctx, n.http, n.teamsWebhook, m.Body)
 	default:
 		return fmt.Errorf("notify: unknown channel %q", m.Channel)
 	}

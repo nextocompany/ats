@@ -292,8 +292,11 @@ func main() {
 	scheduleHandler.SetNotifier(notifier, candidateRepo, cfg.PortalBaseURL)
 	applications.RegisterScheduleRoutes(app, scheduleHandler)
 	// Structured interview feedback recorded by the hiring panel (sgm/hr_manager/
-	// super_admin) during the interview stage; many entries per application.
-	applications.RegisterFeedbackRoutes(app, applications.NewFeedbackHandler(appRepo))
+	// super_admin) during the interview stage; many entries per application. HR is
+	// pinged (email + Teams, best-effort) when feedback is recorded.
+	feedbackHandler := applications.NewFeedbackHandler(appRepo)
+	feedbackHandler.SetNotifier(notifier, applications.NewHRDirectory(pool), cfg.DashboardBaseURL, cfg.TeamsWebhookURL != "")
+	applications.RegisterFeedbackRoutes(app, feedbackHandler)
 	interview.RegisterDashboardRoutes(app, interviewHandler)
 	// AI cross-position fit analysis: HR-triggered verdict combining the CV-screening
 	// result + the AI pre-interview, matched against the whole Master JD catalogue.

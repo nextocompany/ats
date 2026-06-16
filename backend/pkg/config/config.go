@@ -91,6 +91,9 @@ type Config struct {
 	NotifyProvider  string
 	NotifyLINEToken string // LINE Messaging API channel access token (push)
 	NotifyEmailFrom string // from-address for email delivery (real)
+	// TeamsWebhookURL is an MS Teams Incoming Webhook the HR channel receives
+	// notifications on. Empty = Teams channel disabled (independent of LINE/email).
+	TeamsWebhookURL string
 
 	// Interview calendar (Microsoft Graph) — "mock" (default) or "real". When real,
 	// online interviews create a Teams meeting + a calendar event on the service
@@ -132,6 +135,11 @@ type Config struct {
 	// PortalBaseURL is the public Career Portal origin used to build apply links
 	// in outbound notifications.
 	PortalBaseURL string
+
+	// DashboardBaseURL is the HR dashboard origin used to build deep links in
+	// HR-facing notifications (email/Teams). Distinct from PortalBaseURL, which is
+	// candidate-facing.
+	DashboardBaseURL string
 
 	// Report scheduler (Sprint 5b): cron spec for the recurring export, and the
 	// comma-separated recipient list notified with the export link.
@@ -230,6 +238,7 @@ func Load() (*Config, error) {
 		NotifyProvider:  getenv("NOTIFY_PROVIDER", "mock"),
 		NotifyLINEToken: os.Getenv("NOTIFY_LINE_TOKEN"),
 		NotifyEmailFrom: os.Getenv("NOTIFY_EMAIL_FROM"),
+		TeamsWebhookURL: os.Getenv("TEAMS_WEBHOOK_URL"),
 
 		GraphProvider:         getenv("GRAPH_PROVIDER", "mock"),
 		GraphTenantID:         os.Getenv("GRAPH_TENANT_ID"),
@@ -253,7 +262,8 @@ func Load() (*Config, error) {
 		EmailOTPTTL:         getenvDuration("EMAIL_OTP_TTL", 10*time.Minute),
 		HRSessionTTL:        getenvDuration("HR_SESSION_TTL", 12*time.Hour),
 
-		PortalBaseURL: getenv("PORTAL_BASE_URL", "http://localhost:3001"),
+		PortalBaseURL:    getenv("PORTAL_BASE_URL", "http://localhost:3001"),
+		DashboardBaseURL: getenv("DASHBOARD_BASE_URL", "http://localhost:3000"),
 
 		ReportScheduleCron: getenv("REPORT_SCHEDULE_CRON", "0 7 * * 1"), // Mon 07:00
 		ReportRecipients:   os.Getenv("REPORT_RECIPIENTS"),

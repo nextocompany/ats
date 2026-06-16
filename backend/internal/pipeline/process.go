@@ -20,6 +20,7 @@ import (
 	"github.com/nexto/hr-ats/internal/branch"
 	"github.com/nexto/hr-ats/internal/candidates"
 	"github.com/nexto/hr-ats/internal/dedup"
+	"github.com/nexto/hr-ats/internal/notify"
 	"github.com/nexto/hr-ats/internal/positions"
 	"github.com/nexto/hr-ats/internal/scoring"
 	"github.com/nexto/hr-ats/pkg/queue"
@@ -59,6 +60,15 @@ type Processor struct {
 	assigner   *branch.Assigner
 	positions  positions.Repository
 	indexer    CandidateIndexer
+	hrNotify   hrNotify
+}
+
+// hrNotify bundles the optional HR-notification deps (best-effort, nil = no-op).
+type hrNotify struct {
+	notifier         notify.Notifier
+	hr               applications.HRDirectory
+	dashboardBaseURL string
+	teamsEnabled     bool
 }
 
 // NewProcessor wires the pipeline processor.
@@ -80,6 +90,12 @@ func (pr *Processor) SetIndexer(idx CandidateIndexer) {
 	if idx != nil {
 		pr.indexer = idx
 	}
+}
+
+// SetNotifier injects best-effort HR notifications fired when an application is
+// scored + assigned to a store. No-op when notifier/hr are nil (tests/CI).
+func (pr *Processor) SetNotifier(n notify.Notifier, hr applications.HRDirectory, dashboardBaseURL string, teamsEnabled bool) {
+	pr.hrNotify = hrNotify{notifier: n, hr: hr, dashboardBaseURL: dashboardBaseURL, teamsEnabled: teamsEnabled}
 }
 
 // HandleProcessApplication runs the full pipeline for one application. Returning
@@ -247,7 +263,34 @@ func (pr *Processor) run(ctx context.Context, p queue.ProcessApplicationPayload,
 		Bool("talent_pool", assignment.TalentPool).
 		Str("subregion", assignment.Subregion).
 		Msg("application scored and assigned")
+
+	// Step 7 — best-effort HR notification (email + Teams) for store-assigned hires.
+	pr.notifyScored(ctx, appID, cand.FullName, pos.TitleTH, result.Total, assignment.StoreNo)
 	return nil
+}
+
+// notifyScored pings store HR that a new candidate was screened, scored, and
+// assigned to their store. No-op when deps are unset or there is no assigned store
+// (talent pool / unassigned candidates have no store HR to notify).
+func (pr *Processor) notifyScored(ctx context.Context, appID uuid.UUID, candName, positionTitle string, score int, storeNo *int) {
+	d := pr.hrNotify
+	if d.notifier == nil || d.hr == nil || storeNo == nil {
+		return
+	}
+	emails, err := d.hr.EmailsForStore(ctx, storeNo)
+	if err != nil {
+		return // logged at the repo layer; never fail the task
+	}
+	if len(emails) == 0 && !d.teamsEnabled {
+		return
+	}
+	dashURL := d.dashboardBaseURL + "/applications/" + appID.String()
+	msgs := notify.NewScoredHR(emails, d.teamsEnabled, candName, positionTitle, score, dashURL)
+	for _, m := range msgs {
+		if err := d.notifier.Send(ctx, m); err != nil {
+			log.Warn().Err(err).Str("application", appID.String()).Msg("scored notify: send failed (non-fatal)")
+		}
+	}
 }
 
 // persistScore maps a scoring.Result into the repository's pre-serialized Score.

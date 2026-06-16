@@ -37,11 +37,29 @@ func (d statusNotifyDeps) notifyStatusChange(ctx context.Context, apps Repositor
 		log.Warn().Err(err).Str("candidate", app.CandidateID.String()).Msg("status notify: load candidate failed")
 		return
 	}
-	msg := notify.StatusMessage(cand.LineUserID, cand.FullName, status, d.portalBaseURL)
-	if msg.Recipient == "" {
-		return // not notifiable, or candidate has no LINE handle
+	// LINE and email are independent best-effort channels: a candidate with only
+	// one of the two must still be reached. Same notifiable status set for both.
+	if msg := notify.StatusMessage(cand.LineUserID, cand.FullName, status, d.portalBaseURL); msg.Recipient != "" {
+		if err := d.notifier.Send(ctx, msg); err != nil {
+			log.Warn().Err(err).Str("application", appID.String()).Msg("status notify: line send failed (non-fatal)")
+		}
 	}
-	if err := d.notifier.Send(ctx, msg); err != nil {
-		log.Warn().Err(err).Str("application", appID.String()).Msg("status notify: send failed (non-fatal)")
+	if em := notify.StatusEmailMessage(cand.Email, cand.FullName, status, d.portalBaseURL); em.Recipient != "" {
+		if err := d.notifier.Send(ctx, em); err != nil {
+			log.Warn().Err(err).Str("application", appID.String()).Msg("status notify: email send failed (non-fatal)")
+		}
+	}
+}
+
+// dispatchHR sends a set of HR-facing messages best-effort. Failures are logged,
+// never returned — an HR notification must not break the triggering action.
+func dispatchHR(ctx context.Context, notifier notify.Notifier, msgs []notify.Message) {
+	if notifier == nil {
+		return
+	}
+	for _, m := range msgs {
+		if err := notifier.Send(ctx, m); err != nil {
+			log.Warn().Err(err).Str("channel", m.Channel).Msg("hr notify: send failed (non-fatal)")
+		}
 	}
 }

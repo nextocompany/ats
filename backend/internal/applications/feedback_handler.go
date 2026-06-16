@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/nexto/hr-ats/internal/middleware"
+	"github.com/nexto/hr-ats/internal/notify"
 	"github.com/nexto/hr-ats/internal/rbac"
 	"github.com/nexto/hr-ats/pkg/httpx"
 )
@@ -33,12 +34,27 @@ type feedbackStore interface {
 
 // FeedbackHandler records and lists structured interview feedback.
 type FeedbackHandler struct {
-	apps feedbackStore
+	apps     feedbackStore
+	hrNotify hrFeedbackNotify
+}
+
+// hrFeedbackNotify bundles the optional HR-notification deps. All zero → no-op.
+type hrFeedbackNotify struct {
+	notifier         notify.Notifier
+	hr               HRDirectory
+	dashboardBaseURL string
+	teamsEnabled     bool
 }
 
 // NewFeedbackHandler builds the interview-feedback handler.
 func NewFeedbackHandler(apps feedbackStore) *FeedbackHandler {
 	return &FeedbackHandler{apps: apps}
+}
+
+// SetNotifier wires best-effort HR notifications fired when feedback is recorded.
+// Unset → no notifications (tests/CI).
+func (h *FeedbackHandler) SetNotifier(n notify.Notifier, hr HRDirectory, dashboardBaseURL string, teamsEnabled bool) {
+	h.hrNotify = hrFeedbackNotify{notifier: n, hr: hr, dashboardBaseURL: dashboardBaseURL, teamsEnabled: teamsEnabled}
 }
 
 // RegisterFeedbackRoutes mounts the interview-feedback endpoints.
@@ -137,5 +153,25 @@ func (h *FeedbackHandler) Create(c *fiber.Ctx) error {
 	if saved.InterviewerName == "" {
 		saved.InterviewerName = u.Email
 	}
+	h.notifyFeedbackRecorded(c.UserContext(), app, saved)
 	return httpx.Created(c, saved)
+}
+
+// notifyFeedbackRecorded best-effort pings store HR (email + Teams) that feedback
+// was logged. No-op when deps are unset or the application has no assigned store.
+func (h *FeedbackHandler) notifyFeedbackRecorded(ctx context.Context, app *Application, fb InterviewFeedback) {
+	d := h.hrNotify
+	if d.notifier == nil || d.hr == nil {
+		return
+	}
+	emails, err := d.hr.EmailsForStore(ctx, app.AssignedStoreID)
+	if err != nil {
+		return // logged at the repo layer; never block the write
+	}
+	if len(emails) == 0 && !d.teamsEnabled {
+		return
+	}
+	dashURL := d.dashboardBaseURL + "/applications/" + app.ID.String()
+	msgs := notify.FeedbackRecordedHR(emails, d.teamsEnabled, "", "", fb.InterviewerName, fb.Recommendation, dashURL)
+	dispatchHR(ctx, d.notifier, msgs)
 }
