@@ -7,11 +7,12 @@ import {
   Search,
   BarChart3,
   LineChart,
+  ClipboardCheck,
   Settings,
   type LucideIcon,
 } from "lucide-react";
 
-import { canBulkUpload, canViewExecutive } from "@/lib/roles";
+import { canBulkUpload, canViewExecutive, isLineManager } from "@/lib/roles";
 
 export interface NavItem {
   href: string;
@@ -37,6 +38,9 @@ export const BULK_NAV: NavItem = { href: "/applications/bulk", label: "Bulk uplo
 // auditor (KindAll roles), gated via canViewExecutive mirroring the backend allowlist.
 export const EXECUTIVE_NAV: NavItem = { href: "/executive", label: "Executive", key: "executive", icon: LineChart };
 
+// Shortlist is the Line Manager's Top-5 review queue — gated to sgm (store GM).
+export const SHORTLIST_NAV: NavItem = { href: "/shortlist", label: "Shortlist", key: "shortlist", icon: ClipboardCheck };
+
 // Members is super_admin + hr_manager — career-portal member management.
 export const MEMBERS_NAV: NavItem = { href: "/members", label: "Members", key: "members", icon: UserCog };
 
@@ -48,6 +52,7 @@ export const ADMIN_NAV: NavItem = { href: "/admin", label: "Admin", key: "admin"
 export function navForRole(role?: string): NavItem[] {
   const items = [...NAV];
   if (canViewExecutive(role)) items.push(EXECUTIVE_NAV);
+  if (isLineManager(role)) items.push(SHORTLIST_NAV);
   if (canBulkUpload(role)) items.push(BULK_NAV);
   if (role === "super_admin" || role === "hr_manager") items.push(MEMBERS_NAV);
   if (role === "super_admin") items.push(ADMIN_NAV);
@@ -55,7 +60,7 @@ export function navForRole(role?: string): NavItem[] {
 }
 
 // ALL_NAV is every possible item, for pathname→item lookups (e.g. header title).
-export const ALL_NAV: NavItem[] = [...NAV, EXECUTIVE_NAV, BULK_NAV, MEMBERS_NAV, ADMIN_NAV];
+export const ALL_NAV: NavItem[] = [...NAV, EXECUTIVE_NAV, SHORTLIST_NAV, BULK_NAV, MEMBERS_NAV, ADMIN_NAV];
 
 // Brand lockup — text-only institutional wordmark, no monogram tile or dot mark.
 // "CP AXTRA" tracked uppercase over an "ATS Console" line (HSBC/JPM register),

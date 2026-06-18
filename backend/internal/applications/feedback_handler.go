@@ -13,13 +13,21 @@ import (
 	"github.com/nexto/hr-ats/pkg/httpx"
 )
 
-// feedbackRecordRoles may record interview feedback. Reads are open to anyone with
-// RBAC visibility of the application; only the hiring decision-makers may write.
-// sgm (store GM) is the closest role to the "line manager" who runs the interview.
-var feedbackRecordRoles = map[string]bool{
-	"super_admin": true,
-	"hr_manager":  true,
-	"sgm":         true,
+// Per-perspective write allowlists. Reads are open to anyone with RBAC visibility
+// of the application; only the relevant decision-maker may write each scorecard.
+// The TA (recruiter) scorecard is for hr_staff/hr_manager; the Line-Manager
+// scorecard is for sgm (store GM ≈ line manager). super_admin may record either.
+var (
+	taRecordRoles = map[string]bool{"super_admin": true, "hr_manager": true, "hr_staff": true}
+	lmRecordRoles = map[string]bool{"super_admin": true, "sgm": true}
+)
+
+// canRecordPerspective reports whether role may write a scorecard for perspective.
+func canRecordPerspective(role, perspective string) bool {
+	if perspective == PerspectiveLineManager {
+		return lmRecordRoles[role]
+	}
+	return taRecordRoles[role] // default + "ta"
 }
 
 // feedbackStore is the narrow slice of the repository this handler needs (accept
@@ -64,6 +72,7 @@ func RegisterFeedbackRoutes(app *fiber.App, h *FeedbackHandler) {
 }
 
 type feedbackReq struct {
+	Perspective    string                `json:"perspective"` // "ta" (default) | "line_manager"
 	OverallRating  int                   `json:"overall_rating"`
 	Recommendation string                `json:"recommendation"`
 	Competencies   InterviewCompetencies `json:"competencies"`
@@ -106,9 +115,6 @@ func (h *FeedbackHandler) Create(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusNotFound, "application not found")
 	}
 	u, _ := c.Locals(middleware.UserContextKey).(middleware.DevUser)
-	if !feedbackRecordRoles[u.Role] {
-		return fiber.NewError(fiber.StatusForbidden, "insufficient role to record interview feedback")
-	}
 
 	app, err := h.apps.FindByID(c.UserContext(), id)
 	if err != nil {
@@ -123,8 +129,21 @@ func (h *FeedbackHandler) Create(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, "invalid payload")
 	}
 
+	// Perspective drives which role may write (TA recruiters vs line manager).
+	perspective := strings.TrimSpace(req.Perspective)
+	if perspective == "" {
+		perspective = PerspectiveTA
+	}
+	if !ValidatePerspective(perspective) {
+		return fiber.NewError(fiber.StatusBadRequest, "perspective must be one of ta, line_manager")
+	}
+	if !canRecordPerspective(u.Role, perspective) {
+		return fiber.NewError(fiber.StatusForbidden, "insufficient role to record this scorecard")
+	}
+
 	fb := InterviewFeedback{
 		ApplicationID:  id,
+		Perspective:    perspective,
 		OverallRating:  req.OverallRating,
 		Recommendation: strings.TrimSpace(req.Recommendation),
 		Competencies:   req.Competencies,

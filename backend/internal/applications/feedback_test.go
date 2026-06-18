@@ -117,11 +117,48 @@ func postFeedback(t *testing.T, app *fiber.App, id string, body any) int {
 }
 
 func TestCreateFeedback_RoleGate(t *testing.T) {
+	// hr_staff may record the TA scorecard but NOT the line-manager one.
 	store := &fakeFeedbackStore{inScope: true, app: &Application{Status: StatusInterview}}
 	app := feedbackTestApp(store, middleware.DevUser{ID: uuid.NewString(), Role: "hr_staff"})
-	got := postFeedback(t, app, uuid.NewString(), validFeedback())
-	if got != fiber.StatusForbidden {
-		t.Fatalf("hr_staff should be forbidden, got %d", got)
+	lm := validFeedback()
+	lm.Perspective = PerspectiveLineManager
+	if got := postFeedback(t, app, uuid.NewString(), lm); got != fiber.StatusForbidden {
+		t.Fatalf("hr_staff recording LM scorecard should be forbidden, got %d", got)
+	}
+}
+
+func TestCreateFeedback_TAPerspectiveAllowed(t *testing.T) {
+	// hr_staff (recruiter) may record the TA scorecard (default perspective).
+	store := &fakeFeedbackStore{inScope: true, app: &Application{Status: StatusInterview}}
+	app := feedbackTestApp(store, middleware.DevUser{ID: uuid.NewString(), Role: "hr_staff"})
+	if got := postFeedback(t, app, uuid.NewString(), validFeedback()); got != fiber.StatusCreated {
+		t.Fatalf("hr_staff recording TA scorecard should be 201, got %d", got)
+	}
+	if store.created.Perspective != PerspectiveTA {
+		t.Fatalf("expected stored perspective %q, got %q", PerspectiveTA, store.created.Perspective)
+	}
+}
+
+func TestCreateFeedback_LMPerspectiveBySgm(t *testing.T) {
+	store := &fakeFeedbackStore{inScope: true, app: &Application{Status: StatusInterviewed}}
+	app := feedbackTestApp(store, middleware.DevUser{ID: uuid.NewString(), Role: "sgm"})
+	lm := validFeedback()
+	lm.Perspective = PerspectiveLineManager
+	if got := postFeedback(t, app, uuid.NewString(), lm); got != fiber.StatusCreated {
+		t.Fatalf("sgm recording LM scorecard should be 201, got %d", got)
+	}
+	if store.created.Perspective != PerspectiveLineManager {
+		t.Fatalf("expected stored perspective %q, got %q", PerspectiveLineManager, store.created.Perspective)
+	}
+}
+
+func TestCreateFeedback_InvalidPerspective(t *testing.T) {
+	store := &fakeFeedbackStore{inScope: true, app: &Application{Status: StatusInterview}}
+	app := feedbackTestApp(store, middleware.DevUser{ID: uuid.NewString(), Role: "super_admin"})
+	bad := validFeedback()
+	bad.Perspective = "manager"
+	if got := postFeedback(t, app, uuid.NewString(), bad); got != fiber.StatusBadRequest {
+		t.Fatalf("invalid perspective should be 400, got %d", got)
 	}
 }
 
@@ -158,6 +195,9 @@ func TestCreateFeedback_Validation(t *testing.T) {
 type fakeHRDir struct{ emails []string }
 
 func (f fakeHRDir) EmailsForStore(context.Context, *int) ([]string, error) { return f.emails, nil }
+func (f fakeHRDir) LineManagerEmailsForStore(context.Context, *int) ([]string, error) {
+	return f.emails, nil
+}
 
 func TestCreateFeedback_HRNotifyNonFatal(t *testing.T) {
 	store := &fakeFeedbackStore{inScope: true, app: &Application{Status: StatusInterviewed, AssignedStoreID: ptrInt(5)}}
@@ -170,7 +210,9 @@ func TestCreateFeedback_HRNotifyNonFatal(t *testing.T) {
 		return c.Next()
 	})
 	RegisterFeedbackRoutes(app, h)
-	got := postFeedback(t, app, uuid.NewString(), validFeedback())
+	lm := validFeedback()
+	lm.Perspective = PerspectiveLineManager // sgm records the LM scorecard
+	got := postFeedback(t, app, uuid.NewString(), lm)
 	if got != fiber.StatusCreated {
 		t.Fatalf("HR-notify failure must not break create; got %d", got)
 	}
@@ -182,7 +224,9 @@ func TestCreateFeedback_HappyPath(t *testing.T) {
 	store := &fakeFeedbackStore{inScope: true, app: &Application{Status: StatusInterviewed}}
 	uid := uuid.NewString()
 	app := feedbackTestApp(store, middleware.DevUser{ID: uid, Email: "gm@cp.test", Role: "sgm"})
-	got := postFeedback(t, app, uuid.NewString(), validFeedback())
+	lm := validFeedback()
+	lm.Perspective = PerspectiveLineManager // sgm records the LM scorecard
+	got := postFeedback(t, app, uuid.NewString(), lm)
 	if got != fiber.StatusCreated {
 		t.Fatalf("valid feedback should be 201, got %d", got)
 	}
