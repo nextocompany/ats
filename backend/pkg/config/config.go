@@ -202,6 +202,11 @@ type Config struct {
 	// ACA ingress range) whose X-Forwarded-For is trusted for client-IP resolution.
 	// Empty (dev/CI) ⇒ no proxy trusted ⇒ c.IP() is the direct peer.
 	TrustedProxies string
+
+	// LogClientIPs, when true, logs the X-Forwarded-For chain + direct peer +
+	// resolved client IP per request. Off by default; flip on briefly to verify
+	// how the ingress populates X-Forwarded-For before trusting it for rate limits.
+	LogClientIPs bool
 }
 
 // Provider values selecting real (vs mock) integrations.
@@ -317,6 +322,7 @@ func Load() (*Config, error) {
 
 		CORSAllowOrigins: getenv("CORS_ALLOW_ORIGINS", "http://localhost:3000,http://localhost:3001"),
 		TrustedProxies:   os.Getenv("TRUSTED_PROXIES"),
+		LogClientIPs:     getenvBool("LOG_CLIENT_IPS", false),
 	}
 
 	if c.DatabaseURL == "" {
