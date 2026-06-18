@@ -51,6 +51,36 @@ func (d statusNotifyDeps) notifyStatusChange(ctx context.Context, apps Repositor
 	}
 }
 
+// notifyDocumentReviewed sends a best-effort candidate notification (LINE + email)
+// after an onboarding document is approved/rejected (3.8). It never returns an
+// error — a notify failure must not affect the HR action. No-op when deps are
+// unset or the candidate has no contact handle.
+func (d statusNotifyDeps) notifyDocumentReviewed(ctx context.Context, apps Repository, appID uuid.UUID, docType string, approved bool, reason string) {
+	if d.notifier == nil || d.cands == nil {
+		return
+	}
+	app, err := apps.FindByID(ctx, appID)
+	if err != nil {
+		log.Warn().Err(err).Str("application", appID.String()).Msg("onboarding notify: load application failed")
+		return
+	}
+	cand, err := d.cands.FindByID(ctx, app.CandidateID)
+	if err != nil {
+		log.Warn().Err(err).Str("candidate", app.CandidateID.String()).Msg("onboarding notify: load candidate failed")
+		return
+	}
+	if msg := notify.DocumentReviewedMessage(cand.LineUserID, cand.FullName, docType, approved, reason, d.portalBaseURL); msg.Recipient != "" {
+		if err := d.notifier.Send(ctx, msg); err != nil {
+			log.Warn().Err(err).Str("application", appID.String()).Msg("onboarding notify: line send failed (non-fatal)")
+		}
+	}
+	if em := notify.DocumentReviewedEmailMessage(cand.Email, cand.FullName, docType, approved, reason, d.portalBaseURL); em.Recipient != "" {
+		if err := d.notifier.Send(ctx, em); err != nil {
+			log.Warn().Err(err).Str("application", appID.String()).Msg("onboarding notify: email send failed (non-fatal)")
+		}
+	}
+}
+
 // dispatchHR sends a set of HR-facing messages best-effort. Failures are logged,
 // never returned — an HR notification must not break the triggering action.
 func dispatchHR(ctx context.Context, notifier notify.Notifier, msgs []notify.Message) {

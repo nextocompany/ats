@@ -17,6 +17,31 @@ func TestLoad_MissingRequired(t *testing.T) {
 	}
 }
 
+func TestLoad_OnboardingRequiredDocsDefault(t *testing.T) {
+	t.Setenv("DB_URL", "postgres://localhost/db")
+	t.Setenv("REDIS_URL", "redis://localhost:6379")
+	t.Setenv("AZURE_BLOB_CONNECTION_STRING", "conn")
+
+	c, err := Load()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := len(c.OnboardingRequiredDocs()); got != 7 {
+		t.Fatalf("expected 7 default required onboarding docs, got %d", got)
+	}
+}
+
+func TestLoad_OnboardingRequiredDocsInvalid(t *testing.T) {
+	t.Setenv("DB_URL", "postgres://localhost/db")
+	t.Setenv("REDIS_URL", "redis://localhost:6379")
+	t.Setenv("AZURE_BLOB_CONNECTION_STRING", "conn")
+	t.Setenv("ONBOARDING_REQUIRED_DOCS", "id_card,passport")
+
+	if _, err := Load(); err == nil {
+		t.Fatal("expected error for unknown ONBOARDING_REQUIRED_DOCS token, got nil")
+	}
+}
+
 func TestLoad_Defaults(t *testing.T) {
 	// Arrange: only required vars set.
 	t.Setenv("DB_URL", "postgres://localhost/db")

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { LinkLineButton } from "@/components/auth/LinkLineButton";
 import { ProfileForm } from "@/components/auth/ProfileForm";
 import { ResumeUploadStep } from "@/components/auth/ResumeUploadStep";
+import { OnboardingSection } from "@/components/onboarding/OnboardingSection";
 import { PortalShell } from "@/components/PortalShell";
 import { Button } from "@/components/ui/button";
 import { logout } from "@/lib/auth";
@@ -75,6 +76,8 @@ export default function AccountPage() {
             <ResumeUploadStep account={candidate} submitLabel="อัปเดตเรซูเม่" onUploaded={() => undefined} />
           </div>
         </section>
+
+        <OnboardingSection />
       </div>
     </PortalShell>
   );

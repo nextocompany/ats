@@ -261,6 +261,12 @@ func main() {
 	// Candidate letter downloads (account-scoped, under the origin-guarded /auth prefix).
 	applications.RegisterCandidateLetterRoutes(app, applications.NewLetterCandidateHandler(appRepo, blobClient), candidateauth.RequireCandidate(caSvc, cfg.SessionCookieName))
 
+	// Onboarding documents (candidate side): a hired member lists their checklist
+	// and uploads/replaces required documents; upload best-effort notifies store HR.
+	onboardingCandHandler := applications.NewOnboardingCandidateHandler(appRepo, blobClient, cfg.OnboardingRequiredDocs())
+	onboardingCandHandler.SetNotifier(notifier, applications.NewHRDirectory(pool), cfg.DashboardBaseURL, cfg.TeamsWebhookURL != "")
+	applications.RegisterCandidateOnboardingRoutes(app, onboardingCandHandler, candidateauth.RequireCandidate(caSvc, cfg.SessionCookieName))
+
 	// LINE Login OAuth web flow. With the candidate session issuer wired (account-
 	// first), the callback creates/links an account and sets the session cookie;
 	// the legacy fragment-token path remains when no issuer is supplied.
@@ -322,6 +328,12 @@ func main() {
 	// Letter generation (HR): interview/offer PDF letters → blob → signed download.
 	letterRenderer := letters.NewRenderer(cfg.CompanyName)
 	applications.RegisterLetterRoutes(app, applications.NewLetterHandler(appRepo, letterRenderer, blobClient))
+
+	// Onboarding documents (HR side): review the checklist + approve/reject each
+	// document; a review best-effort notifies the candidate.
+	onboardingHandler := applications.NewOnboardingHandler(appRepo, blobClient, cfg.OnboardingRequiredDocs())
+	onboardingHandler.SetNotifier(notifier, candidateRepo, cfg.PortalBaseURL)
+	applications.RegisterOnboardingRoutes(app, onboardingHandler)
 	// Bulk CV upload (HR dashboard): many resumes for one position → one application
 	// + pipeline job each. Positions list powers the picker.
 	applications.RegisterBulkRoutes(app, applications.NewBulkHandler(intakeSvc))

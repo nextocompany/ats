@@ -2,8 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { api } from "./api";
-import { getMyLetters, getMyOffers, respondToOffer } from "./auth";
+import { api, ApiError } from "./api";
+import { getMyLetters, getMyOffers, getMyOnboarding, respondToOffer } from "./auth";
 import type {
   ApplyInput,
   ApplyResult,
@@ -12,6 +12,7 @@ import type {
   Letter,
   Offer,
   OfferResponseInput,
+  OnboardingStatus,
   PositionDetail,
   PublicPosition,
   QuickApplyResult,
@@ -36,6 +37,45 @@ export function useRespondOffer(id: string) {
 // useMyLetters loads the member's letters (interview/offer) with signed URLs.
 export function useMyLetters() {
   return useQuery<Letter[]>({ queryKey: ["my-letters"], queryFn: getMyLetters });
+}
+
+export const MY_ONBOARDING_KEY = ["my-onboarding"] as const;
+
+// useMyOnboarding loads the member's onboarding checklist + progress (Module-3
+// 3.8). A 404 (not hired / no onboarding) resolves to null — a normal state for
+// most members — so the section can simply render nothing.
+export function useMyOnboarding() {
+  return useQuery<OnboardingStatus | null>({
+    queryKey: MY_ONBOARDING_KEY,
+    queryFn: () =>
+      getMyOnboarding().catch((e) => {
+        if (e instanceof ApiError && e.status === 404) return null;
+        throw e;
+      }),
+    retry: false,
+  });
+}
+
+// buildOnboardingDocForm assembles the multipart body the backend expects. Kept
+// pure and exported so the FormData shape can be unit-tested without a network call.
+export function buildOnboardingDocForm(docType: string, file: File): FormData {
+  const form = new FormData();
+  form.set("doc_type", docType);
+  form.set("document", file);
+  return form;
+}
+
+// useUploadOnboardingDoc uploads (or replaces) one required document and refreshes
+// the checklist from the response.
+export function useUploadOnboardingDoc() {
+  const qc = useQueryClient();
+  return useMutation<OnboardingStatus, Error, { docType: string; file: File }>({
+    mutationFn: ({ docType, file }) =>
+      api
+        .postForm<OnboardingStatus>("/api/v1/public/auth/onboarding/documents", buildOnboardingDocForm(docType, file))
+        .then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: MY_ONBOARDING_KEY }),
+  });
 }
 
 export function usePublicPositions() {

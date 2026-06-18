@@ -29,6 +29,8 @@ import type {
   Member,
   Offer,
   OfferInput,
+  OnboardingDoc,
+  OnboardingStatus,
   MemberFilter,
   MemberNote,
   MemberStats,
@@ -418,6 +420,41 @@ export function useGenerateLetter(appId: string) {
     mutationFn: (type: LetterType) =>
       api.post<Letter>(`/api/v1/applications/${appId}/letters`, { type }).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["letters", appId] }),
+  });
+}
+
+// --- Onboarding documents (Module-3 3.8) ------------------------------------
+
+// useOnboarding loads an application's onboarding checklist + progress. A 404
+// (the application is not hired / no checklist) resolves to null rather than error.
+export function useOnboarding(appId: string) {
+  return useQuery({
+    queryKey: ["onboarding", appId],
+    queryFn: () =>
+      api
+        .get<OnboardingStatus>(`/api/v1/applications/${appId}/onboarding`)
+        .then((r) => r.data)
+        .catch((e) => {
+          if (e instanceof ApiError && e.status === 404) return null;
+          throw e;
+        }),
+    enabled: !!appId,
+    retry: false,
+  });
+}
+
+// useReviewOnboardingDoc approves/rejects a single document and refreshes the list.
+export function useReviewOnboardingDoc(appId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { docId: string; decision: "approve" | "reject"; reason?: string }) =>
+      api
+        .post<OnboardingDoc>(`/api/v1/applications/${appId}/onboarding/documents/${vars.docId}/review`, {
+          decision: vars.decision,
+          reason: vars.reason,
+        })
+        .then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["onboarding", appId] }),
   });
 }
 

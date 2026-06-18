@@ -76,6 +76,15 @@ type Repository interface {
 	GetLettersByApplication(ctx context.Context, applicationID uuid.UUID) ([]Letter, error)
 	GetLetterByID(ctx context.Context, id uuid.UUID) (*Letter, error)
 	ListLettersByAccount(ctx context.Context, accountID uuid.UUID) ([]Letter, error)
+	// Onboarding documents (Module-3 3.8): one document per (application, doc_type),
+	// candidate-uploaded, HR-reviewed. ReviewOnboardingDocument is a single
+	// transaction; FindHiredApplicationByAccount scopes the candidate endpoints
+	// server-side so the client never passes an application id.
+	UpsertOnboardingDocument(ctx context.Context, applicationID uuid.UUID, docType, blobURL, fileName, fileType string, uploadedBy uuid.UUID) (OnboardingDocument, error)
+	ListOnboardingByApplication(ctx context.Context, applicationID uuid.UUID) ([]OnboardingDocument, error)
+	GetOnboardingDocByID(ctx context.Context, id uuid.UUID) (*OnboardingDocument, error)
+	ReviewOnboardingDocument(ctx context.Context, docID, applicationID, reviewerID uuid.UUID, approve bool, reason string) (OnboardingDocument, error)
+	FindHiredApplicationByAccount(ctx context.Context, accountID uuid.UUID) (uuid.UUID, error)
 }
 
 type pgRepository struct {

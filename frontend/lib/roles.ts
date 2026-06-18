@@ -114,6 +114,15 @@ export function canManageLetters(role?: string): boolean {
   return !!role && LETTER_ROLES.includes(role);
 }
 
+// ONBOARDING_ROLES may review onboarding documents. Mirrors the backend
+// onboardingWriteRoles map in internal/applications/onboarding.go (the
+// candidate-managing HR roles, same wider set as letters).
+export const ONBOARDING_ROLES = ["super_admin", "hr_manager", "hr_staff", "sgm"];
+
+export function canManageOnboarding(role?: string): boolean {
+  return !!role && ONBOARDING_ROLES.includes(role);
+}
+
 // HR_ROLES are the roles a local password account may hold. Mirrors the backend
 // `allowedRoles` set in internal/hrauth/model.go; the label is what super_admins
 // pick from when provisioning an account.

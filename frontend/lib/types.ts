@@ -225,6 +225,33 @@ export interface Letter {
   url: string;
 }
 
+// --- Onboarding documents (Module-3 3.8) ------------------------------------
+// Mirrors internal/applications/onboarding.go.
+
+export type DocStatus = "pending" | "approved" | "rejected";
+
+export interface OnboardingDoc {
+  id: string;
+  doc_type: string;
+  status: DocStatus;
+  file_name?: string;
+  file_type?: string;
+  review_reason?: string;
+  uploaded_at: string;
+  reviewed_at?: string | null;
+  url?: string;
+}
+
+// OnboardingStatus mirrors applications.OnboardingStatus (the checklist + progress).
+export interface OnboardingStatus {
+  application_id: string;
+  required: string[];
+  documents: OnboardingDoc[];
+  approved_count: number;
+  required_count: number;
+  complete: boolean;
+}
+
 // ShortlistItem mirrors applications.ShortlistItem (LM Top-5 row).
 export interface ShortlistItem {
   application_id: string;

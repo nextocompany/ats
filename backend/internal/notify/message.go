@@ -48,6 +48,72 @@ func StatusEmailMessage(emailAddr, fullName, status, portalBaseURL string) Messa
 	}
 }
 
+// docTypeLabelTH maps onboarding document types to Thai labels for notification
+// copy. Kept local to the notify package (decoupled from applications).
+var docTypeLabelTH = map[string]string{
+	"id_card":               "บัตรประชาชน",
+	"house_registration":    "ทะเบียนบ้าน",
+	"education_certificate": "วุฒิการศึกษา",
+	"bank_book":             "สมุดบัญชีธนาคาร",
+	"tax_document":          "เอกสารภาษี/ลดหย่อน",
+	"photo":                 "รูปถ่าย",
+	"health_check":          "ใบรับรองแพทย์",
+	"military_certificate":  "หลักฐานทางทหาร (สด.43)",
+	"name_change":           "ใบเปลี่ยนชื่อ-สกุล",
+}
+
+// docTypeLabel returns the Thai label for an onboarding document type, or a
+// generic fallback for an unknown type.
+func docTypeLabel(docType string) string {
+	if l, ok := docTypeLabelTH[docType]; ok {
+		return l
+	}
+	return "เอกสาร"
+}
+
+// DocumentReviewedMessage builds a candidate-facing LINE notification for an
+// onboarding-document review outcome (3.8). Returns a zero Message (empty
+// Recipient, skipped by callers) when the candidate has no LINE handle.
+func DocumentReviewedMessage(lineUserID, fullName, docType string, approved bool, reason, portalBaseURL string) Message {
+	if lineUserID == "" {
+		return Message{}
+	}
+	return Message{
+		Channel:   ChannelLINE,
+		Recipient: lineUserID,
+		Subject:   "อัปเดตเอกสาร onboarding",
+		Body:      documentReviewedBody(fullName, docType, approved, reason, portalBaseURL),
+	}
+}
+
+// DocumentReviewedEmailMessage is the email equivalent of DocumentReviewedMessage,
+// reusing the same body so the LINE and email copy never drift. Returns a zero
+// Message when the address is empty.
+func DocumentReviewedEmailMessage(emailAddr, fullName, docType string, approved bool, reason, portalBaseURL string) Message {
+	if emailAddr == "" {
+		return Message{}
+	}
+	return Message{
+		Channel:   ChannelEmail,
+		Recipient: emailAddr,
+		Subject:   "อัปเดตเอกสาร onboarding",
+		Body:      documentReviewedBody(fullName, docType, approved, reason, portalBaseURL),
+	}
+}
+
+func documentReviewedBody(fullName, docType string, approved bool, reason, portalBaseURL string) string {
+	greeting := "สวัสดีค่ะ"
+	if fullName != "" {
+		greeting = "สวัสดีคุณ" + fullName
+	}
+	label := docTypeLabel(docType)
+	link := fmt.Sprintf(" ดูรายละเอียดได้ที่ %s/account", portalBaseURL)
+	if approved {
+		return greeting + fmt.Sprintf(" เอกสาร \"%s\" ของคุณได้รับการอนุมัติแล้ว", label) + link
+	}
+	return greeting + fmt.Sprintf(" เอกสาร \"%s\" ของคุณถูกตีกลับ เหตุผล: %s กรุณาอัปโหลดใหม่", label, fallback(reason, "-")) + link
+}
+
 func statusBody(fullName, status, portalBaseURL string) (string, bool) {
 	greeting := "สวัสดีค่ะ"
 	if fullName != "" {

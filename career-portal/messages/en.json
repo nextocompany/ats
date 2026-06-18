@@ -40,5 +40,30 @@
     "docInterview": "Interview invitation",
     "docOffer": "Offer letter",
     "download": "Download"
+  },
+  "onboarding": {
+    "title": "Onboarding documents",
+    "progress": "{approved} of {required} approved",
+    "status_pending": "Pending review",
+    "status_approved": "Approved",
+    "status_rejected": "Rejected",
+    "notUploaded": "Not uploaded",
+    "view": "View",
+    "upload": "Upload",
+    "replace": "Replace",
+    "uploading": "Uploading…",
+    "uploadFailed": "Could not upload the document. Please try again.",
+    "fileTypeInvalid": "Only PDF, DOCX, JPG or PNG files are accepted.",
+    "fileTooLarge": "The file must not exceed 10MB.",
+    "rejectedReason": "Rejected: {reason}",
+    "doc_id_card": "ID card",
+    "doc_house_registration": "House registration",
+    "doc_education_certificate": "Education certificate",
+    "doc_bank_book": "Bank book",
+    "doc_tax_document": "Tax document",
+    "doc_photo": "Photo",
+    "doc_health_check": "Health certificate",
+    "doc_military_certificate": "Military certificate (Sor.Dor.43)",
+    "doc_name_change": "Name change certificate"
   }
 }
