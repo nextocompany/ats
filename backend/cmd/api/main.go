@@ -359,6 +359,8 @@ func main() {
 	reportRepo := reports.New(pool)
 	reportExporter := reports.NewExportService(reportRepo, blobClient, notifier, cfg.ReportRecipientList())
 	reports.RegisterRoutes(app, reports.NewHandler(reportRepo, reportExporter, blobClient))
+	// ATS Reports (Module-3 3.9): RBAC-scoped, date-ranged hiring-funnel metrics + CSV.
+	reports.RegisterATSRoutes(app, reports.NewATSReportHandler(reportRepo, cfg.OnboardingRequiredDocs()))
 	executive.RegisterRoutes(app, executive.NewHandler(executive.NewService(pool, cfg.ExecutiveProvider)))
 	pdpa.RegisterRoutes(app, pdpa.NewHandler(pdpaRepo))
 	users.RegisterRoutes(app, users.NewHandler())

@@ -123,6 +123,23 @@ export function canManageOnboarding(role?: string): boolean {
   return !!role && ONBOARDING_ROLES.includes(role);
 }
 
+// REPORT_VIEW_ROLES may view the ATS Reports page. Mirrors the backend
+// reportViewRoles map in internal/reports/ats_report_handler.go — everyone with
+// dashboard access; results are RBAC-scoped server-side (store roles see their store).
+export const REPORT_VIEW_ROLES = [
+  "super_admin",
+  "regional_director",
+  "operation_director",
+  "auditor",
+  "sgm",
+  "hr_manager",
+  "hr_staff",
+];
+
+export function canViewReports(role?: string): boolean {
+  return !!role && REPORT_VIEW_ROLES.includes(role);
+}
+
 // HR_ROLES are the roles a local password account may hold. Mirrors the backend
 // `allowedRoles` set in internal/hrauth/model.go; the label is what super_admins
 // pick from when provisioning an account.

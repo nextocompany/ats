@@ -385,6 +385,54 @@ export interface Source {
   conversion: number;
 }
 
+// --- ATS Reports (Module-3 3.9) ---------------------------------------------
+// Mirrors internal/reports/ats_report.go (RBAC-scoped, date-ranged metrics).
+export interface AtsFunnelStage {
+  key: string;
+  count: number;
+  conversion_pct: number;
+}
+
+export interface AtsReport {
+  from: string;
+  to: string;
+  scope: string;
+  funnel: { stages: AtsFunnelStage[] };
+  timing: {
+    hired_count: number;
+    avg_days_to_hire: number;
+    median_days_to_hire: number;
+    avg_days_to_offer: number;
+    avg_offer_response_days: number;
+  };
+  offers: {
+    sent: number;
+    accepted: number;
+    declined: number;
+    accept_rate_pct: number;
+    decline_rate_pct: number;
+  };
+  onboarding: {
+    hired_in_range: number;
+    completed: number;
+    completion_rate_pct: number;
+    docs_reviewed: number;
+    docs_rejected: number;
+    doc_rejection_rate_pct: number;
+  };
+  quality: {
+    interview_feedback_count: number;
+    interview_passed: number;
+    interview_pass_rate_pct: number;
+    avg_interview_rating: number;
+    approval_decided: number;
+    avg_approval_cycle_days: number;
+    approval_steps: number;
+    approval_breached: number;
+    approval_sla_breach_pct: number;
+  };
+}
+
 // StoreLoad: review backlog at one store (reports/by-store).
 export interface StoreLoad {
   store_id: number | null;
