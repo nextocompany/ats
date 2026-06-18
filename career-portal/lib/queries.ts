@@ -3,12 +3,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "./api";
-import { getMyOffers, respondToOffer } from "./auth";
+import { getMyLetters, getMyOffers, respondToOffer } from "./auth";
 import type {
   ApplyInput,
   ApplyResult,
   ApplicationStatus,
   InterviewSessionState,
+  Letter,
   Offer,
   OfferResponseInput,
   PositionDetail,
@@ -30,6 +31,11 @@ export function useRespondOffer(id: string) {
     mutationFn: (input) => respondToOffer(id, input),
     onSuccess: () => qc.invalidateQueries({ queryKey: MY_OFFERS_KEY }),
   });
+}
+
+// useMyLetters loads the member's letters (interview/offer) with signed URLs.
+export function useMyLetters() {
+  return useQuery<Letter[]>({ queryKey: ["my-letters"], queryFn: getMyLetters });
 }
 
 export function usePublicPositions() {

@@ -34,6 +34,11 @@
     "status_sent": "Awaiting your response",
     "status_accepted": "Accepted",
     "status_declined": "Declined",
-    "status_expired": "Expired"
+    "status_expired": "Expired",
+    "documentsTitle": "My documents",
+    "documentsFailed": "Could not load your documents. Please try again.",
+    "docInterview": "Interview invitation",
+    "docOffer": "Offer letter",
+    "download": "Download"
   }
 }

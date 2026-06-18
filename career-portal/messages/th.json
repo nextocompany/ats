@@ -34,6 +34,11 @@
     "status_sent": "รอการตอบรับจากคุณ",
     "status_accepted": "ตอบรับแล้ว",
     "status_declined": "ปฏิเสธแล้ว",
-    "status_expired": "หมดอายุ"
+    "status_expired": "หมดอายุ",
+    "documentsTitle": "เอกสารของฉัน",
+    "documentsFailed": "โหลดเอกสารไม่สำเร็จ กรุณาลองใหม่อีกครั้ง",
+    "docInterview": "จดหมายเชิญสัมภาษณ์",
+    "docOffer": "จดหมายจ้างงาน",
+    "download": "ดาวน์โหลด"
   }
 }

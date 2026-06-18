@@ -23,6 +23,8 @@ import type {
   InterviewInviteResult,
   InterviewView,
   KPI,
+  Letter,
+  LetterType,
   Me,
   Member,
   Offer,
@@ -395,6 +397,27 @@ export function useSendOffer(appId: string) {
       qc.invalidateQueries({ queryKey: ["offer", appId] });
       qc.invalidateQueries({ queryKey: ["application", appId] });
     },
+  });
+}
+
+// --- Letters (Module-3 3.3) -------------------------------------------------
+
+// useLetters loads an application's generated letters (each with a signed URL).
+export function useLetters(appId: string) {
+  return useQuery({
+    queryKey: ["letters", appId],
+    queryFn: () => api.get<Letter[]>(`/api/v1/applications/${appId}/letters`).then((r) => r.data),
+    enabled: !!appId,
+  });
+}
+
+// useGenerateLetter renders + stores an interview/offer letter and refreshes the list.
+export function useGenerateLetter(appId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (type: LetterType) =>
+      api.post<Letter>(`/api/v1/applications/${appId}/letters`, { type }).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["letters", appId] }),
   });
 }
 

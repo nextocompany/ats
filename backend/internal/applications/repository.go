@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/nexto/hr-ats/internal/letters"
 	"github.com/nexto/hr-ats/internal/rbac"
 )
 
@@ -69,6 +70,12 @@ type Repository interface {
 	SendOffer(ctx context.Context, applicationID uuid.UUID) (Offer, error)
 	RespondOffer(ctx context.Context, offerID, accountID uuid.UUID, accept bool, reason string) (Offer, error)
 	ListOffersByAccount(ctx context.Context, accountID uuid.UUID) ([]OfferView, error)
+	// Letter generation (Module-3 3.3): interview/offer PDF letters.
+	GatherLetterData(ctx context.Context, applicationID uuid.UUID, letterType string) (letters.LetterData, error)
+	UpsertLetter(ctx context.Context, applicationID, createdBy uuid.UUID, letterType, blobURL string) (Letter, error)
+	GetLettersByApplication(ctx context.Context, applicationID uuid.UUID) ([]Letter, error)
+	GetLetterByID(ctx context.Context, id uuid.UUID) (*Letter, error)
+	ListLettersByAccount(ctx context.Context, accountID uuid.UUID) ([]Letter, error)
 }
 
 type pgRepository struct {
