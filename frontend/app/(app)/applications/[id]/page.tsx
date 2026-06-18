@@ -6,6 +6,7 @@ import { ArrowLeft } from "lucide-react";
 
 import { AiSummaryPanel } from "@/components/resume/AiSummaryPanel";
 import { ApprovalPanel } from "@/components/resume/ApprovalPanel";
+import { OfferPanel } from "@/components/resume/OfferPanel";
 import { FitAnalysisPanel } from "@/components/resume/FitAnalysisPanel";
 import { InterviewPanel } from "@/components/resume/InterviewPanel";
 import {
@@ -52,6 +53,7 @@ export default function ApplicationDetailPage() {
           >
             <AiSummaryPanel app={app} />
             <ApprovalPanel applicationId={app.id} app={app} />
+            <OfferPanel applicationId={app.id} app={app} />
             <InterviewPanel applicationId={app.id} />
             <ScorecardSummary applicationId={app.id} />
             <TaScorecard applicationId={app.id} status={app.status} />

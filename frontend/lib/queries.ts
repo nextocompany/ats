@@ -25,6 +25,8 @@ import type {
   KPI,
   Me,
   Member,
+  Offer,
+  OfferInput,
   MemberFilter,
   MemberNote,
   MemberStats,
@@ -352,6 +354,46 @@ export function useDecideApproval(requestId: string, appId: string) {
       qc.invalidateQueries({ queryKey: ["approval-queue"] });
       qc.invalidateQueries({ queryKey: ["application", appId] });
       qc.invalidateQueries({ queryKey: ["applications"] });
+    },
+  });
+}
+
+// --- Offer management (Module-3 3.6) ----------------------------------------
+
+// useOffer loads an application's offer (backend returns null when none exists).
+export function useOffer(appId: string) {
+  return useQuery({
+    queryKey: ["offer", appId],
+    queryFn: () => api.get<Offer | null>(`/api/v1/applications/${appId}/offer`).then((r) => r.data),
+    enabled: !!appId,
+  });
+}
+
+// useCreateOffer composes a draft offer; useUpdateOffer edits a still-draft offer.
+export function useCreateOffer(appId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: OfferInput) => api.post<Offer>(`/api/v1/applications/${appId}/offer`, vars).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["offer", appId] }),
+  });
+}
+
+export function useUpdateOffer(appId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: OfferInput) => api.patch<Offer>(`/api/v1/applications/${appId}/offer`, vars).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["offer", appId] }),
+  });
+}
+
+// useSendOffer transitions a draft offer to sent and notifies the candidate.
+export function useSendOffer(appId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<Offer>(`/api/v1/applications/${appId}/offer/send`).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["offer", appId] });
+      qc.invalidateQueries({ queryKey: ["application", appId] });
     },
   });
 }

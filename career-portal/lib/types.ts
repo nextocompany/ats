@@ -23,6 +23,30 @@ export interface PublicPosition {
   open_count: number;
 }
 
+// Offer management (Module-3 3.6) — mirrors applications.OfferView / OfferResponseInput.
+export type OfferStatus = "draft" | "sent" | "accepted" | "declined" | "expired";
+
+export interface Offer {
+  id: string;
+  application_id: string;
+  status: OfferStatus;
+  salary: number | null;
+  start_date: string | null;
+  terms?: string;
+  sent_at: string | null;
+  responded_at: string | null;
+  expires_at: string | null;
+  decline_reason?: string;
+  created_at: string;
+  position_title?: string;
+  store_id: number | null;
+}
+
+export interface OfferResponseInput {
+  decision: "accept" | "decline";
+  reason?: string;
+}
+
 // GET /api/v1/public/positions/:id — public detail projection.
 export interface PositionDetail {
   id: string;
