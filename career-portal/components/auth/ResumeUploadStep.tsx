@@ -8,14 +8,7 @@ import { Label } from "@/components/ui/label";
 import { uploadResume } from "@/lib/auth";
 import { useCandidate } from "@/lib/session";
 import type { Account } from "@/lib/types";
-
-const MAX_RESUME_BYTES = 10 * 1024 * 1024;
-const ACCEPTED_TYPES = new Set([
-  "application/pdf",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "image/jpeg",
-  "image/png",
-]);
+import { UPLOAD_ACCEPT_ATTR, validateUploadFile } from "@/lib/upload";
 
 interface ResumeUploadStepProps {
   account: Account;
@@ -23,11 +16,17 @@ interface ResumeUploadStepProps {
   onUploaded: () => void;
 }
 
-// validateFile mirrors the server gate (415/413) for instant inline feedback.
+// validateFile mirrors the server gate (415/413) for instant inline feedback,
+// mapping the shared validator's error code to Thai copy.
 function validateFile(file: File): string | null {
-  if (!ACCEPTED_TYPES.has(file.type)) return "รองรับเฉพาะไฟล์ PDF, DOCX, JPG หรือ PNG เท่านั้น";
-  if (file.size > MAX_RESUME_BYTES) return "ไฟล์ต้องมีขนาดไม่เกิน 10MB";
-  return null;
+  switch (validateUploadFile(file)) {
+    case "fileTypeInvalid":
+      return "รองรับเฉพาะไฟล์ PDF, DOCX, JPG หรือ PNG เท่านั้น";
+    case "fileTooLarge":
+      return "ไฟล์ต้องมีขนาดไม่เกิน 10MB";
+    default:
+      return null;
+  }
 }
 
 // ResumeUploadStep saves the account's reusable resume — uploaded once, reused on
@@ -75,7 +74,7 @@ export function ResumeUploadStep({ account, submitLabel, onUploaded }: ResumeUpl
         <Input
           id="resume"
           type="file"
-          accept=".pdf,.docx,image/jpeg,image/png"
+          accept={UPLOAD_ACCEPT_ATTR}
           onChange={handleFile}
           aria-invalid={!!fileError}
           className="h-auto py-2.5 file:mr-3 file:rounded-md file:bg-secondary file:px-3 file:py-1.5"

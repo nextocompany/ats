@@ -57,6 +57,32 @@ export interface Letter {
   url: string;
 }
 
+// --- Onboarding documents (Module-3 3.8) ---
+// Mirrors internal/applications/onboarding.go.
+export type DocStatus = "pending" | "approved" | "rejected";
+
+export interface OnboardingDoc {
+  id: string;
+  doc_type: string;
+  status: DocStatus;
+  file_name?: string;
+  file_type?: string;
+  review_reason?: string;
+  uploaded_at: string;
+  reviewed_at?: string | null;
+  url?: string;
+}
+
+// GET /api/v1/public/auth/onboarding — the member's checklist + progress.
+export interface OnboardingStatus {
+  application_id: string;
+  required: string[];
+  documents: OnboardingDoc[];
+  approved_count: number;
+  required_count: number;
+  complete: boolean;
+}
+
 // GET /api/v1/public/positions/:id — public detail projection.
 export interface PositionDetail {
   id: string;

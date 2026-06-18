@@ -40,5 +40,30 @@
     "docInterview": "จดหมายเชิญสัมภาษณ์",
     "docOffer": "จดหมายจ้างงาน",
     "download": "ดาวน์โหลด"
+  },
+  "onboarding": {
+    "title": "เอกสาร Onboarding",
+    "progress": "อนุมัติแล้ว {approved} จาก {required}",
+    "status_pending": "รอตรวจสอบ",
+    "status_approved": "อนุมัติแล้ว",
+    "status_rejected": "ตีกลับ",
+    "notUploaded": "ยังไม่อัปโหลด",
+    "view": "ดู",
+    "upload": "อัปโหลด",
+    "replace": "อัปโหลดใหม่",
+    "uploading": "กำลังอัปโหลด…",
+    "uploadFailed": "อัปโหลดเอกสารไม่สำเร็จ กรุณาลองใหม่",
+    "fileTypeInvalid": "รองรับเฉพาะไฟล์ PDF, DOCX, JPG หรือ PNG เท่านั้น",
+    "fileTooLarge": "ไฟล์ต้องมีขนาดไม่เกิน 10MB",
+    "rejectedReason": "ตีกลับ: {reason}",
+    "doc_id_card": "บัตรประชาชน",
+    "doc_house_registration": "ทะเบียนบ้าน",
+    "doc_education_certificate": "วุฒิการศึกษา",
+    "doc_bank_book": "สมุดบัญชีธนาคาร",
+    "doc_tax_document": "เอกสารภาษี/ลดหย่อน",
+    "doc_photo": "รูปถ่าย",
+    "doc_health_check": "ใบรับรองแพทย์",
+    "doc_military_certificate": "หลักฐานทางทหาร (สด.43)",
+    "doc_name_change": "ใบเปลี่ยนชื่อ-สกุล"
   }
 }

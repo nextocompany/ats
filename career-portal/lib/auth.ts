@@ -2,7 +2,7 @@
 // httpOnly session cookie sent by lib/api (credentials:'include'). OAuth flows
 // (LINE/Google) are top-level navigations — see lib/line.ts.
 import { api } from "./api";
-import type { Account, Letter, Offer, OfferResponseInput, ProfileInput } from "./types";
+import type { Account, Letter, Offer, OfferResponseInput, OnboardingStatus, ProfileInput } from "./types";
 
 export { lineLoginUrl, googleLoginUrl } from "./line";
 
@@ -52,4 +52,10 @@ export function respondToOffer(id: string, input: OfferResponseInput): Promise<O
 // getMyLetters lists the member's letters (interview/offer) with signed URLs.
 export function getMyLetters(): Promise<Letter[]> {
   return api.get<Letter[]>("/api/v1/public/auth/letters").then((r) => r.data);
+}
+
+// getMyOnboarding returns the member's onboarding checklist + progress (Module-3
+// 3.8). Throws ApiError(404) when there is no hired application / onboarding.
+export function getMyOnboarding(): Promise<OnboardingStatus> {
+  return api.get<OnboardingStatus>("/api/v1/public/auth/onboarding").then((r) => r.data);
 }

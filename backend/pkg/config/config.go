@@ -152,6 +152,12 @@ type Config struct {
 	// CompanyName is the letterhead name printed on generated PDF letters (3.3).
 	CompanyName string
 
+	// OnboardingRequiredDocsRaw is the comma-separated subset of known onboarding
+	// document types (3.8) that a hired candidate must submit. Defaults to seven;
+	// military_certificate + name_change are known types but optional by default
+	// (operator opts in via env). Validated at Load; read via OnboardingRequiredDocs().
+	OnboardingRequiredDocsRaw string
+
 	// Report scheduler (Sprint 5b): cron spec for the recurring export, and the
 	// comma-separated recipient list notified with the export link.
 	ReportScheduleCron string
@@ -288,6 +294,8 @@ func Load() (*Config, error) {
 		DashboardBaseURL: getenv("DASHBOARD_BASE_URL", "http://localhost:3000"),
 		CompanyName:      getenv("COMPANY_NAME", "CP AXTRA"),
 
+		OnboardingRequiredDocsRaw: getenv("ONBOARDING_REQUIRED_DOCS", "id_card,house_registration,education_certificate,bank_book,tax_document,photo,health_check"),
+
 		ReportScheduleCron: getenv("REPORT_SCHEDULE_CRON", "0 7 * * 1"), // Mon 07:00
 		ReportRecipients:   os.Getenv("REPORT_RECIPIENTS"),
 
@@ -341,6 +349,20 @@ func Load() (*Config, error) {
 	} {
 		if !isOneOf(p.val, p.allowed) {
 			return nil, fmt.Errorf("config: %s must be one of %v, got %q", p.name, p.allowed, p.val)
+		}
+	}
+
+	// Validate ONBOARDING_REQUIRED_DOCS tokens against the known onboarding document
+	// types (mirrors the onboarding_documents CHECK constraint; kept local to avoid
+	// importing the applications package).
+	knownOnboardingDocs := map[string]bool{
+		"id_card": true, "house_registration": true, "education_certificate": true,
+		"bank_book": true, "tax_document": true, "photo": true, "health_check": true,
+		"military_certificate": true, "name_change": true,
+	}
+	for _, tok := range c.OnboardingRequiredDocs() {
+		if !knownOnboardingDocs[tok] {
+			return nil, fmt.Errorf("config: invalid ONBOARDING_REQUIRED_DOCS token %q", tok)
 		}
 	}
 
@@ -465,6 +487,18 @@ func (c *Config) ReportRecipientList() []string {
 	var out []string
 	for _, r := range strings.Split(c.ReportRecipients, ",") {
 		if t := strings.TrimSpace(r); t != "" {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// OnboardingRequiredDocs splits the comma-separated ONBOARDING_REQUIRED_DOCS into
+// trimmed, non-empty document types (the checklist a hired candidate must submit).
+func (c *Config) OnboardingRequiredDocs() []string {
+	var out []string
+	for _, d := range strings.Split(c.OnboardingRequiredDocsRaw, ",") {
+		if t := strings.TrimSpace(d); t != "" {
 			out = append(out, t)
 		}
 	}

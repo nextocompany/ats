@@ -78,6 +78,17 @@ func ApprovalEscalationHR(toEmails []string, teamsEnabled bool, candName, levelL
 	return hrMessages(toEmails, teamsEnabled, subject, body)
 }
 
+// OnboardingDocUploadedHR notifies store HR that a hired candidate uploaded an
+// onboarding document awaiting review (3.8). dashURL deep-links the application.
+func OnboardingDocUploadedHR(toEmails []string, teamsEnabled bool, docType, dashURL string) []Message {
+	subject := "มีการอัปโหลดเอกสาร onboarding ใหม่"
+	body := fmt.Sprintf(
+		"ผู้สมัครที่ได้รับการจ้างได้อัปโหลดเอกสาร onboarding รอการตรวจสอบ\nเอกสาร: %s\nดูรายละเอียด: %s",
+		docTypeLabel(docType), dashURL,
+	)
+	return hrMessages(toEmails, teamsEnabled, subject, body)
+}
+
 // hrMessages fans a subject/body out to one email Message per address plus an
 // optional Teams Message.
 func hrMessages(toEmails []string, teamsEnabled bool, subject, body string) []Message {
