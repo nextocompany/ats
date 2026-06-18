@@ -50,12 +50,16 @@
   across api replicas instead of counted per process; keys live under `ratelimit:*`. The limiter **fails
   open** on a Redis outage (availability over strict limiting for a public endpoint) and never touches
   non-rate-limit keys (`Reset` is scoped to `ratelimit:*`, never `FLUSHDB`).
-- **Trusted-proxy client IP (Sprint 8)**: the Fiber app runs with `EnableTrustedProxyCheck` +
-  `ProxyHeader: X-Forwarded-For` and a `TRUSTED_PROXIES` allowlist (IPs/CIDRs). When the request comes from
-  a trusted proxy (set `TRUSTED_PROXIES` to the prod ingress/LB CIDR), `c.IP()` is the real client; an empty
-  allowlist (dev/CI) trusts no proxy and uses the direct peer. `X-Forwarded-For` is **never** honoured from a
-  non-allowlisted source (it is client-spoofable), so an attacker cannot mint a fresh rate-limit bucket per
-  request.
+- **Spoof-resistant client IP**: the rate limiters key on `middleware.RealClientIP`, NOT fiber's `c.IP()`.
+  Fiber's `c.IP()` returns the raw client-supplied `X-Forwarded-For` once a proxy is trusted (it does not
+  validate the chain), so it is spoofable. `RealClientIP` instead walks `X-Forwarded-For` **right-to-left**
+  and returns the first entry NOT in the `TRUSTED_PROXIES` allowlist (IPs/CIDRs) — the address our ingress
+  actually observed. Because the ACA ingress **appends** the real client to the right of any client-supplied
+  XFF, attacker-injected entries sit to the left and are unreachable; an attacker cannot mint a fresh
+  rate-limit bucket per request. An empty allowlist (dev/CI) trusts no proxy and uses the direct TCP peer,
+  never a header value. In prod set `TRUSTED_PROXIES` to cover the ingress peer range (ACA Consumption uses
+  `100.100.0.0/16`, within the `100.64.0.0/10` CGNAT block). `LOG_CLIENT_IPS=true` logs the XFF chain +
+  peer + resolved IP to re-verify the ingress topology before trusting it.
 
 ## Secrets
 - No secrets are committed; only `.env.example` is tracked (`.env` is gitignored and untracked).
