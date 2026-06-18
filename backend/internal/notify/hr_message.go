@@ -30,6 +30,17 @@ func FeedbackRecordedHR(toEmails []string, teamsEnabled bool, candName, position
 	return hrMessages(toEmails, teamsEnabled, subject, body)
 }
 
+// ShortlistReadyLM notifies a store's Line Manager(s) that a candidate has been
+// shortlisted and is awaiting their Top-5 review. dashURL deep-links the shortlist.
+func ShortlistReadyLM(lmEmails []string, teamsEnabled bool, candName, positionTitle, dashURL string) []Message {
+	subject := "มีผู้สมัครรอการพิจารณา (Shortlist)"
+	body := fmt.Sprintf(
+		"มีผู้สมัครถูกคัดเข้า shortlist รอการพิจารณาของผู้จัดการสาขา\nผู้สมัคร: %s\nตำแหน่ง: %s\nดูรายชื่อคัดสรร: %s",
+		fallback(candName, "ผู้สมัคร"), fallback(positionTitle, "-"), dashURL,
+	)
+	return hrMessages(lmEmails, teamsEnabled, subject, body)
+}
+
 // hrMessages fans a subject/body out to one email Message per address plus an
 // optional Teams Message.
 func hrMessages(toEmails []string, teamsEnabled bool, subject, body string) []Message {

@@ -23,6 +23,26 @@ export function canRecordInterviewFeedback(role?: string): boolean {
   return !!role && INTERVIEW_FEEDBACK_ROLES.includes(role);
 }
 
+// TA_SCORECARD_ROLES may record the TA (recruiter) scorecard; LINE_MANAGER_ROLES
+// (sgm = store GM ≈ line manager) record the LM scorecard. Mirrors the backend
+// taRecordRoles / lmRecordRoles allowlists in feedback_handler.go. Server is the
+// real gate.
+export const TA_SCORECARD_ROLES = ["super_admin", "hr_manager", "hr_staff"];
+export const LINE_MANAGER_ROLES = ["sgm"];
+
+export function canRecordTaScorecard(role?: string): boolean {
+  return !!role && TA_SCORECARD_ROLES.includes(role);
+}
+
+export function isLineManager(role?: string): boolean {
+  return !!role && LINE_MANAGER_ROLES.includes(role);
+}
+
+// canRecordLmScorecard: the line manager plus super_admin (who may record either).
+export function canRecordLmScorecard(role?: string): boolean {
+  return role === "super_admin" || isLineManager(role);
+}
+
 // BULK_UPLOAD_ROLES may bulk-upload CVs. Mirrors the backend `bulkIntakeRoles`
 // allowlist in internal/applications/bulk_handler.go (auditor is read-only).
 export const BULK_UPLOAD_ROLES = ["super_admin", "hr_manager", "sgm", "hr_staff"];

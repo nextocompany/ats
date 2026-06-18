@@ -47,6 +47,16 @@ type DashboardHandler struct {
 	activity   ActivityWriter
 	indexer    CandidateIndexer
 	notifyDeps statusNotifyDeps
+	lmNotify   lmShortlistNotify
+}
+
+// lmShortlistNotify bundles the optional Line-Manager shortlist-notify deps. All
+// zero → no-op.
+type lmShortlistNotify struct {
+	notifier         notify.Notifier
+	hr               HRDirectory
+	dashboardBaseURL string
+	teamsEnabled     bool
 }
 
 // NewDashboardHandler builds the dashboard handler.
@@ -66,6 +76,30 @@ func (h *DashboardHandler) SetIndexer(idx CandidateIndexer) {
 // Unset → no notifications. Mirrors SetIndexer.
 func (h *DashboardHandler) SetNotifier(n notify.Notifier, cands candidates.Repository, portalBaseURL string) {
 	h.notifyDeps = statusNotifyDeps{notifier: n, cands: cands, portalBaseURL: portalBaseURL}
+}
+
+// SetLineManagerNotifier wires the best-effort email/Teams ping to a store's line
+// manager(s) when a candidate is bulk-shortlisted. Unset → no notifications.
+func (h *DashboardHandler) SetLineManagerNotifier(n notify.Notifier, hr HRDirectory, dashboardBaseURL string, teamsEnabled bool) {
+	h.lmNotify = lmShortlistNotify{notifier: n, hr: hr, dashboardBaseURL: dashboardBaseURL, teamsEnabled: teamsEnabled}
+}
+
+// notifyShortlistLM best-effort pings the store line manager(s) that a candidate is
+// awaiting their shortlist review. No-op when deps are unset or no store assigned.
+func (h *DashboardHandler) notifyShortlistLM(ctx context.Context, app *Application) {
+	d := h.lmNotify
+	if d.notifier == nil || d.hr == nil {
+		return
+	}
+	emails, err := d.hr.LineManagerEmailsForStore(ctx, app.AssignedStoreID)
+	if err != nil {
+		return // never block the status write
+	}
+	if len(emails) == 0 && !d.teamsEnabled {
+		return
+	}
+	msgs := notify.ShortlistReadyLM(emails, d.teamsEnabled, "", "", d.dashboardBaseURL+"/shortlist")
+	dispatchHR(ctx, d.notifier, msgs)
 }
 
 // RegisterDashboardRoutes mounts the inbox endpoints.
@@ -193,6 +227,10 @@ func (h *DashboardHandler) Bulk(c *fiber.Ctx) error {
 		_ = h.indexer.Index(c.UserContext(), app.CandidateID)
 		// Notify the candidate — best-effort (rejections are never notified).
 		h.notifyDeps.notifyStatusChange(c.UserContext(), h.apps, id, target)
+		// Notify the store line manager that a candidate awaits shortlist review.
+		if target == StatusShortlisted {
+			h.notifyShortlistLM(c.UserContext(), app)
+		}
 		updated++
 	}
 	return httpx.OK(c, fiber.Map{"updated": updated, "failed": failed, "status": target})

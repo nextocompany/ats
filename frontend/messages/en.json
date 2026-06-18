@@ -11,9 +11,20 @@
     "search": "Search",
     "analytics": "Analytics",
     "executive": "Executive",
+    "shortlist": "Shortlist",
     "bulkUpload": "Bulk upload",
     "members": "Members",
     "admin": "Admin"
+  },
+  "shortlist": {
+    "eyebrow": "Line manager",
+    "title": "Shortlist",
+    "meta": "Top candidates awaiting your review, ranked by AI score + interview rating.",
+    "composite": "Composite",
+    "emptyTitle": "No candidates to review",
+    "emptyHint": "Shortlisted candidates for your store appear here, ranked for your decision.",
+    "notAvailable": "Not available for your role",
+    "notAvailableHint": "The shortlist is limited to store line managers."
   },
   "executive": {
     "eyebrow": "Leadership",

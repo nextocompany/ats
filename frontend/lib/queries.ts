@@ -28,8 +28,10 @@ import type {
   OpenRole,
   Position,
   ReportExport,
+  ScorecardSummary,
   SearchFilter,
   SearchHit,
+  ShortlistItem,
   Source,
   StoreLoad,
   TimelineEntry,
@@ -263,14 +265,37 @@ export function useInterviewFeedback(id: string) {
   });
 }
 
-// useAddInterviewFeedback records a new interview-feedback entry and refreshes the
-// list. Write access is server-gated to sgm/hr_manager/super_admin.
+// useAddInterviewFeedback records a new scorecard entry (TA or LM perspective) and
+// refreshes the list + aggregate. Write access is server-gated per perspective.
 export function useAddInterviewFeedback(id: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (vars: InterviewFeedbackInput) =>
       api.post<InterviewFeedback>(`/api/v1/applications/${id}/interview-feedback`, vars).then((r) => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["interview-feedback", id] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["interview-feedback", id] });
+      qc.invalidateQueries({ queryKey: ["scorecard-summary", id] });
+      qc.invalidateQueries({ queryKey: ["shortlist"] });
+    },
+  });
+}
+
+// useScorecardSummary loads the combined TA + Line-Manager aggregate + composite.
+export function useScorecardSummary(id: string) {
+  return useQuery({
+    queryKey: ["scorecard-summary", id],
+    queryFn: () =>
+      api.get<ScorecardSummary>(`/api/v1/applications/${id}/scorecard-summary`).then((r) => r.data),
+    enabled: !!id,
+  });
+}
+
+// useShortlist loads the Line Manager's Top-N shortlist (store-scoped server-side).
+export function useShortlist(limit = 5) {
+  return useQuery({
+    queryKey: ["shortlist", limit],
+    queryFn: () =>
+      api.get<ShortlistItem[]>(`/api/v1/shortlist?limit=${limit}`).then((r) => r.data),
   });
 }
 

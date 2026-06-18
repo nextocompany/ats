@@ -32,6 +32,9 @@ type Repository interface {
 	// Interview feedback (structured panel outcome; many rows per application).
 	CreateFeedback(ctx context.Context, f InterviewFeedback) (InterviewFeedback, error)
 	ListFeedback(ctx context.Context, applicationID uuid.UUID) ([]InterviewFeedback, error)
+	// Shortlist returns the top-N shortlisted applications visible to scope,
+	// composite-ranked (AI score + TA interview rating) — powers the LM view.
+	Shortlist(ctx context.Context, scope rbac.Scope, limit int) ([]ShortlistItem, error)
 	// Sprint 2:
 	SetCanonicalCandidate(ctx context.Context, id, candidateID uuid.UUID) error
 	SetDedupState(ctx context.Context, id uuid.UUID, state string, confidence float64) error
@@ -185,14 +188,17 @@ func (r *pgRepository) CreateFeedback(ctx context.Context, f InterviewFeedback) 
 	if err != nil {
 		return InterviewFeedback{}, fmt.Errorf("applications: marshal competencies: %w", err)
 	}
+	if f.Perspective == "" {
+		f.Perspective = PerspectiveTA
+	}
 	const q = `
 		INSERT INTO interview_feedback
-			(application_id, appointment_id, interviewer_id, overall_rating, recommendation,
+			(application_id, appointment_id, interviewer_id, perspective, overall_rating, recommendation,
 			 competencies, strengths, concerns, notes)
-		VALUES ($1, $2, $3, $4, $5, $6, NULLIF($7,''), NULLIF($8,''), NULLIF($9,''))
+		VALUES ($1, $2, $3, $4, $5, $6, $7, NULLIF($8,''), NULLIF($9,''), NULLIF($10,''))
 		RETURNING id, created_at`
 	err = r.pool.QueryRow(ctx, q,
-		f.ApplicationID, f.AppointmentID, f.InterviewerID, f.OverallRating, f.Recommendation,
+		f.ApplicationID, f.AppointmentID, f.InterviewerID, f.Perspective, f.OverallRating, f.Recommendation,
 		comp, f.Strengths, f.Concerns, f.Notes,
 	).Scan(&f.ID, &f.CreatedAt)
 	if err != nil {
@@ -203,7 +209,7 @@ func (r *pgRepository) CreateFeedback(ctx context.Context, f InterviewFeedback) 
 
 func (r *pgRepository) ListFeedback(ctx context.Context, applicationID uuid.UUID) ([]InterviewFeedback, error) {
 	const q = `
-		SELECT f.id, f.application_id, f.appointment_id, f.overall_rating, f.recommendation,
+		SELECT f.id, f.application_id, f.appointment_id, COALESCE(f.perspective,'ta'), f.overall_rating, f.recommendation,
 		       f.competencies, COALESCE(f.strengths,''), COALESCE(f.concerns,''), COALESCE(f.notes,''),
 		       COALESCE(u.full_name, u.email, ''), f.created_at
 		FROM interview_feedback f
@@ -221,7 +227,7 @@ func (r *pgRepository) ListFeedback(ctx context.Context, applicationID uuid.UUID
 		var f InterviewFeedback
 		var comp []byte
 		if err := rows.Scan(
-			&f.ID, &f.ApplicationID, &f.AppointmentID, &f.OverallRating, &f.Recommendation,
+			&f.ID, &f.ApplicationID, &f.AppointmentID, &f.Perspective, &f.OverallRating, &f.Recommendation,
 			&comp, &f.Strengths, &f.Concerns, &f.Notes, &f.InterviewerName, &f.CreatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("applications: scan feedback: %w", err)
@@ -235,6 +241,70 @@ func (r *pgRepository) ListFeedback(ctx context.Context, applicationID uuid.UUID
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("applications: iterate feedback: %w", err)
+	}
+	return out, nil
+}
+
+// Shortlist returns the top-N shortlisted applications visible to the given scope,
+// ranked by a composite of AI score and the TA average interview rating. A
+// store-scoped role (sgm = line manager) only ever sees its own store's shortlist.
+func (r *pgRepository) Shortlist(ctx context.Context, scope rbac.Scope, limit int) ([]ShortlistItem, error) {
+	if limit <= 0 {
+		limit = defaultShortlistLimit
+	}
+	var args []any
+	add := func(v any) string { args = append(args, v); return fmt.Sprintf("$%d", len(args)) }
+
+	where := "a.status = 'shortlisted'"
+	if clause, cargs := scope.ApplicationsClause(len(args) + 1); clause != "" {
+		where += " AND " + clause
+		args = append(args, cargs...)
+	}
+	limitPH := add(limit)
+
+	q := `
+		SELECT a.id, COALESCE(c.full_name, ''), a.position_id::text,
+		       COALESCE(NULLIF(p.title_en,''), p.title_th, ''), a.assigned_store_id,
+		       a.ai_score, ta.avg_overall
+		FROM applications a
+		JOIN candidates c ON c.id = a.candidate_id
+		JOIN positions p ON p.id = a.position_id
+		LEFT JOIN (
+			SELECT application_id, AVG(overall_rating) AS avg_overall
+			FROM interview_feedback WHERE perspective = 'ta' GROUP BY application_id
+		) ta ON ta.application_id = a.id
+		WHERE ` + where + `
+		ORDER BY (CASE WHEN ta.avg_overall IS NULL THEN COALESCE(a.ai_score,0)
+		               ELSE COALESCE(a.ai_score,0)*0.6 + ta.avg_overall*20*0.4 END) DESC,
+		         a.ai_score DESC NULLS LAST, a.created_at DESC
+		LIMIT ` + limitPH
+	rows, err := r.pool.Query(ctx, q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("applications: shortlist: %w", err)
+	}
+	defer rows.Close()
+
+	out := make([]ShortlistItem, 0)
+	for rows.Next() {
+		var it ShortlistItem
+		if err := rows.Scan(
+			&it.ApplicationID, &it.CandidateName, &it.PositionID, &it.PositionTitle,
+			&it.AssignedStoreID, &it.AIScore, &it.TAAvgOverall,
+		); err != nil {
+			return nil, fmt.Errorf("applications: scan shortlist: %w", err)
+		}
+		ai, ta := 0.0, 0.0
+		if it.AIScore != nil {
+			ai = *it.AIScore
+		}
+		if it.TAAvgOverall != nil {
+			ta = *it.TAAvgOverall
+		}
+		it.Composite = CompositeScore(ai, ta)
+		out = append(out, it)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("applications: iterate shortlist: %w", err)
 	}
 	return out, nil
 }

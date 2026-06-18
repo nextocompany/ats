@@ -74,12 +74,20 @@ export interface InterviewAppointment {
 
 // InterviewCompetencies mirrors applications.InterviewCompetencies — per-dimension
 // 0..5 ratings (0 = not rated).
+// Superset of competency dimensions across perspectives (0 = not rated). TA rates
+// communication/technical/experience/attitude; the Line Manager rates
+// culture_fit/growth_potential/leadership. Each perspective sends only its subset.
 export interface InterviewCompetencies {
   communication: number;
   technical: number;
   experience: number;
+  attitude: number;
   culture_fit: number;
+  growth_potential: number;
+  leadership: number;
 }
+
+export type ScorecardPerspective = "ta" | "line_manager";
 
 export type InterviewRecommendation = "pass" | "hold" | "fail";
 
@@ -90,6 +98,7 @@ export interface InterviewFeedback {
   application_id: string;
   appointment_id?: string;
   interviewer_name?: string;
+  perspective: ScorecardPerspective;
   overall_rating: number;
   recommendation: InterviewRecommendation;
   competencies: InterviewCompetencies;
@@ -101,12 +110,40 @@ export interface InterviewFeedback {
 
 // InterviewFeedbackInput is the create payload (POST .../interview-feedback).
 export interface InterviewFeedbackInput {
+  perspective: ScorecardPerspective;
   overall_rating: number;
   recommendation: InterviewRecommendation;
   competencies: InterviewCompetencies;
   strengths?: string;
   concerns?: string;
   notes?: string;
+}
+
+// PerspectiveAgg mirrors applications.PerspectiveAgg (averaged scorecard).
+export interface PerspectiveAgg {
+  count: number;
+  avg_overall: number;
+  avg_competencies: Record<string, number>;
+  recommendations: Record<string, number>;
+}
+
+// ScorecardSummary mirrors applications.ScorecardSummary (TA + LM aggregate).
+export interface ScorecardSummary {
+  ta: PerspectiveAgg | null;
+  line_manager: PerspectiveAgg | null;
+  composite_score: number | null;
+}
+
+// ShortlistItem mirrors applications.ShortlistItem (LM Top-5 row).
+export interface ShortlistItem {
+  application_id: string;
+  candidate_name: string;
+  position_id: string;
+  position_title: string;
+  assigned_store_id: number | null;
+  ai_score: number | null;
+  ta_avg_overall: number | null;
+  composite: number;
 }
 
 // Position is the slim picker projection (mirrors positions.ListItem).

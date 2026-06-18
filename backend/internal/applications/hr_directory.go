@@ -14,10 +14,16 @@ type HRDirectory interface {
 	// storeID (talent pool / unassigned) returns no recipients — we never email
 	// every store.
 	EmailsForStore(ctx context.Context, storeID *int) ([]string, error)
+	// LineManagerEmailsForStore returns active line-manager (sgm) emails for the
+	// store, for the Top-5 shortlist-ready notification. nil storeID → none.
+	LineManagerEmailsForStore(ctx context.Context, storeID *int) ([]string, error)
 }
 
 // hrNotifyRoles are the store-scoped roles that receive candidate notifications.
 var hrNotifyRoles = []string{"sgm", "hr_manager", "hr_staff"}
+
+// lineManagerRoles are the roles that act as the store's line manager (sgm).
+var lineManagerRoles = []string{"sgm"}
 
 type pgHRDirectory struct {
 	pool *pgxpool.Pool
@@ -27,13 +33,21 @@ type pgHRDirectory struct {
 func NewHRDirectory(pool *pgxpool.Pool) HRDirectory { return &pgHRDirectory{pool: pool} }
 
 func (d *pgHRDirectory) EmailsForStore(ctx context.Context, storeID *int) ([]string, error) {
+	return d.emailsForStoreRoles(ctx, storeID, hrNotifyRoles)
+}
+
+func (d *pgHRDirectory) LineManagerEmailsForStore(ctx context.Context, storeID *int) ([]string, error) {
+	return d.emailsForStoreRoles(ctx, storeID, lineManagerRoles)
+}
+
+func (d *pgHRDirectory) emailsForStoreRoles(ctx context.Context, storeID *int, roles []string) ([]string, error) {
 	if storeID == nil {
 		return nil, nil
 	}
 	const q = `
 		SELECT email FROM users
 		WHERE is_active AND store_id = $1 AND role = ANY($2) AND COALESCE(email,'') <> ''`
-	rows, err := d.pool.Query(ctx, q, *storeID, hrNotifyRoles)
+	rows, err := d.pool.Query(ctx, q, *storeID, roles)
 	if err != nil {
 		return nil, fmt.Errorf("applications: hr emails for store: %w", err)
 	}

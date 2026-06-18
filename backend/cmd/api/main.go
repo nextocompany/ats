@@ -285,6 +285,7 @@ func main() {
 	dashboardHandler := applications.NewDashboardHandler(appRepo, blobClient, activityLog)
 	dashboardHandler.SetIndexer(search.NewCandidateSync(pool, searchIndexer))
 	dashboardHandler.SetNotifier(notifier, candidateRepo, cfg.PortalBaseURL)
+	dashboardHandler.SetLineManagerNotifier(notifier, applications.NewHRDirectory(pool), cfg.DashboardBaseURL, cfg.TeamsWebhookURL != "")
 	applications.RegisterDashboardRoutes(app, dashboardHandler)
 	// Human interview scheduling (state-machine feature): sets status=interview and,
 	// for an online interview, creates a Teams meeting + calendar invite via Graph
@@ -298,6 +299,8 @@ func main() {
 	feedbackHandler := applications.NewFeedbackHandler(appRepo)
 	feedbackHandler.SetNotifier(notifier, applications.NewHRDirectory(pool), cfg.DashboardBaseURL, cfg.TeamsWebhookURL != "")
 	applications.RegisterFeedbackRoutes(app, feedbackHandler)
+	// Line-Manager Top-5 shortlist + per-application scorecard summary (TA + LM).
+	applications.RegisterShortlistRoutes(app, applications.NewShortlistHandler(appRepo))
 	// Bulk CV upload (HR dashboard): many resumes for one position → one application
 	// + pipeline job each. Positions list powers the picker.
 	applications.RegisterBulkRoutes(app, applications.NewBulkHandler(intakeSvc))
