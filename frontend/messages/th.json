@@ -87,6 +87,17 @@
     "sendFailed": "ส่งข้อเสนอไม่สำเร็จ",
     "declinedTitle": "ผู้สมัครปฏิเสธ"
   },
+  "letters": {
+    "title": "จดหมาย",
+    "generateInterview": "จดหมายสัมภาษณ์",
+    "generateOffer": "จดหมายจ้างงาน",
+    "generated": "สร้างจดหมายแล้ว",
+    "generateFailed": "สร้างจดหมายไม่สำเร็จ",
+    "open": "เปิด",
+    "empty": "ยังไม่มีจดหมายที่สร้าง",
+    "type_interview": "จดหมายเชิญสัมภาษณ์",
+    "type_offer": "จดหมายจ้างงาน"
+  },
   "executive": {
     "eyebrow": "ผู้บริหาร",
     "title": "ภาพรวมผู้บริหาร",

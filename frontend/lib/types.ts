@@ -214,6 +214,17 @@ export interface OfferInput {
   expires_at?: string | null;
 }
 
+// --- Letters (Module-3 3.3) -------------------------------------------------
+// Mirrors applications.LetterView.
+export type LetterType = "interview" | "offer";
+
+export interface Letter {
+  id: string;
+  type: LetterType;
+  created_at: string;
+  url: string;
+}
+
 // ShortlistItem mirrors applications.ShortlistItem (LM Top-5 row).
 export interface ShortlistItem {
   application_id: string;

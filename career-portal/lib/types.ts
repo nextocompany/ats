@@ -47,6 +47,16 @@ export interface OfferResponseInput {
   reason?: string;
 }
 
+// Letters (Module-3 3.3) — mirrors applications.LetterView.
+export type LetterType = "interview" | "offer";
+
+export interface Letter {
+  id: string;
+  type: LetterType;
+  created_at: string;
+  url: string;
+}
+
 // GET /api/v1/public/positions/:id — public detail projection.
 export interface PositionDetail {
   id: string;

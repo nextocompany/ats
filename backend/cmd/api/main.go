@@ -29,6 +29,7 @@ import (
 	"github.com/nexto/hr-ats/internal/health"
 	"github.com/nexto/hr-ats/internal/hrauth"
 	"github.com/nexto/hr-ats/internal/interview"
+	"github.com/nexto/hr-ats/internal/letters"
 	"github.com/nexto/hr-ats/internal/lineauth"
 	"github.com/nexto/hr-ats/internal/members"
 	"github.com/nexto/hr-ats/internal/middleware"
@@ -257,6 +258,8 @@ func main() {
 	// under /api/v1/public/auth (already origin-guarded) behind RequireCandidate.
 	offerCandHandler := applications.NewOfferCandidateHandler(appRepo, psService)
 	applications.RegisterCandidateOfferRoutes(app, offerCandHandler, candidateauth.RequireCandidate(caSvc, cfg.SessionCookieName))
+	// Candidate letter downloads (account-scoped, under the origin-guarded /auth prefix).
+	applications.RegisterCandidateLetterRoutes(app, applications.NewLetterCandidateHandler(appRepo, blobClient), candidateauth.RequireCandidate(caSvc, cfg.SessionCookieName))
 
 	// LINE Login OAuth web flow. With the candidate session issuer wired (account-
 	// first), the callback creates/links an account and sets the session cookie;
@@ -316,6 +319,9 @@ func main() {
 	offerHandler := applications.NewOfferHandler(appRepo)
 	offerHandler.SetNotifier(notifier, candidateRepo, cfg.PortalBaseURL)
 	applications.RegisterOfferRoutes(app, offerHandler)
+	// Letter generation (HR): interview/offer PDF letters → blob → signed download.
+	letterRenderer := letters.NewRenderer(cfg.CompanyName)
+	applications.RegisterLetterRoutes(app, applications.NewLetterHandler(appRepo, letterRenderer, blobClient))
 	// Bulk CV upload (HR dashboard): many resumes for one position → one application
 	// + pipeline job each. Positions list powers the picker.
 	applications.RegisterBulkRoutes(app, applications.NewBulkHandler(intakeSvc))

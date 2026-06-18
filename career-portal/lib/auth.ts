@@ -2,7 +2,7 @@
 // httpOnly session cookie sent by lib/api (credentials:'include'). OAuth flows
 // (LINE/Google) are top-level navigations — see lib/line.ts.
 import { api } from "./api";
-import type { Account, Offer, OfferResponseInput, ProfileInput } from "./types";
+import type { Account, Letter, Offer, OfferResponseInput, ProfileInput } from "./types";
 
 export { lineLoginUrl, googleLoginUrl } from "./line";
 
@@ -47,4 +47,9 @@ export function getMyOffers(): Promise<Offer[]> {
 // respondToOffer accepts or declines an offer (decline requires a reason).
 export function respondToOffer(id: string, input: OfferResponseInput): Promise<Offer> {
   return api.post<Offer>(`/api/v1/public/auth/offers/${id}/respond`, input).then((r) => r.data);
+}
+
+// getMyLetters lists the member's letters (interview/offer) with signed URLs.
+export function getMyLetters(): Promise<Letter[]> {
+  return api.get<Letter[]>("/api/v1/public/auth/letters").then((r) => r.data);
 }

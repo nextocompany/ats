@@ -87,6 +87,17 @@
     "sendFailed": "Could not send offer",
     "declinedTitle": "Candidate declined"
   },
+  "letters": {
+    "title": "Letters",
+    "generateInterview": "Interview letter",
+    "generateOffer": "Offer letter",
+    "generated": "Letter generated",
+    "generateFailed": "Could not generate letter",
+    "open": "Open",
+    "empty": "No letters generated yet.",
+    "type_interview": "Interview invitation",
+    "type_offer": "Offer letter"
+  },
   "executive": {
     "eyebrow": "Leadership",
     "title": "Executive Overview",

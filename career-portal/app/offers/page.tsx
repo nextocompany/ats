@@ -9,7 +9,7 @@ import { useTranslations } from "next-intl";
 
 import { PortalShell } from "@/components/PortalShell";
 import { Button } from "@/components/ui/button";
-import { useMyOffers, useRespondOffer } from "@/lib/queries";
+import { useMyLetters, useMyOffers, useRespondOffer } from "@/lib/queries";
 import { useCandidate } from "@/lib/session";
 import type { Offer, OfferStatus } from "@/lib/types";
 
@@ -76,8 +76,49 @@ export default function OffersPage() {
             ))}
           </ul>
         )}
+
+        <DocumentsSection t={t} formatDate={formatThaiDate} />
       </div>
     </PortalShell>
+  );
+}
+
+function DocumentsSection({
+  t,
+  formatDate,
+}: {
+  t: ReturnType<typeof useTranslations>;
+  formatDate: (iso: string | null) => string;
+}) {
+  const { data: letters, isError } = useMyLetters();
+  if (isError) {
+    return (
+      <section className="border-t border-line pt-6">
+        <h2 className="[font-size:var(--text-h3)] font-semibold text-foreground">{t("documentsTitle")}</h2>
+        <p role="alert" className="mt-3 text-sm text-destructive">{t("documentsFailed")}</p>
+      </section>
+    );
+  }
+  if (!letters || letters.length === 0) return null;
+  return (
+    <section className="border-t border-line pt-6">
+      <h2 className="[font-size:var(--text-h3)] font-semibold text-foreground">{t("documentsTitle")}</h2>
+      <ul className="mt-3 flex flex-col gap-2">
+        {letters.map((l) => (
+          <li key={l.id} className="flex items-center justify-between gap-3 rounded-lg border border-line bg-card px-4 py-3">
+            <span className="text-sm text-foreground">
+              {l.type === "interview" ? t("docInterview") : t("docOffer")}
+              <span className="ml-2 text-xs text-muted-foreground">{formatDate(l.created_at)}</span>
+            </span>
+            {l.url && (
+              <a href={l.url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-primary underline-offset-2 hover:underline">
+                {t("download")}
+              </a>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
