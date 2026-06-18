@@ -127,9 +127,10 @@ func main() {
 		ErrorHandler:          httpx.ErrorHandler,
 		DisableStartupMessage: true,
 		BodyLimit:             maxBodyBytes,
-		// Behind a trusted proxy/LB (e.g. the ACA ingress, set via TRUSTED_PROXIES),
-		// resolve c.IP() from X-Forwarded-For so the rate limiter keys on the real
-		// client. Empty allowlist ⇒ no proxy trusted ⇒ direct peer (dev/CI).
+		// Retained as a safe default for any fiber c.IP() callers. The rate limiters
+		// do NOT use c.IP() — they key via middleware.RealClientIP (right-most
+		// non-trusted X-Forwarded-For entry), which is spoof-resistant whereas
+		// fiber's c.IP() returns the raw header when a proxy is trusted.
 		EnableTrustedProxyCheck: true,
 		TrustedProxies:          cfg.TrustedProxyList(),
 		ProxyHeader:             fiber.HeaderXForwardedFor,
@@ -151,6 +152,25 @@ func main() {
 		PermissionPolicy:      "camera=(), microphone=(), geolocation=()",
 	}))
 	app.Use(middleware.RequestLogger())
+	// Spoof-resistant client-IP resolution for the rate limiters: parse the
+	// TRUSTED_PROXIES allowlist once, then key on the right-most non-trusted
+	// X-Forwarded-For entry (the address our ingress actually saw). A client
+	// cannot prepend hops to escape its bucket. Empty allowlist ⇒ direct peer.
+	trustedProxies, badProxies, maskedProxies := middleware.ParseTrustedCIDRs(cfg.TrustedProxyList())
+	if len(badProxies) > 0 {
+		log.Warn().Strs("entries", badProxies).Msg("TRUSTED_PROXIES: ignoring malformed entries")
+	}
+	if len(maskedProxies) > 0 {
+		log.Warn().Strs("entries", maskedProxies).Msg("TRUSTED_PROXIES: host bits set — trust range widened to network")
+	}
+	if len(trustedProxies) == 0 && !cfg.IsDevelopment() {
+		// Behind ACA the direct TCP peer is always the ingress, so an empty allowlist
+		// collapses every client into one rate-limit bucket. Warn loudly, don't fatal.
+		log.Warn().Msg("TRUSTED_PROXIES empty in non-dev: rate limiters key on the direct peer (ingress) — all traffic shares one bucket")
+	}
+	log.Info().Int("trusted_proxy_cidrs", len(trustedProxies)).Msg("client-ip trust configured")
+	clientIPKey := func(c *fiber.Ctx) string { return middleware.RealClientIP(c, trustedProxies) }
+	app.Use(middleware.ClientIPDebugLogger(cfg.LogClientIPs, trustedProxies))
 	// Settings service backs the runtime "allow all Entra tenants" admin toggle,
 	// read by the auth middleware (cached) and managed via /api/v1/admin/settings.
 	settingsSvc := settings.NewService(settings.NewRepository(pool))
@@ -220,7 +240,7 @@ func main() {
 		Max:          cfg.RateLimitPublicMax,
 		Expiration:   publicRateWindow,
 		Storage:      ratelimit.New(rdb),
-		KeyGenerator: func(c *fiber.Ctx) string { return c.IP() },
+		KeyGenerator: clientIPKey,
 		LimitReached: func(c *fiber.Ctx) error {
 			return fiber.NewError(fiber.StatusTooManyRequests, "rate limit exceeded")
 		},
@@ -373,7 +393,7 @@ func main() {
 		Max:          cfg.RateLimitLoginMax,
 		Expiration:   publicRateWindow,
 		Storage:      ratelimit.New(rdb),
-		KeyGenerator: func(c *fiber.Ctx) string { return c.IP() },
+		KeyGenerator: clientIPKey,
 		LimitReached: func(c *fiber.Ctx) error {
 			return fiber.NewError(fiber.StatusTooManyRequests, "too many login attempts")
 		},
