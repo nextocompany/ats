@@ -36,6 +36,7 @@ import type {
   MemberStats,
   OpenRole,
   Position,
+  AtsReport,
   ReportExport,
   ScorecardSummary,
   SearchFilter,
@@ -232,6 +233,23 @@ export function useTriggerExport() {
   return useMutation({
     mutationFn: () => api.post("/api/v1/reports/exports"),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["report-exports"] }),
+  });
+}
+
+// useAtsReport loads the RBAC-scoped ATS report for a date range (Module-3 3.9).
+// A 403 (role not allowed) resolves to null so the page can show "not available".
+export function useAtsReport(from: string, to: string) {
+  return useQuery({
+    queryKey: ["ats-report", from, to],
+    queryFn: () =>
+      api
+        .get<AtsReport>("/api/v1/reports/ats" + buildQuery({ from, to }))
+        .then((r) => r.data)
+        .catch((e) => {
+          if (e instanceof ApiError && e.status === 403) return null;
+          throw e;
+        }),
+    retry: false,
   });
 }
 

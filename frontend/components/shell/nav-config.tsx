@@ -7,13 +7,14 @@ import {
   Search,
   BarChart3,
   LineChart,
+  FileBarChart,
   ClipboardCheck,
   CheckSquare,
   Settings,
   type LucideIcon,
 } from "lucide-react";
 
-import { canAccessApprovals, canBulkUpload, canViewExecutive, isLineManager } from "@/lib/roles";
+import { canAccessApprovals, canBulkUpload, canViewExecutive, canViewReports, isLineManager } from "@/lib/roles";
 
 export interface NavItem {
   href: string;
@@ -34,6 +35,10 @@ export const NAV: NavItem[] = [
 // Bulk upload is for HR roles that add candidates (super_admin/hr_manager/sgm/
 // hr_staff) — gated via canBulkUpload, mirroring the backend allowlist.
 export const BULK_NAV: NavItem = { href: "/applications/bulk", label: "Bulk upload", key: "bulkUpload", icon: UploadCloud };
+
+// Reports is the HR-facing ATS Reports page (recruitment-funnel metrics, RBAC-scoped) —
+// most HR roles, gated via canViewReports mirroring the backend allowlist.
+export const REPORTS_NAV: NavItem = { href: "/reports", label: "Reports", key: "reports", icon: FileBarChart };
 
 // Executive is the company-wide leadership overview — super_admin/regional_director/
 // auditor (KindAll roles), gated via canViewExecutive mirroring the backend allowlist.
@@ -56,6 +61,7 @@ export const ADMIN_NAV: NavItem = { href: "/admin", label: "Admin", key: "admin"
 // uploader roles; super_admin + hr_manager see Members; super_admin also sees Admin.
 export function navForRole(role?: string): NavItem[] {
   const items = [...NAV];
+  if (canViewReports(role)) items.push(REPORTS_NAV);
   if (canViewExecutive(role)) items.push(EXECUTIVE_NAV);
   if (isLineManager(role)) items.push(SHORTLIST_NAV);
   if (canAccessApprovals(role)) items.push(APPROVALS_NAV);
@@ -66,7 +72,7 @@ export function navForRole(role?: string): NavItem[] {
 }
 
 // ALL_NAV is every possible item, for pathname→item lookups (e.g. header title).
-export const ALL_NAV: NavItem[] = [...NAV, EXECUTIVE_NAV, SHORTLIST_NAV, APPROVALS_NAV, BULK_NAV, MEMBERS_NAV, ADMIN_NAV];
+export const ALL_NAV: NavItem[] = [...NAV, REPORTS_NAV, EXECUTIVE_NAV, SHORTLIST_NAV, APPROVALS_NAV, BULK_NAV, MEMBERS_NAV, ADMIN_NAV];
 
 // Brand lockup — text-only institutional wordmark, no monogram tile or dot mark.
 // "CP AXTRA" tracked uppercase over an "ATS Console" line (HSBC/JPM register),
