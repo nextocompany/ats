@@ -186,6 +186,34 @@ export interface ApprovalDecisionInput {
   reason?: string;
 }
 
+// --- Offer management (Module-3 3.6) ----------------------------------------
+// Mirrors internal/applications/offer.go.
+
+export type OfferStatus = "draft" | "sent" | "accepted" | "declined" | "expired";
+
+// Offer mirrors applications.Offer (one per application).
+export interface Offer {
+  id: string;
+  application_id: string;
+  status: OfferStatus;
+  salary: number | null;
+  start_date: string | null;
+  terms?: string;
+  sent_at: string | null;
+  responded_at: string | null;
+  expires_at: string | null;
+  decline_reason?: string;
+  created_at: string;
+}
+
+// OfferInput is the HR compose/edit payload.
+export interface OfferInput {
+  salary?: number | null;
+  start_date?: string | null;
+  terms?: string;
+  expires_at?: string | null;
+}
+
 // ShortlistItem mirrors applications.ShortlistItem (LM Top-5 row).
 export interface ShortlistItem {
   application_id: string;

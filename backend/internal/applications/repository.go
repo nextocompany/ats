@@ -60,6 +60,15 @@ type Repository interface {
 	ListPendingApprovals(ctx context.Context, scope rbac.Scope) ([]ApprovalQueueItem, error)
 	ListOverdueApprovalSteps(ctx context.Context) ([]OverdueApprovalStep, error)
 	MarkApprovalStepEscalated(ctx context.Context, stepID uuid.UUID) error
+	// Offer management (Module-3 3.6): one offer per application. RespondOffer is a
+	// single transaction so the offer and the application status never diverge.
+	CreateOffer(ctx context.Context, applicationID, createdBy uuid.UUID, in OfferInput) (Offer, error)
+	UpdateOffer(ctx context.Context, applicationID uuid.UUID, in OfferInput) (Offer, error)
+	GetOfferByApplication(ctx context.Context, applicationID uuid.UUID) (*Offer, error)
+	GetOfferByID(ctx context.Context, id uuid.UUID) (*Offer, error)
+	SendOffer(ctx context.Context, applicationID uuid.UUID) (Offer, error)
+	RespondOffer(ctx context.Context, offerID, accountID uuid.UUID, accept bool, reason string) (Offer, error)
+	ListOffersByAccount(ctx context.Context, accountID uuid.UUID) ([]OfferView, error)
 }
 
 type pgRepository struct {

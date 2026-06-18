@@ -1,17 +1,36 @@
 "use client";
 
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "./api";
+import { getMyOffers, respondToOffer } from "./auth";
 import type {
   ApplyInput,
   ApplyResult,
   ApplicationStatus,
   InterviewSessionState,
+  Offer,
+  OfferResponseInput,
   PositionDetail,
   PublicPosition,
   QuickApplyResult,
 } from "./types";
+
+export const MY_OFFERS_KEY = ["my-offers"] as const;
+
+// useMyOffers loads the logged-in member's offers (Module-3 3.6).
+export function useMyOffers() {
+  return useQuery<Offer[]>({ queryKey: MY_OFFERS_KEY, queryFn: getMyOffers });
+}
+
+// useRespondOffer accepts/declines an offer and refreshes the list + session.
+export function useRespondOffer(id: string) {
+  const qc = useQueryClient();
+  return useMutation<Offer, Error, OfferResponseInput>({
+    mutationFn: (input) => respondToOffer(id, input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: MY_OFFERS_KEY }),
+  });
+}
 
 export function usePublicPositions() {
   return useQuery({
