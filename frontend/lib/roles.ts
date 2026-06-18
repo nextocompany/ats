@@ -106,6 +106,14 @@ export function canManageOffer(role?: string): boolean {
   return !!role && OFFER_ROLES.includes(role);
 }
 
+// LETTER_ROLES may generate PDF letters. Mirrors the backend letterWriteRoles map
+// in internal/applications/letter.go (the candidate-managing HR roles).
+export const LETTER_ROLES = ["super_admin", "hr_manager", "hr_staff", "sgm"];
+
+export function canManageLetters(role?: string): boolean {
+  return !!role && LETTER_ROLES.includes(role);
+}
+
 // HR_ROLES are the roles a local password account may hold. Mirrors the backend
 // `allowedRoles` set in internal/hrauth/model.go; the label is what super_admins
 // pick from when provisioning an account.

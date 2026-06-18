@@ -149,6 +149,9 @@ type Config struct {
 	// candidate-facing.
 	DashboardBaseURL string
 
+	// CompanyName is the letterhead name printed on generated PDF letters (3.3).
+	CompanyName string
+
 	// Report scheduler (Sprint 5b): cron spec for the recurring export, and the
 	// comma-separated recipient list notified with the export link.
 	ReportScheduleCron string
@@ -283,6 +286,7 @@ func Load() (*Config, error) {
 
 		PortalBaseURL:    getenv("PORTAL_BASE_URL", "http://localhost:3001"),
 		DashboardBaseURL: getenv("DASHBOARD_BASE_URL", "http://localhost:3000"),
+		CompanyName:      getenv("COMPANY_NAME", "CP AXTRA"),
 
 		ReportScheduleCron: getenv("REPORT_SCHEDULE_CRON", "0 7 * * 1"), // Mon 07:00
 		ReportRecipients:   os.Getenv("REPORT_RECIPIENTS"),
