@@ -98,6 +98,14 @@ export function canSubmitApproval(role?: string): boolean {
   return role === "super_admin" || role === "hr_staff";
 }
 
+// OFFER_ROLES may compose/send offers. Mirrors the backend offerWriteRoles map in
+// internal/applications/offer.go (hr_manager + super_admin).
+export const OFFER_ROLES = ["super_admin", "hr_manager"];
+
+export function canManageOffer(role?: string): boolean {
+  return !!role && OFFER_ROLES.includes(role);
+}
+
 // HR_ROLES are the roles a local password account may hold. Mirrors the backend
 // `allowedRoles` set in internal/hrauth/model.go; the label is what super_admins
 // pick from when provisioning an account.

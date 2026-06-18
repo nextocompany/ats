@@ -14,7 +14,11 @@ package applications
 //	interview     --Mark done(interviewed)/Reject
 //	interviewed   --Submit for approval(pending_approval)/Reject
 //	pending_approval --(4-level chain decides)--> offer | rejected
-//	offer         --Reject
+//	offer         --Reject, or (candidate accepts offer)--> hired
+//
+// The "hired" target is reachable only by a candidate accepting their offer (the
+// offer respond endpoint sets it in a transaction); it is not a manual HR PATCH and
+// so is intentionally absent from the map below.
 //
 // The "interview" target requires a schedule payload, so it is reachable only via
 // the interview-schedule endpoint, never via a plain status PATCH (RequiresSchedule).

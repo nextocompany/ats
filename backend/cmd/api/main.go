@@ -252,6 +252,12 @@ func main() {
 	public.RegisterRoutes(app, publicHandler)
 	app.Post("/api/v1/public/apply/quick", candidateauth.RequireCandidate(caSvc, cfg.SessionCookieName), publicHandler.QuickApply)
 
+	// Offer management (candidate side): a logged-in member lists their offers and
+	// accepts/declines. Accept best-effort pushes the hire to PeopleSoft. Routes sit
+	// under /api/v1/public/auth (already origin-guarded) behind RequireCandidate.
+	offerCandHandler := applications.NewOfferCandidateHandler(appRepo, psService)
+	applications.RegisterCandidateOfferRoutes(app, offerCandHandler, candidateauth.RequireCandidate(caSvc, cfg.SessionCookieName))
+
 	// LINE Login OAuth web flow. With the candidate session issuer wired (account-
 	// first), the callback creates/links an account and sets the session cookie;
 	// the legacy fragment-token path remains when no issuer is supplied.
@@ -305,6 +311,11 @@ func main() {
 	approvalHandler := applications.NewApprovalHandler(appRepo, cfg.ApprovalSLAHours)
 	approvalHandler.SetNotifier(notifier, applications.NewHRDirectory(pool), cfg.DashboardBaseURL, cfg.TeamsWebhookURL != "")
 	applications.RegisterApprovalRoutes(app, approvalHandler)
+	// Offer management (HR side): compose / edit / send an offer for an
+	// offer-stage application; sending notifies the candidate.
+	offerHandler := applications.NewOfferHandler(appRepo)
+	offerHandler.SetNotifier(notifier, candidateRepo, cfg.PortalBaseURL)
+	applications.RegisterOfferRoutes(app, offerHandler)
 	// Bulk CV upload (HR dashboard): many resumes for one position → one application
 	// + pipeline job each. Positions list powers the picker.
 	applications.RegisterBulkRoutes(app, applications.NewBulkHandler(intakeSvc))

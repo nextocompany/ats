@@ -9,5 +9,31 @@
     "status": "Check status",
     "back": "Back",
     "menu": "Main menu"
+  },
+  "offers": {
+    "title": "Your offer",
+    "subtitle": "Review your job offer and let us know your decision.",
+    "loading": "Loading…",
+    "loadFailed": "Could not load your offers. Please try again.",
+    "empty": "You have no offers yet.",
+    "position": "Position",
+    "baht": "THB / month",
+    "startDate": "Start date",
+    "expires": "Responds by",
+    "accept": "Accept offer",
+    "decline": "Decline",
+    "declineReasonLabel": "Reason for declining",
+    "declineReasonPlaceholder": "e.g. accepted another role",
+    "confirmDecline": "Confirm decline",
+    "cancel": "Cancel",
+    "respondFailed": "Could not record your response",
+    "acceptedNote": "You accepted this offer. HR will be in touch about your start.",
+    "declinedNote": "You declined this offer.",
+    "expiredNote": "This offer has expired.",
+    "status_draft": "Draft",
+    "status_sent": "Awaiting your response",
+    "status_accepted": "Accepted",
+    "status_declined": "Declined",
+    "status_expired": "Expired"
   }
 }

@@ -59,6 +59,8 @@ func statusBody(fullName, status, portalBaseURL string) (string, bool) {
 		return greeting + " ใบสมัครของคุณผ่านการคัดกรองเบื้องต้นและเข้าสู่รอบพิจารณา ทีม HR จะติดต่อกลับ" + link, true
 	case "interview":
 		return greeting + " คุณได้รับเชิญเข้าสัมภาษณ์ ทีมงานจะติดต่อเพื่อนัดหมายเร็ว ๆ นี้" + link, true
+	case "offer":
+		return greeting + fmt.Sprintf(" คุณได้รับข้อเสนอการจ้างงาน! เข้าสู่ระบบเพื่อดูรายละเอียดและตอบรับได้ที่ %s/offers", portalBaseURL), true
 	case "hired":
 		return greeting + " ยินดีด้วย! คุณได้รับการคัดเลือก ทีม HR จะติดต่อเรื่องการเริ่มงาน" + link, true
 	default:
