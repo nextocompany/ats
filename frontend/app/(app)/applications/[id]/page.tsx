@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
 import { AiSummaryPanel } from "@/components/resume/AiSummaryPanel";
+import { ApprovalPanel } from "@/components/resume/ApprovalPanel";
 import { FitAnalysisPanel } from "@/components/resume/FitAnalysisPanel";
 import { InterviewPanel } from "@/components/resume/InterviewPanel";
 import {
@@ -50,6 +51,7 @@ export default function ApplicationDetailPage() {
             className="h-fit rounded-xl bg-card p-6 ring-1 ring-hairline lg:sticky lg:top-6"
           >
             <AiSummaryPanel app={app} />
+            <ApprovalPanel applicationId={app.id} app={app} />
             <InterviewPanel applicationId={app.id} />
             <ScorecardSummary applicationId={app.id} />
             <TaScorecard applicationId={app.id} status={app.status} />

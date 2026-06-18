@@ -301,6 +301,10 @@ func main() {
 	applications.RegisterFeedbackRoutes(app, feedbackHandler)
 	// Line-Manager Top-5 shortlist + per-application scorecard summary (TA + LM).
 	applications.RegisterShortlistRoutes(app, applications.NewShortlistHandler(appRepo))
+	// Multi-level hiring approval chain (Staff → HR Manager → SGM → Regional).
+	approvalHandler := applications.NewApprovalHandler(appRepo, cfg.ApprovalSLAHours)
+	approvalHandler.SetNotifier(notifier, applications.NewHRDirectory(pool), cfg.DashboardBaseURL, cfg.TeamsWebhookURL != "")
+	applications.RegisterApprovalRoutes(app, approvalHandler)
 	// Bulk CV upload (HR dashboard): many resumes for one position → one application
 	// + pipeline job each. Positions list powers the picker.
 	applications.RegisterBulkRoutes(app, applications.NewBulkHandler(intakeSvc))

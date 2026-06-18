@@ -50,6 +50,16 @@ type Repository interface {
 	// all/subregion/store), so per-record authorization stays consistent with
 	// list visibility.
 	ExistsInScope(ctx context.Context, id uuid.UUID, scope rbac.Scope) (bool, error)
+	// Approval workflow (Module-3 3.5): four-level hiring sign-off chain. Create
+	// and Decide are each a single transaction so the approval tables and
+	// applications.status never diverge (see approval_repository.go).
+	CreateApprovalRequest(ctx context.Context, applicationID, createdBy uuid.UUID, slaHours int) (ApprovalRequest, error)
+	GetApprovalRequest(ctx context.Context, applicationID uuid.UUID) (*ApprovalRequest, error)
+	GetApprovalRequestByID(ctx context.Context, id uuid.UUID) (*ApprovalRequest, error)
+	DecideApproval(ctx context.Context, args approvalDecideArgs) (ApprovalRequest, error)
+	ListPendingApprovals(ctx context.Context, scope rbac.Scope) ([]ApprovalQueueItem, error)
+	ListOverdueApprovalSteps(ctx context.Context) ([]OverdueApprovalStep, error)
+	MarkApprovalStepEscalated(ctx context.Context, stepID uuid.UUID) error
 }
 
 type pgRepository struct {

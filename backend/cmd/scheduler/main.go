@@ -75,6 +75,23 @@ func main() {
 		log.Info().Msg("scheduler: auth cleanup disabled (AUTH_CLEANUP_ENABLED=false)")
 	}
 
+	// Approval SLA sweep (Module-3 3.5): remind approvers of hiring-approval steps
+	// left pending past their SLA. Disabled by default so a fresh environment never
+	// escalates until opted in.
+	if cfg.ApprovalSLAEnabled {
+		slaTask, err := queue.NewApprovalSLASweepTask(queue.ApprovalSLASweepPayload{})
+		if err != nil {
+			log.Fatal().Err(err).Msg("build approval sla sweep task failed")
+		}
+		slaID, err := scheduler.Register(cfg.ApprovalSLACron, slaTask)
+		if err != nil {
+			log.Fatal().Err(err).Str("cron", cfg.ApprovalSLACron).Msg("register approval sla sweep failed")
+		}
+		log.Info().Str("cron", cfg.ApprovalSLACron).Str("entry_id", slaID).Msg("scheduler: approval:sla_sweep registered")
+	} else {
+		log.Info().Msg("scheduler: approval SLA sweep disabled (APPROVAL_SLA_ENABLED=false)")
+	}
+
 	if err := scheduler.Run(); err != nil {
 		log.Fatal().Err(err).Msg("scheduler error")
 	}

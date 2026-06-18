@@ -7,7 +7,7 @@ export type Action =
   | "shortlist"
   | "interview"
   | "mark_interviewed"
-  | "hire"
+  | "submit_approval"
   | "reject";
 
 // allowedActions returns the HR actions available from a given application status.
@@ -24,7 +24,9 @@ export function allowedActions(status: string): Action[] {
     case "interview":
       return ["mark_interviewed", "reject"];
     case "interviewed":
-      return ["hire", "reject"];
+      return ["submit_approval", "reject"];
+    case "pending_approval":
+      return []; // the ApprovalPanel drives approve/reject for the active level
     case "offer":
       return ["reject"];
     default:

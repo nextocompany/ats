@@ -170,6 +170,14 @@ type Config struct {
 	AuthCleanupCron    string
 	AuthCleanupBatch   int
 
+	// Approval SLA escalation (Module-3 3.5): the scheduler enqueues a sweep that
+	// reminds approvers of hiring-approval steps left pending past their SLA.
+	// Defaults DISABLED so a fresh environment never escalates until opted in.
+	// ApprovalSLAHours seeds each active step's due_at when it activates.
+	ApprovalSLAEnabled bool
+	ApprovalSLACron    string
+	ApprovalSLAHours   int
+
 	// Public API rate limit (Sprint 7): max requests per IP per minute on
 	// /api/v1/public/*. Enforced cluster-wide via the Redis-backed store.
 	RateLimitPublicMax int
@@ -287,6 +295,10 @@ func Load() (*Config, error) {
 		AuthCleanupEnabled: getenvBool("AUTH_CLEANUP_ENABLED", true),
 		AuthCleanupCron:    getenv("AUTH_CLEANUP_CRON", "15 3 * * *"), // daily 03:15 (offset from retention)
 		AuthCleanupBatch:   getenvInt("AUTH_CLEANUP_BATCH", 500),
+
+		ApprovalSLAEnabled: getenvBool("APPROVAL_SLA_ENABLED", false),
+		ApprovalSLACron:    getenv("APPROVAL_SLA_CRON", "0 * * * *"), // hourly
+		ApprovalSLAHours:   getenvInt("APPROVAL_SLA_HOURS", 48),
 
 		RateLimitPublicMax: getenvInt("RATE_LIMIT_PUBLIC_MAX", 30),
 		RateLimitLoginMax:  getenvInt("RATE_LIMIT_LOGIN_MAX", 10),

@@ -41,6 +41,43 @@ func ShortlistReadyLM(lmEmails []string, teamsEnabled bool, candName, positionTi
 	return hrMessages(lmEmails, teamsEnabled, subject, body)
 }
 
+// ApprovalPendingHR notifies the approvers at a newly active chain level that a
+// hire approval is awaiting their decision. levelLabel is e.g. "HR Manager".
+func ApprovalPendingHR(toEmails []string, teamsEnabled bool, candName, levelLabel, dashURL string) []Message {
+	subject := "มีคำขออนุมัติจ้างรอการพิจารณา"
+	body := fmt.Sprintf(
+		"มีคำขออนุมัติการจ้างรอการอนุมัติของคุณ\nผู้สมัคร: %s\nขั้นอนุมัติ: %s\nดูรายการอนุมัติ: %s",
+		fallback(candName, "ผู้สมัคร"), fallback(levelLabel, "-"), dashURL,
+	)
+	return hrMessages(toEmails, teamsEnabled, subject, body)
+}
+
+// ApprovalDecidedHR notifies HR of the final outcome of an approval chain.
+func ApprovalDecidedHR(toEmails []string, teamsEnabled bool, candName string, approved bool, dashURL string) []Message {
+	outcome := "ถูกปฏิเสธ"
+	subject := "ผลการอนุมัติจ้าง: ไม่อนุมัติ"
+	if approved {
+		outcome = "ได้รับอนุมัติ (เข้าสู่ขั้นตอน Offer)"
+		subject = "ผลการอนุมัติจ้าง: อนุมัติ"
+	}
+	body := fmt.Sprintf(
+		"คำขออนุมัติการจ้างได้ข้อสรุปแล้ว\nผู้สมัคร: %s\nผล: %s\nดูรายละเอียด: %s",
+		fallback(candName, "ผู้สมัคร"), outcome, dashURL,
+	)
+	return hrMessages(toEmails, teamsEnabled, subject, body)
+}
+
+// ApprovalEscalationHR reminds the responsible approvers that a chain level has
+// passed its SLA without a decision.
+func ApprovalEscalationHR(toEmails []string, teamsEnabled bool, candName, levelLabel, dashURL string) []Message {
+	subject := "เตือน: คำขออนุมัติจ้างเกินกำหนด (SLA)"
+	body := fmt.Sprintf(
+		"คำขออนุมัติการจ้างเกินกำหนดเวลาพิจารณาแล้ว กรุณาดำเนินการ\nผู้สมัคร: %s\nขั้นอนุมัติ: %s\nดูรายการอนุมัติ: %s",
+		fallback(candName, "ผู้สมัคร"), fallback(levelLabel, "-"), dashURL,
+	)
+	return hrMessages(toEmails, teamsEnabled, subject, body)
+}
+
 // hrMessages fans a subject/body out to one email Message per address plus an
 // optional Teams Message.
 func hrMessages(toEmails []string, teamsEnabled bool, subject, body string) []Message {

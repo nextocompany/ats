@@ -149,6 +149,9 @@ func main() {
 	// Auth cleanup (candidate membership): purge expired OTP/session rows.
 	authCleanupSvc := candidateauth.NewCleanupService(pool)
 
+	// Approval SLA escalation (Module-3 3.5): remind approvers of overdue steps.
+	approvalSLASvc := applications.NewApprovalSLAService(appRepo, notifier, applications.NewHRDirectory(pool), cfg.DashboardBaseURL, cfg.TeamsWebhookURL != "")
+
 	srv := asynq.NewServer(redisOpt, asynq.Config{Concurrency: cfg.WorkerConcurrency})
 	mux := asynq.NewServeMux()
 	mux.HandleFunc(queue.TypeProcessApplication, processor.HandleProcessApplication)
@@ -156,6 +159,7 @@ func main() {
 	mux.HandleFunc(queue.TypeExportReport, exportSvc.HandleExportReport)
 	mux.HandleFunc(queue.TypeRetentionSweep, retentionSvc.HandleRetentionSweep)
 	mux.HandleFunc(queue.TypeAuthCleanup, authCleanupSvc.HandleAuthCleanup)
+	mux.HandleFunc(queue.TypeApprovalSLASweep, approvalSLASvc.HandleApprovalSLASweep)
 
 	log.Info().Str("provider", cfg.AIProvider).Msg("worker started; consuming process_application + vacancy:reengage + report:export + retention:sweep + auth:cleanup")
 	if err := srv.Run(mux); err != nil {

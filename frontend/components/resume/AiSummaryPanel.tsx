@@ -52,14 +52,20 @@ export function AiSummaryPanel({ app }: { app: Application }) {
         return <Button key={a} size="sm" variant="secondary" disabled={busy} onClick={() => setScheduleOpen(true)} className="w-full">Interview…</Button>;
       case "mark_interviewed":
         return <Button key={a} size="sm" variant="secondary" disabled={busy} onClick={() => move("interviewed", "Marked as interviewed")} className="w-full">Mark interview done</Button>;
-      case "hire":
-        return <Button key={a} size="sm" variant="default" disabled={busy} onClick={() => move("offer", "Hired — entered offer process")} className="w-full">Hire</Button>;
+      case "submit_approval":
+        // The hiring approval submit lives in ApprovalPanel (with the chain view);
+        // nothing is rendered here so the action grid only shows generic moves.
+        return null;
       case "reject":
         return <Button key={a} size="sm" variant="destructive" disabled={busy} onClick={() => setRejectOpen(true)} className="w-full">Reject…</Button>;
       default:
         return null;
     }
   }
+
+  // Filter nulls (e.g. submit_approval renders nothing here — ApprovalPanel owns
+  // it) so a lone action isn't orphaned into the second grid column.
+  const nextStepButtons = actions.map(renderAction).filter(Boolean);
 
   const score = app.ai_score;
   const tone =
@@ -134,8 +140,8 @@ export function AiSummaryPanel({ app }: { app: Application }) {
         <p className="mb-2.5 text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
           Next step
         </p>
-        {actions.length > 0 ? (
-          <div className="grid grid-cols-2 gap-2">{actions.map(renderAction)}</div>
+        {nextStepButtons.length > 0 ? (
+          <div className="grid grid-cols-2 gap-2">{nextStepButtons}</div>
         ) : (
           <p className="text-sm text-muted-foreground">
             {app.status === "ai_interview"
