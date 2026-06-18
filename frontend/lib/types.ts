@@ -134,6 +134,58 @@ export interface ScorecardSummary {
   composite_score: number | null;
 }
 
+// --- Approval workflow (Module-3 3.5) ---------------------------------------
+// Multi-level hiring approval chain. Mirrors internal/applications/approval.go.
+
+export type ApprovalDecision = "approve" | "reject";
+export type ApprovalEntityStatus = "pending" | "approved" | "rejected";
+
+// ApprovalStep mirrors applications.ApprovalStep (one level in the chain).
+export interface ApprovalStep {
+  id: string;
+  level: number;
+  role: string;
+  status: ApprovalEntityStatus;
+  approver_name?: string;
+  comment?: string;
+  due_at: string | null;
+  escalated: boolean;
+  decided_at: string | null;
+}
+
+// ApprovalRequest mirrors applications.ApprovalRequest (a hire decision + steps).
+export interface ApprovalRequest {
+  id: string;
+  application_id: string;
+  status: ApprovalEntityStatus;
+  current_level: number;
+  created_at: string;
+  decided_at: string | null;
+  decision_reason?: string;
+  steps: ApprovalStep[];
+}
+
+// ApprovalQueueItem mirrors applications.ApprovalQueueItem (an "awaiting me" row).
+export interface ApprovalQueueItem {
+  request_id: string;
+  application_id: string;
+  candidate_name?: string;
+  position_title?: string;
+  store_id: number | null;
+  active_level: number;
+  active_role: string;
+  ai_score: number | null;
+  due_at: string | null;
+  waiting_since: string;
+}
+
+// ApprovalDecisionInput is the decide payload (POST .../decide).
+export interface ApprovalDecisionInput {
+  decision: ApprovalDecision;
+  comment?: string;
+  reason?: string;
+}
+
 // ShortlistItem mirrors applications.ShortlistItem (LM Top-5 row).
 export interface ShortlistItem {
   application_id: string;

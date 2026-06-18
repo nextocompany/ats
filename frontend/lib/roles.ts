@@ -60,6 +60,44 @@ export function canViewExecutive(role?: string): boolean {
   return !!role && EXECUTIVE_ROLES.includes(role);
 }
 
+// APPROVAL workflow (Module-3 3.5): the four-level hiring sign-off chain. Mirrors
+// the backend approvalLevelRoles map in internal/applications/approval.go. Server
+// is the real gate; these only decide what to render.
+export const APPROVAL_LEVEL_ROLES: Record<number, string> = {
+  1: "hr_staff",
+  2: "hr_manager",
+  3: "sgm",
+  4: "regional_director",
+};
+
+// APPROVAL_ROLES may reach the Approvals queue (any chain role, plus super_admin).
+export const APPROVAL_ROLES = ["super_admin", "hr_staff", "hr_manager", "sgm", "regional_director"];
+
+export function canAccessApprovals(role?: string): boolean {
+  return !!role && APPROVAL_ROLES.includes(role);
+}
+
+// roleLevel returns the chain level a role decides (0 if none / super_admin, which
+// may decide any level).
+export function roleLevel(role?: string): number {
+  if (!role) return 0;
+  for (const [lvl, r] of Object.entries(APPROVAL_LEVEL_ROLES)) {
+    if (r === role) return Number(lvl);
+  }
+  return 0;
+}
+
+// canDecideApprovalLevel mirrors the backend per-level gate: the level's role, or
+// super_admin (who may decide any level).
+export function canDecideApprovalLevel(role: string | undefined, level: number): boolean {
+  return role === "super_admin" || (!!role && APPROVAL_LEVEL_ROLES[level] === role);
+}
+
+// canSubmitApproval gates opening a request (the level-1 / Staff sign-off).
+export function canSubmitApproval(role?: string): boolean {
+  return role === "super_admin" || role === "hr_staff";
+}
+
 // HR_ROLES are the roles a local password account may hold. Mirrors the backend
 // `allowedRoles` set in internal/hrauth/model.go; the label is what super_admins
 // pick from when provisioning an account.

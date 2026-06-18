@@ -7,6 +7,9 @@ import type {
   AdminSettings,
   Application,
   ApplicationFilter,
+  ApprovalDecisionInput,
+  ApprovalQueueItem,
+  ApprovalRequest,
   BulkIntakeResult,
   Candidate,
   CreateHRUserInput,
@@ -296,6 +299,60 @@ export function useShortlist(limit = 5) {
     queryKey: ["shortlist", limit],
     queryFn: () =>
       api.get<ShortlistItem[]>(`/api/v1/shortlist?limit=${limit}`).then((r) => r.data),
+  });
+}
+
+// --- Approval workflow (Module-3 3.5) ---------------------------------------
+
+// useApprovalForApplication loads the hiring approval request for an application.
+// The backend returns null (200) when none has been opened, so the panel can show
+// a "submit" CTA. queryKey is shared by the submit/decide mutations for refresh.
+export function useApprovalForApplication(appId: string) {
+  return useQuery({
+    queryKey: ["approval", appId],
+    queryFn: () =>
+      api.get<ApprovalRequest | null>(`/api/v1/applications/${appId}/approval-request`).then((r) => r.data),
+    enabled: !!appId,
+  });
+}
+
+// useApprovalQueue loads the in-flight approvals awaiting the caller's decision
+// level. Pass enabled=false to skip the call for roles that cannot approve.
+export function useApprovalQueue(enabled = true) {
+  return useQuery({
+    queryKey: ["approval-queue"],
+    queryFn: () => api.get<ApprovalQueueItem[]>("/api/v1/approvals").then((r) => r.data),
+    enabled,
+  });
+}
+
+// useSubmitApproval opens the approval chain for an interviewed application (the
+// Staff-level sign-off). Refreshes the application + its approval state.
+export function useSubmitApproval(appId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<ApprovalRequest>(`/api/v1/applications/${appId}/approval-request`).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["approval", appId] });
+      qc.invalidateQueries({ queryKey: ["application", appId] });
+      qc.invalidateQueries({ queryKey: ["applications"] });
+    },
+  });
+}
+
+// useDecideApproval records an approve/reject on the active level and refreshes the
+// approval state, the queue, and the application.
+export function useDecideApproval(requestId: string, appId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: ApprovalDecisionInput) =>
+      api.post<ApprovalRequest>(`/api/v1/approval-requests/${requestId}/decide`, vars).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["approval", appId] });
+      qc.invalidateQueries({ queryKey: ["approval-queue"] });
+      qc.invalidateQueries({ queryKey: ["application", appId] });
+      qc.invalidateQueries({ queryKey: ["applications"] });
+    },
   });
 }
 

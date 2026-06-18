@@ -203,3 +203,40 @@ func ParseAuthCleanupPayload(body []byte) (AuthCleanupPayload, error) {
 	}
 	return p, nil
 }
+
+// TypeApprovalSLASweep is the asynq task type for the hiring-approval SLA sweep
+// (Module-3 3.5): escalate approval steps left pending past their SLA deadline.
+const TypeApprovalSLASweep = "approval:sla_sweep"
+
+// ApprovalSLASweepPayload is the (empty) job body for an approval SLA sweep — the
+// worker derives the overdue set from the DB at run time.
+type ApprovalSLASweepPayload struct{}
+
+// approvalSLAUniqueTTL dedups overlapping sweep enqueues during a rolling deploy.
+const approvalSLAUniqueTTL = 1 * time.Hour
+
+// NewApprovalSLASweepTask builds the approval SLA sweep task with retry/timeout
+// policy and enqueue-scoped uniqueness.
+func NewApprovalSLASweepTask(p ApprovalSLASweepPayload) (*asynq.Task, error) {
+	body, err := json.Marshal(p)
+	if err != nil {
+		return nil, fmt.Errorf("queue: marshal payload: %w", err)
+	}
+	return asynq.NewTask(
+		TypeApprovalSLASweep,
+		body,
+		asynq.MaxRetry(taskMaxRetry),
+		asynq.Timeout(taskTimeout),
+		asynq.Retention(taskRetention),
+		asynq.Unique(approvalSLAUniqueTTL),
+	), nil
+}
+
+// ParseApprovalSLASweepPayload decodes an approval SLA sweep task body.
+func ParseApprovalSLASweepPayload(body []byte) (ApprovalSLASweepPayload, error) {
+	var p ApprovalSLASweepPayload
+	if err := json.Unmarshal(body, &p); err != nil {
+		return p, fmt.Errorf("queue: unmarshal payload: %w", err)
+	}
+	return p, nil
+}

@@ -198,6 +198,9 @@ func (f fakeHRDir) EmailsForStore(context.Context, *int) ([]string, error) { ret
 func (f fakeHRDir) LineManagerEmailsForStore(context.Context, *int) ([]string, error) {
 	return f.emails, nil
 }
+func (f fakeHRDir) EmailsForRoleStore(context.Context, string, *int) ([]string, error) {
+	return f.emails, nil
+}
 
 func TestCreateFeedback_HRNotifyNonFatal(t *testing.T) {
 	store := &fakeFeedbackStore{inScope: true, app: &Application{Status: StatusInterviewed, AssignedStoreID: ptrInt(5)}}

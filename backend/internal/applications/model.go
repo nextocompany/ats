@@ -24,12 +24,13 @@ const (
 	StatusHired    = "hired"    // legacy terminal (superseded by StatusOffer)
 
 	// HR funnel statuses (manual transitions, gated by transitions.go).
-	StatusAIInterview   = "ai_interview"   // AI pre-interview invited / in progress
-	StatusAIInterviewed = "ai_interviewed" // AI pre-interview completed (system-set)
-	StatusShortlisted   = "shortlisted"    // HR shortlisted
-	StatusInterview     = "interview"      // human interview scheduled (carries appointment)
-	StatusInterviewed   = "interviewed"    // human interview completed
-	StatusOffer         = "offer"          // entered Offer Package process (future)
+	StatusAIInterview     = "ai_interview"     // AI pre-interview invited / in progress
+	StatusAIInterviewed   = "ai_interviewed"   // AI pre-interview completed (system-set)
+	StatusShortlisted     = "shortlisted"      // HR shortlisted
+	StatusInterview       = "interview"        // human interview scheduled (carries appointment)
+	StatusInterviewed     = "interviewed"      // human interview completed
+	StatusPendingApproval = "pending_approval" // hire submitted into the 4-level approval chain
+	StatusOffer           = "offer"            // entered Offer Package process (future)
 )
 
 // Application maps the applications table (columns used in Sprint 1).

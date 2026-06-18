@@ -24,9 +24,14 @@ func TestCanTransition(t *testing.T) {
 		{"interview → interviewed", StatusInterview, StatusInterviewed, true},
 		{"interview → reject", StatusInterview, StatusRejected, true},
 		{"interview cannot hire directly", StatusInterview, StatusOffer, false},
-		// after the interview → hire (offer) or reject.
-		{"interviewed → offer", StatusInterviewed, StatusOffer, true},
+		// after the interview → reject, or submit into the approval chain (NOT a
+		// direct offer PATCH anymore — that routes through the approval workflow).
+		{"interviewed cannot offer directly", StatusInterviewed, StatusOffer, false},
 		{"interviewed → reject", StatusInterviewed, StatusRejected, true},
+		// pending_approval has no generic transitions — the approval decide endpoint
+		// owns its only exits (offer / rejected).
+		{"pending_approval no generic offer", StatusPendingApproval, StatusOffer, false},
+		{"pending_approval no generic reject", StatusPendingApproval, StatusRejected, false},
 		// offer → reject only.
 		{"offer → reject", StatusOffer, StatusRejected, true},
 		{"offer cannot reopen", StatusOffer, StatusShortlisted, false},
@@ -56,5 +61,16 @@ func TestRequiresScheduleAndReason(t *testing.T) {
 	}
 	if RequiresReason(StatusOffer) {
 		t.Fatal("offer must not require a reason")
+	}
+}
+
+func TestCanRequestApproval(t *testing.T) {
+	if !CanRequestApproval(StatusInterviewed) {
+		t.Fatal("approval must be requestable from interviewed")
+	}
+	for _, s := range []string{StatusShortlisted, StatusInterview, StatusPendingApproval, StatusOffer, StatusScored} {
+		if CanRequestApproval(s) {
+			t.Fatalf("approval must not be requestable from %q", s)
+		}
 	}
 }
