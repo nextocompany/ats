@@ -1,31 +1,38 @@
+"use client";
+
+import { useTranslations } from "next-intl";
+
 interface ScoreBadgeProps {
   score: number | null;
 }
 
-/* Plain-language fit tier — the same 75 / 50 thresholds the badge uses, but
-   spoken as words an HR reader understands without knowing the 0–100 scale.
-   Shared so the inbox, candidates, and search all say "fit" the same way. */
+/* Plain-language fit tier — four bands an HR reader understands without knowing
+   the 0–100 scale: ไม่ผ่าน / มาตรฐาน / ดี / ดีมาก. Returns a translation key
+   (resolved by FitLabel) + a colour band. Shared so inbox, shortlist, candidates,
+   and search all speak "fit" the same way. */
 export function fitTier(
   score: number | null | undefined,
-): { label: string; band: "high" | "mid" | "low" } | null {
+): { key: "fail" | "standard" | "good" | "veryGood"; band: "high" | "mid" | "low" } | null {
   if (score === null || score === undefined) return null;
-  const band: "high" | "mid" | "low" = score >= 75 ? "high" : score >= 50 ? "mid" : "low";
-  const label = band === "high" ? "Strong fit" : band === "mid" ? "Possible fit" : "Weak fit";
-  return { label, band };
+  if (score >= 75) return { key: "veryGood", band: "high" };
+  if (score >= 60) return { key: "good", band: "high" };
+  if (score >= 45) return { key: "standard", band: "mid" };
+  return { key: "fail", band: "low" };
 }
 
 /* Word label that pairs with the numeric ScoreBadge — colour-matched to the
-   badge band so "82 · Strong fit" reads as one unit. */
+   badge band so "82 · ดีมาก" reads as one unit. */
 export function FitLabel({ score }: ScoreBadgeProps) {
+  const t = useTranslations("fit");
   const tier = fitTier(score);
-  if (!tier) return <span className="text-xs text-muted-foreground">Not scored yet</span>;
+  if (!tier) return <span className="text-xs text-muted-foreground">{t("notScored")}</span>;
   const color =
     tier.band === "high"
       ? "text-[var(--score-high)]"
       : tier.band === "low"
         ? "text-[var(--score-low)]"
         : "text-muted-foreground";
-  return <span className={`text-xs font-medium ${color}`}>{tier.label}</span>;
+  return <span className={`text-xs font-medium ${color}`}>{t(tier.key)}</span>;
 }
 
 /* AI score chip — semantic ramp tuned so the color reads as *fit*, not caution.

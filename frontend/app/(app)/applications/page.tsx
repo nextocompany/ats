@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useMemo, useState } from "react";
 import { X, Flag, SlidersHorizontal, Inbox as InboxIcon } from "lucide-react";
@@ -43,11 +44,13 @@ function appliedAgo(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" });
 }
 
-// Where this application would be placed — store name first, else talent pool,
-// else the candidate's province. Never a bare numeric store id.
-function placement(a: Application): string {
+// Where this application would be placed — store name first, else the central
+// pool (no nearby branch yet — awaiting manual assignment), else the candidate's
+// province. Never a bare numeric store id. centralPoolLabel is passed in so the
+// copy is localized + conveys "holding pool, to be assigned".
+function placement(a: Application, centralPoolLabel: string): string {
   if (a.store_name) return a.store_name;
-  if (a.talent_pool) return "Talent pool";
+  if (a.talent_pool) return centralPoolLabel;
   if (a.candidate_province) return a.candidate_province;
   return "—";
 }
@@ -64,6 +67,7 @@ function Requirements({ passed }: { passed: boolean | null }) {
 }
 
 function InboxInner() {
+  const t = useTranslations("inbox");
   const params = useSearchParams();
   const router = useRouter();
   const [selected, setSelected] = useState<string[]>([]);
@@ -111,7 +115,7 @@ function InboxInner() {
     <div className="settle space-y-6">
       <PageHeader
         eyebrow="Screening queue"
-        title="Candidate Inbox"
+        title={t("title")}
         meta={
           <span className="tabular-nums">
             {total} candidate{total === 1 ? "" : "s"} · best fit first
@@ -255,7 +259,7 @@ function InboxInner() {
                       </span>
                     )}
                     <span className="ml-auto truncate text-xs text-muted-foreground">
-                      {placement(a)} · {appliedAgo(a.created_at)}
+                      {placement(a, t("centralPool"))} · {appliedAgo(a.created_at)}
                     </span>
                   </div>
                 </div>
@@ -351,8 +355,8 @@ function InboxInner() {
                       </div>
                     </td>
                     <td className="px-3 py-3.5 text-muted-foreground">
-                      <span className="block max-w-[9rem] truncate" title={placement(a)}>
-                        {placement(a)}
+                      <span className="block max-w-[9rem] truncate" title={placement(a, t("centralPool"))}>
+                        {placement(a, t("centralPool"))}
                       </span>
                     </td>
                     <td className="px-3 py-3.5 text-muted-foreground" title={new Date(a.created_at).toLocaleString()}>

@@ -109,8 +109,8 @@ export function AiSummaryPanel({ app }: { app: Application }) {
 
       <div className="flex flex-wrap gap-1.5">
         <Badge variant="secondary" className="capitalize">status: {app.status}</Badge>
-        {app.assigned_store_id !== null && <Badge variant="outline">store {app.assigned_store_id}</Badge>}
-        {app.talent_pool && <Badge variant="outline">talent pool</Badge>}
+        {app.assigned_store_id !== null && <Badge variant="outline">สาขา {app.assigned_store_id}</Badge>}
+        {app.talent_pool && <Badge variant="outline">พูลกลาง · รอจัดสาขา</Badge>}
         {app.needs_manual_review && (
           <span className="inline-flex items-center rounded-full bg-brass-soft px-2 py-0.5 text-xs font-medium text-brass">
             manual review
