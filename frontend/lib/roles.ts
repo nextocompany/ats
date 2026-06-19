@@ -114,16 +114,3 @@ export function canAccessApprovals(me: PermHolder): boolean {
     canDecideApprovalLevel(me, 4)
   );
 }
-
-// HR_ROLES are the built-in role keys the UserManagement role <Select> offers.
-// Phase 6 replaces this with the API-driven role list (useRbacRoles); kept here as
-// a transitional fallback so the role picker still works.
-export const HR_ROLES: { value: string }[] = [
-  { value: "super_admin" },
-  { value: "regional_director" },
-  { value: "auditor" },
-  { value: "operation_director" },
-  { value: "sgm" },
-  { value: "hr_manager" },
-  { value: "hr_staff" },
-];

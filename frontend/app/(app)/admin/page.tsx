@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { ShieldAlert, ShieldCheck } from "lucide-react";
 
 import { PageHeader } from "@/components/shell/PageHeader";
+import { RolesPermissions } from "@/components/admin/RolesPermissions";
 import { UserManagement } from "@/components/admin/UserManagement";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
@@ -110,6 +111,8 @@ export default function AdminPage() {
           )}
         </div>
       </section>
+
+      <RolesPermissions />
 
       <UserManagement />
     </div>
