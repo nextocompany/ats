@@ -29,18 +29,20 @@ import type { Application } from "@/lib/types";
 const STATUSES = ["", "pending", "parsed", "scored", "ai_interview", "ai_interviewed", "shortlisted", "interview", "interviewed", "offer", "hired", "rejected"];
 const LIMIT = 20;
 
+type T = ReturnType<typeof useTranslations>;
+
 // Friendly relative time so "Applied" reads as recency, not an ISO timestamp.
-function appliedAgo(iso: string): string {
+function appliedAgo(iso: string, t: T): string {
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return "—";
   const mins = Math.floor((Date.now() - then) / 60000);
-  if (mins < 1) return "Just now";
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return t("agoJustNow");
+  if (mins < 60) return t("agoMin", { n: mins });
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
+  if (hrs < 24) return t("agoHour", { n: hrs });
   const days = Math.floor(hrs / 24);
-  if (days < 7) return `${days}d ago`;
-  if (days < 30) return `${Math.floor(days / 7)}w ago`;
+  if (days < 7) return t("agoDay", { n: days });
+  if (days < 30) return t("agoWeek", { n: Math.floor(days / 7) });
   return new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" });
 }
 
@@ -58,12 +60,9 @@ function placement(a: Application, centralPoolLabel: string): string {
 // The must-have screening gate, spoken plainly. "Gate / Pass / Fail" was
 // engineering jargon; HR reads whether a candidate meets the role's musts.
 function Requirements({ passed }: { passed: boolean | null }) {
-  if (passed === null) return <span className="text-xs text-muted-foreground">Pending</span>;
-  return passed ? (
-    <Pill tone="pass">Meets requirements</Pill>
-  ) : (
-    <Pill tone="fail">Missing requirements</Pill>
-  );
+  const t = useTranslations("inbox");
+  if (passed === null) return <span className="text-xs text-muted-foreground">{t("reqPending")}</span>;
+  return passed ? <Pill tone="pass">{t("reqMeets")}</Pill> : <Pill tone="fail">{t("reqMissing")}</Pill>;
 }
 
 function InboxInner() {
@@ -108,38 +107,34 @@ function InboxInner() {
   }, [items]);
 
   const activeFilters: { key: string; label: string }[] = [];
-  if (status) activeFilters.push({ key: "status", label: `Status · ${status[0].toUpperCase() + status.slice(1)}` });
-  if (minScore) activeFilters.push({ key: "min_score", label: `Fit ≥ ${minScore}` });
+  if (status) activeFilters.push({ key: "status", label: t("filterStatus", { value: status[0].toUpperCase() + status.slice(1) }) });
+  if (minScore) activeFilters.push({ key: "min_score", label: t("filterMinFit", { value: minScore }) });
 
   return (
     <div className="settle space-y-6">
       <PageHeader
-        eyebrow="Screening queue"
+        eyebrow={t("eyebrow")}
         title={t("title")}
-        meta={
-          <span className="tabular-nums">
-            {total} candidate{total === 1 ? "" : "s"} · best fit first
-          </span>
-        }
+        meta={<span className="tabular-nums">{t("meta", { count: total })}</span>}
         actions={
           <>
             <label className="flex flex-col gap-1 text-[0.6875rem] font-medium uppercase tracking-wide text-muted-foreground">
-              Status
+              {t("statusFilter")}
               <Select value={status || "all"} onValueChange={(v) => setParam("status", v && v !== "all" ? v : "")}>
                 <SelectTrigger className="w-40" size="sm">
-                  <SelectValue placeholder="All" />
+                  <SelectValue placeholder={t("allPlaceholder")} />
                 </SelectTrigger>
                 <SelectContent>
                   {STATUSES.map((s) => (
                     <SelectItem key={s || "all"} value={s || "all"}>
-                      {s ? s[0].toUpperCase() + s.slice(1) : "All statuses"}
+                      {s ? s[0].toUpperCase() + s.slice(1) : t("allStatuses")}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </label>
             <label className="flex flex-col gap-1 text-[0.6875rem] font-medium uppercase tracking-wide text-muted-foreground">
-              Min fit
+              {t("minFit")}
               <Input
                 type="number"
                 min={0}
@@ -158,7 +153,7 @@ function InboxInner() {
       {activeFilters.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-1.5 text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-            <SlidersHorizontal className="size-3.5" /> Filtering
+            <SlidersHorizontal className="size-3.5" /> {t("filtering")}
           </span>
           {activeFilters.map((f) => (
             <button
@@ -176,14 +171,14 @@ function InboxInner() {
             onClick={() => router.replace("/applications")}
             className="text-xs font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm px-1"
           >
-            Clear all
+            {t("clearAll")}
           </button>
         </div>
       )}
 
       {isError && (
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-          {error instanceof Error ? error.message : "Failed to load candidates. Try again in a moment."}
+          {error instanceof Error ? error.message : t("loadError")}
         </div>
       )}
 
@@ -192,13 +187,13 @@ function InboxInner() {
       {!isError && (
         <SummaryStrip
           stats={[
-            { label: "In queue", value: <span className="tabular-nums">{total}</span>, lead: true, accent: true },
-            { label: "Meet requirements", value: <span className="tabular-nums">{queue.passed}</span>, hint: "on this page" },
-            { label: "Need a closer look", value: <span className="tabular-nums">{queue.flagged}</span>, hint: "flagged for you" },
+            { label: t("sumInQueue"), value: <span className="tabular-nums">{total}</span>, lead: true, accent: true },
+            { label: t("sumMeet"), value: <span className="tabular-nums">{queue.passed}</span>, hint: t("sumMeetHint") },
+            { label: t("sumReview"), value: <span className="tabular-nums">{queue.flagged}</span>, hint: t("sumReviewHint") },
             {
-              label: "Best fit",
+              label: t("sumBestFit"),
               value: queue.top !== null ? <span className="tabular-nums">{queue.top}</span> : <span className="text-muted-foreground">—</span>,
-              hint: "top score here",
+              hint: t("sumBestFitHint"),
             },
           ]}
         />
@@ -216,7 +211,7 @@ function InboxInner() {
           ))}
         {!isLoading && items.length === 0 && <EmptyState filtered={activeFilters.length > 0} onClear={() => router.replace("/applications")} />}
         {items.map((a) => {
-          const name = a.candidate_name?.trim() || "Unnamed candidate";
+          const name = a.candidate_name?.trim() || t("unnamed");
           return (
             <li
               key={a.id}
@@ -227,7 +222,7 @@ function InboxInner() {
                 <span className="flex items-center pt-1">
                   <Checkbox
                     checked={selected.includes(a.id)}
-                    aria-label={`Select ${name}`}
+                    aria-label={t("selectName", { name })}
                     onCheckedChange={(c) =>
                       setSelected((s) => (c ? [...s, a.id] : s.filter((x) => x !== a.id)))
                     }
@@ -243,7 +238,7 @@ function InboxInner() {
                       >
                         {name}
                       </Link>
-                      <p className="truncate text-xs text-muted-foreground">{a.position_title || "Role not set"}</p>
+                      <p className="truncate text-xs text-muted-foreground">{a.position_title || t("roleNotSet")}</p>
                     </div>
                     <span className="flex shrink-0 flex-col items-end gap-1">
                       <ScoreBadge score={a.ai_score} />
@@ -255,11 +250,11 @@ function InboxInner() {
                     <Requirements passed={a.must_have_passed} />
                     {a.needs_manual_review && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-brass-soft px-1.5 py-0.5 text-[10px] font-medium text-brass">
-                        <Flag className="size-2.5" /> review
+                        <Flag className="size-2.5" /> {t("review")}
                       </span>
                     )}
                     <span className="ml-auto truncate text-xs text-muted-foreground">
-                      {placement(a, t("centralPool"))} · {appliedAgo(a.created_at)}
+                      {placement(a, t("centralPool"))} · {appliedAgo(a.created_at, t)}
                     </span>
                   </div>
                 </div>
@@ -278,17 +273,17 @@ function InboxInner() {
                   <span className="flex items-center">
                     <Checkbox
                       checked={allChecked}
-                      aria-label="Select all"
+                      aria-label={t("selectAll")}
                       onCheckedChange={(c) => setSelected(c ? items.map((i) => i.id) : [])}
                     />
                   </span>
                 </th>
-                <th className="w-36 px-3 py-3">Fit</th>
-                <th className="px-3 py-3">Candidate</th>
-                <th className="w-40 px-3 py-3">Placement</th>
-                <th className="w-24 px-3 py-3">Applied</th>
-                <th className="w-28 px-3 py-3">Status</th>
-                <th className="w-36 py-3 pl-3 pr-5">Requirements</th>
+                <th className="w-36 px-3 py-3">{t("colFit")}</th>
+                <th className="px-3 py-3">{t("colCandidate")}</th>
+                <th className="w-40 px-3 py-3">{t("colPlacement")}</th>
+                <th className="w-24 px-3 py-3">{t("colApplied")}</th>
+                <th className="w-28 px-3 py-3">{t("colStatus")}</th>
+                <th className="w-36 py-3 pl-3 pr-5">{t("colRequirements")}</th>
               </tr>
             </thead>
             <tbody>
@@ -308,7 +303,7 @@ function InboxInner() {
                 </tr>
               )}
               {items.map((a) => {
-                const name = a.candidate_name?.trim() || "Unnamed candidate";
+                const name = a.candidate_name?.trim() || t("unnamed");
                 return (
                   <tr
                     key={a.id}
@@ -319,7 +314,7 @@ function InboxInner() {
                       <span className="flex items-center">
                         <Checkbox
                           checked={selected.includes(a.id)}
-                          aria-label={`Select ${name}`}
+                          aria-label={t("selectName", { name })}
                           onCheckedChange={(c) =>
                             setSelected((s) => (c ? [...s, a.id] : s.filter((x) => x !== a.id)))
                           }
@@ -346,11 +341,11 @@ function InboxInner() {
                             </Link>
                             {a.needs_manual_review && (
                               <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-brass-soft px-1.5 py-0.5 text-[10px] font-medium text-brass">
-                                <Flag className="size-2.5" /> review
+                                <Flag className="size-2.5" /> {t("review")}
                               </span>
                             )}
                           </span>
-                          <p className="truncate text-xs text-muted-foreground">{a.position_title || "Role not set"}</p>
+                          <p className="truncate text-xs text-muted-foreground">{a.position_title || t("roleNotSet")}</p>
                         </div>
                       </div>
                     </td>
@@ -360,7 +355,7 @@ function InboxInner() {
                       </span>
                     </td>
                     <td className="px-3 py-3.5 text-muted-foreground" title={new Date(a.created_at).toLocaleString()}>
-                      {appliedAgo(a.created_at)}
+                      {appliedAgo(a.created_at, t)}
                     </td>
                     <td className="px-3 py-3.5">
                       <StatusPill status={a.status} />
@@ -385,6 +380,7 @@ function InboxInner() {
 
 // Empty-state body shared by the mobile list item and the desktop table cell.
 function EmptyStateBody({ filtered, onClear }: { filtered: boolean; onClear: () => void }) {
+  const t = useTranslations("inbox");
   return (
     <>
       <span
@@ -394,16 +390,14 @@ function EmptyStateBody({ filtered, onClear }: { filtered: boolean; onClear: () 
         <InboxIcon className="size-6" strokeWidth={1.75} />
       </span>
       <p className="text-base font-semibold text-foreground">
-        {filtered ? "No candidates match these filters" : "The queue is clear"}
+        {filtered ? t("emptyFilteredTitle") : t("emptyClearTitle")}
       </p>
       <p className="mx-auto mt-1.5 max-w-sm text-sm text-muted-foreground">
-        {filtered
-          ? "Try widening the status or lowering the minimum fit to see more candidates."
-          : "Newly screened candidates land here, ranked by AI fit. You're all caught up."}
+        {filtered ? t("emptyFilteredBody") : t("emptyClearBody")}
       </p>
       {filtered && (
         <Button variant="outline" size="sm" className="mt-5" onClick={onClear}>
-          Clear filters
+          {t("clearFilters")}
         </Button>
       )}
       <span className="mx-auto mt-6 block h-px w-10 bg-hairline" aria-hidden />
