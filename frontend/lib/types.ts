@@ -298,6 +298,9 @@ export interface TimelineEntry {
   action: string;
   entity_type: string;
   entity_id: string;
+  // Action-specific detail (e.g. { from, to } for a status_change). Shape varies by
+  // action, so it's loosely typed; consumers read known keys defensively.
+  new_value?: { from?: string; to?: string; status?: string } | null;
   created_at: string;
 }
 
