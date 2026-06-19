@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { Store, Briefcase, ArrowRight } from "lucide-react";
 
 import type { OpenRole, StoreLoad } from "@/lib/types";
@@ -120,13 +121,14 @@ function RankPanel({ eyebrow, title, icon, meta, rows, emptyTitle, emptyHint }: 
 }
 
 export function WaitingByStore({ data }: { data: StoreLoad[] }) {
+  const t = useTranslations("analytics");
   const total = data.reduce((sum, d) => sum + d.waiting, 0);
   return (
     <RankPanel
-      eyebrow="Backlog"
-      title="Waiting by store"
+      eyebrow={t("backlogEyebrow")}
+      title={t("backlogTitle")}
       icon={<Store className="size-4" strokeWidth={1.75} />}
-      meta={total > 0 ? `${fmt.format(total)} awaiting review` : undefined}
+      meta={total > 0 ? t("backlogMeta", { count: fmt.format(total) }) : undefined}
       rows={data.map((d) => ({
         key: d.store_id !== null ? String(d.store_id) : d.store_name,
         label: d.store_name,
@@ -134,28 +136,29 @@ export function WaitingByStore({ data }: { data: StoreLoad[] }) {
         // Drill into the review queue (the inbox's scored backlog).
         href: "/applications?status=scored",
       }))}
-      emptyTitle="No review backlog"
-      emptyHint="When candidates are scored and waiting for an operator, the busiest stores rank here."
+      emptyTitle={t("backlogEmptyTitle")}
+      emptyHint={t("backlogEmptyHint")}
     />
   );
 }
 
 export function OpenRoles({ data }: { data: OpenRole[] }) {
+  const t = useTranslations("analytics");
   const total = data.reduce((sum, d) => sum + d.openings, 0);
   return (
     <RankPanel
-      eyebrow="Hiring"
-      title="Open roles"
+      eyebrow={t("rolesEyebrow")}
+      title={t("rolesTitle")}
       icon={<Briefcase className="size-4" strokeWidth={1.75} />}
-      meta={total > 0 ? `${fmt.format(total)} openings` : undefined}
+      meta={total > 0 ? t("rolesMeta", { count: fmt.format(total) }) : undefined}
       rows={data.map((d) => ({
         key: d.position_id,
         label: d.title,
-        sub: d.stores === 1 ? "1 store" : `${d.stores} stores`,
+        sub: t("rolesStores", { count: d.stores }),
         value: d.openings,
       }))}
-      emptyTitle="No open roles"
-      emptyHint="Open vacancies imported from PeopleSoft appear here, ranked by headcount."
+      emptyTitle={t("rolesEmptyTitle")}
+      emptyHint={t("rolesEmptyHint")}
     />
   );
 }
