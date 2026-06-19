@@ -3,6 +3,7 @@
 // Reject an application with a mandatory reason. The reason is stored internally
 // for HR — it is never sent to the candidate (per spec).
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -29,6 +30,7 @@ function Label({ children }: { htmlFor?: string; children: React.ReactNode }) {
 }
 
 export function RejectDialog({ applicationId, open, onClose }: Props) {
+  const t = useTranslations("resume");
   const setStatus = useSetStatus(applicationId);
   const [reason, setReason] = useState("");
 
@@ -46,10 +48,10 @@ export function RejectDialog({ applicationId, open, onClose }: Props) {
       { status: "rejected", reason: trimmed },
       {
         onSuccess: () => {
-          toast.success("Candidate rejected");
+          toast.success(t("rejOk"));
           close();
         },
-        onError: (err) => toast.error(err instanceof Error ? err.message : "Could not reject"),
+        onError: (err) => toast.error(err instanceof Error ? err.message : t("rejFailed")),
       },
     );
   }
@@ -58,14 +60,12 @@ export function RejectDialog({ applicationId, open, onClose }: Props) {
     <Dialog open={open} onOpenChange={(o) => (o ? null : close())}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Reject candidate</DialogTitle>
-          <DialogDescription>
-            A reason is required. It is recorded for HR only and is never sent to the candidate.
-          </DialogDescription>
+          <DialogTitle>{t("rejTitle")}</DialogTitle>
+          <DialogDescription>{t("rejDesc")}</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-3" noValidate>
           <label className="block space-y-1.5">
-            <Label htmlFor="reason">Reason</Label>
+            <Label htmlFor="reason">{t("rejReason")}</Label>
             <textarea
               id="reason"
               value={reason}
@@ -73,23 +73,23 @@ export function RejectDialog({ applicationId, open, onClose }: Props) {
               rows={4}
               required
               className="w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-              placeholder="เช่น คุณสมบัติไม่ตรงกับตำแหน่ง / ไม่ผ่านการสัมภาษณ์"
+              placeholder={t("rejPlaceholder")}
             />
           </label>
 
           {setStatus.isError && (
             <p role="alert" className="text-xs font-medium text-destructive">
-              {setStatus.error instanceof Error ? setStatus.error.message : "Failed"}
+              {setStatus.error instanceof Error ? setStatus.error.message : t("rejFailedShort")}
             </p>
           )}
 
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={close}>
-              Cancel
+              {t("cancel")}
             </Button>
             <Button type="submit" variant="destructive" disabled={!reason.trim() || setStatus.isPending} className="gap-2">
               {setStatus.isPending && <Loader2 className="size-4 animate-spin" />}
-              Reject
+              {t("rejSubmit")}
             </Button>
           </DialogFooter>
         </form>

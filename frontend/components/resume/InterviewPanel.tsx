@@ -1,16 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { Badge } from "@/components/ui/badge";
 import { useInterview } from "@/lib/queries";
-
-const REC_LABEL: Record<string, string> = {
-  strong_recommend: "แนะนำอย่างยิ่ง",
-  recommend: "แนะนำ",
-  neutral: "เป็นกลาง",
-  caution: "ควรพิจารณา",
-};
 
 function recTone(rec: string): string {
   if (rec === "strong_recommend" || rec === "recommend") return "var(--score-high)";
@@ -20,6 +14,7 @@ function recTone(rec: string): string {
 }
 
 export function InterviewPanel({ applicationId }: { applicationId: string }) {
+  const t = useTranslations("resume");
   const { data, isLoading, isError } = useInterview(applicationId);
   const [showTranscript, setShowTranscript] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -28,7 +23,7 @@ export function InterviewPanel({ applicationId }: { applicationId: string }) {
   if (isError) {
     return (
       <p className="mt-6 border-t border-hairline pt-6 text-xs text-muted-foreground">
-        Could not load the AI interview.
+        {t("intvFailed")}
       </p>
     );
   }
@@ -50,18 +45,18 @@ export function InterviewPanel({ applicationId }: { applicationId: string }) {
     <div className="mt-6 space-y-5 border-t border-hairline pt-6">
       <div className="flex items-center justify-between">
         <div>
-          <p className="eyebrow">AI interview</p>
-          <h2 className="mt-1 font-heading text-lg font-semibold tracking-tight">Pre-screening chat</h2>
+          <p className="eyebrow">{t("intvEyebrow")}</p>
+          <h2 className="mt-1 font-heading text-lg font-semibold tracking-tight">{t("intvTitle")}</h2>
         </div>
         <Badge variant="secondary" className="capitalize">
-          {s.status.replace("_", " ")}
+          {t.has(`istatus_${s.status}`) ? t(`istatus_${s.status}`) : s.status.replace("_", " ")}
         </Badge>
       </div>
 
       {!completed && (
         <div className="rounded-lg bg-brand-soft/60 p-4 text-sm ring-1 ring-brand/10">
           <p className="font-medium text-foreground">
-            {s.status === "invited" ? "Invitation sent — awaiting the candidate" : "Interview in progress"}
+            {s.status === "invited" ? t("intvAwaiting") : t("intvInProgress")}
           </p>
           <button
             type="button"
@@ -71,7 +66,7 @@ export function InterviewPanel({ applicationId }: { applicationId: string }) {
             }}
             className="mt-2 text-xs font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
           >
-            {copied ? "Link copied ✓" : "Copy interview link"}
+            {copied ? t("intvLinkCopied") : t("intvCopyLink")}
           </button>
         </div>
       )}
@@ -82,7 +77,7 @@ export function InterviewPanel({ applicationId }: { applicationId: string }) {
             <div
               className="grid size-16 shrink-0 place-items-center rounded-lg text-2xl font-semibold tabular-nums text-white"
               style={{ backgroundColor: tone }}
-              aria-label={score === null ? "Not scored" : `Interview score ${Math.round(score)}`}
+              aria-label={score === null ? t("intvNotScored") : t("intvScoreAria", { score: Math.round(score) })}
             >
               {score === null ? "—" : Math.round(score)}
             </div>
@@ -92,7 +87,7 @@ export function InterviewPanel({ applicationId }: { applicationId: string }) {
                   className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold text-white"
                   style={{ backgroundColor: recTone(s.recommendation) }}
                 >
-                  {REC_LABEL[s.recommendation] ?? s.recommendation}
+                  {t.has(`irec_${s.recommendation}`) ? t(`irec_${s.recommendation}`) : s.recommendation}
                 </span>
               )}
               {s.summary && <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{s.summary}</p>}
@@ -102,13 +97,13 @@ export function InterviewPanel({ applicationId }: { applicationId: string }) {
           {s.strengths && s.strengths.length > 0 && (
             <div>
               <p className="mb-2 text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                จุดแข็ง
+                {t("strengths")}
               </p>
               <ul className="space-y-1.5 text-sm text-foreground">
-                {s.strengths.map((t, i) => (
+                {s.strengths.map((item, i) => (
                   <li key={i} className="flex gap-2">
                     <span className="text-[var(--score-high)]">•</span>
-                    <span>{t}</span>
+                    <span>{item}</span>
                   </li>
                 ))}
               </ul>
@@ -118,13 +113,13 @@ export function InterviewPanel({ applicationId }: { applicationId: string }) {
           {s.concerns && s.concerns.length > 0 && (
             <div>
               <p className="mb-2 text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                ข้อสังเกต
+                {t("concerns")}
               </p>
               <ul className="space-y-1.5 text-sm text-foreground">
-                {s.concerns.map((t, i) => (
+                {s.concerns.map((item, i) => (
                   <li key={i} className="flex gap-2">
                     <span className="text-[var(--score-low)]">•</span>
-                    <span>{t}</span>
+                    <span>{item}</span>
                   </li>
                 ))}
               </ul>
@@ -140,20 +135,20 @@ export function InterviewPanel({ applicationId }: { applicationId: string }) {
             onClick={() => setShowTranscript((v) => !v)}
             className="text-xs font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
           >
-            {showTranscript ? "Hide transcript" : `View transcript (${s.conversation.length} turns)`}
+            {showTranscript ? t("intvHideTranscript") : t("intvViewTranscript", { count: s.conversation.length })}
           </button>
           {showTranscript && (
             <ul className="mt-3 space-y-3">
-              {s.conversation.map((t, i) => (
-                <li key={`${i}-${t.role}`} className={t.role === "user" ? "flex justify-end" : "flex justify-start"}>
+              {s.conversation.map((turn, i) => (
+                <li key={`${i}-${turn.role}`} className={turn.role === "user" ? "flex justify-end" : "flex justify-start"}>
                   <div
                     className={
-                      t.role === "user"
+                      turn.role === "user"
                         ? "max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-3 py-2 text-xs leading-relaxed text-primary-foreground"
                         : "max-w-[85%] rounded-2xl rounded-bl-sm bg-muted px-3 py-2 text-xs leading-relaxed text-foreground"
                     }
                   >
-                    {t.content}
+                    {turn.content}
                   </div>
                 </li>
               ))}
