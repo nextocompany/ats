@@ -193,6 +193,11 @@ type Config struct {
 	ReengageSweepEnabled bool
 	ReengageSweepCron    string
 
+	// IntakeWebhookSecret authenticates the external intake webhook (MS Forms / SEEK
+	// / JobsDB → /api/v1/intake/:source) via HMAC. Empty ⇒ the endpoint is not
+	// mounted at all (intake disabled, secure by default).
+	IntakeWebhookSecret string
+
 	// Public API rate limit (Sprint 7): max requests per IP per minute on
 	// /api/v1/public/*. Enforced cluster-wide via the Redis-backed store.
 	RateLimitPublicMax int
@@ -200,6 +205,10 @@ type Config struct {
 	// Login rate limit: max POST /api/v1/auth/login attempts per IP per minute —
 	// the credential-stuffing surface. Deliberately tight.
 	RateLimitLoginMax int
+
+	// Intake webhook rate limit: max POST /api/v1/intake/* per IP per minute. A
+	// machine-to-machine webhook; bounds cost/queue amplification if the HMAC leaks.
+	RateLimitIntakeMax int
 
 	// CORSAllowOrigins is the comma-separated allowlist for browser clients.
 	CORSAllowOrigins string
@@ -326,8 +335,11 @@ func Load() (*Config, error) {
 		ReengageSweepEnabled: getenvBool("REENGAGE_SWEEP_ENABLED", false),
 		ReengageSweepCron:    getenv("REENGAGE_SWEEP_CRON", "0 2 * * *"), // daily 02:00
 
+		IntakeWebhookSecret: os.Getenv("INTAKE_WEBHOOK_SECRET"),
+
 		RateLimitPublicMax: getenvInt("RATE_LIMIT_PUBLIC_MAX", 30),
 		RateLimitLoginMax:  getenvInt("RATE_LIMIT_LOGIN_MAX", 10),
+		RateLimitIntakeMax: getenvInt("RATE_LIMIT_INTAKE_MAX", 60),
 
 		CORSAllowOrigins: getenv("CORS_ALLOW_ORIGINS", "http://localhost:3000,http://localhost:3001"),
 		TrustedProxies:   os.Getenv("TRUSTED_PROXIES"),

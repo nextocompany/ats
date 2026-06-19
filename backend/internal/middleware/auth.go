@@ -109,7 +109,8 @@ func isUnauthedPath(path string) bool {
 		path == "/api/v1/auth/login" ||
 		path == "/api/v1/auth/logout" ||
 		strings.HasPrefix(path, "/api/v1/public") ||
-		strings.HasPrefix(path, "/api/v1/ps")
+		strings.HasPrefix(path, "/api/v1/ps") ||
+		strings.HasPrefix(path, "/api/v1/intake/") // HMAC-authed external intake webhook (trailing slash: no prefix bleed)
 }
 
 // bearerToken extracts the token from an "Authorization: Bearer <jwt>" header.
