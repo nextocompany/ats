@@ -220,6 +220,23 @@
     "good": "ดี",
     "veryGood": "ดีมาก"
   },
+  "dashboard": {
+    "eyebrow": "วันนี้",
+    "title": "ภาพรวม",
+    "desc": "ข้อมูลการสรรหาแบบเรียลไทม์จากทุกสาขา — รับสมัคร คัดกรอง และออนบอร์ด",
+    "openInbox": "เปิดกล่องใบสมัคร",
+    "actionEyebrow": "ดำเนินการ",
+    "actionTitle": "รอคุณดำเนินการ",
+    "openCount": "ค้าง {count} รายการ",
+    "qaReviewTitle": "ตรวจผู้สมัครที่คัดกรองแล้ว",
+    "qaReviewHint": "รอคุณ {count} รายการ",
+    "qaBestFitTitle": "ผู้สมัครที่เหมาะสมที่สุด",
+    "qaBestFitHint": "คะแนน 75+ — เร่งพิจารณา",
+    "qaHumanTitle": "ต้องให้คนตรวจสอบ",
+    "qaHumanHint": "สแกนไม่ชัดหรืออาจซ้ำ",
+    "passRateLabel": "อัตราผ่านการคัดกรอง",
+    "passRateBody": "ของผู้สมัครผ่านการคัดกรอง · ออนบอร์ดแล้ว <b>{onboarded}</b> คนในรอบนี้"
+  },
   "candidates": {
     "eyebrow": "บุคลากร",
     "title": "ผู้สมัคร",
