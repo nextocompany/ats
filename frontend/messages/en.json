@@ -171,6 +171,25 @@
     "approvalCycle": "Approval cycle time",
     "slaBreach": "Approval SLA breach"
   },
+  "search": {
+    "eyebrow": "Lookup",
+    "title": "Search candidates",
+    "meta": "By name or province — across the entire pipeline.",
+    "placeholder": "Search by name or province…",
+    "ariaLabel": "Search candidates",
+    "promptEyebrow": "National roster",
+    "promptHeading": "Find anyone across the pipeline — by <name>name</name> or <province>province</province>.",
+    "promptBody": "Search spans every store and every intake cycle. Jump in with a province below.",
+    "quickFilters": "Quick filters",
+    "searchFailed": "Search failed. Try a different term.",
+    "results": "{count, plural, one {# result} other {# results}} for “{q}”",
+    "colScore": "Score",
+    "colCandidate": "Candidate",
+    "colProvince": "Province",
+    "colStatus": "Status",
+    "emptyTitle": "No candidates match “{q}”",
+    "emptyBody": "Check the spelling, or try a province name instead of a full name."
+  },
   "login": {
     "platformEyebrow": "National recruitment platform",
     "heroLine1": "One pipeline,",
