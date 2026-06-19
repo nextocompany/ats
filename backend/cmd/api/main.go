@@ -220,6 +220,7 @@ func main() {
 	intakeSvc := applications.NewService(candidateRepo, appRepo, blobClient, queueClient)
 	intakeHandler := applications.NewHandler(intakeSvc, appRepo, inspector, psService)
 	intakeHandler.SetNotifier(notifier, candidateRepo, cfg.PortalBaseURL)
+	intakeHandler.SetActivity(activity.New(pool)) // record single status changes onto the journey
 	applications.RegisterRoutes(app, intakeHandler)
 
 	// PeopleSoft integration (Direction A webhooks + Direction B sync). Vacancy

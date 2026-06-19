@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
 
+	"github.com/nexto/hr-ats/internal/activity"
 	"github.com/nexto/hr-ats/internal/candidates"
 	"github.com/nexto/hr-ats/internal/notify"
 	"github.com/nexto/hr-ats/pkg/httpx"
@@ -37,6 +38,7 @@ type Handler struct {
 	inspector  JobInspector
 	hired      HiredSyncer
 	notifyDeps statusNotifyDeps
+	activity   activity.Writer // optional; records status changes onto the candidate journey
 }
 
 // SetNotifier wires best-effort candidate notifications on status changes. Unset
@@ -44,6 +46,10 @@ type Handler struct {
 func (h *Handler) SetNotifier(n notify.Notifier, cands candidates.Repository, portalBaseURL string) {
 	h.notifyDeps = statusNotifyDeps{notifier: n, cands: cands, portalBaseURL: portalBaseURL}
 }
+
+// SetActivity wires the audit/journey writer so single status changes are recorded
+// onto the candidate timeline (mirrors the bulk handler). Unset → not recorded.
+func (h *Handler) SetActivity(w activity.Writer) { h.activity = w }
 
 // NewHandler builds the applications handler.
 func NewHandler(svc *Service, apps Repository, inspector JobInspector, hired HiredSyncer) *Handler {
@@ -188,14 +194,26 @@ func (h *Handler) UpdateStatus(c *fiber.Ctx) error {
 		if err := h.apps.SetRejection(c.UserContext(), id, strings.TrimSpace(req.Reason)); err != nil {
 			return err
 		}
+		h.recordStatusChange(c.UserContext(), id, app.Status, StatusRejected)
 		return httpx.OK(c, fiber.Map{"id": id, "status": StatusRejected})
 	}
 
 	if err := h.apps.SetStatus(c.UserContext(), id, req.Status); err != nil {
 		return err
 	}
+	h.recordStatusChange(c.UserContext(), id, app.Status, req.Status)
 	// Best-effort candidate notification (only shortlisted produces a message today;
 	// offer/interviewed have none defined — the seam is a no-op for those).
 	h.notifyDeps.notifyStatusChange(c.UserContext(), h.apps, id, req.Status)
 	return httpx.OK(c, fiber.Map{"id": id, "status": req.Status})
+}
+
+// recordStatusChange best-effort logs a status transition onto the candidate
+// journey. No-op when the activity writer is unset; a failure is swallowed (the
+// status change already succeeded — the audit entry is non-critical).
+func (h *Handler) recordStatusChange(ctx context.Context, id uuid.UUID, from, to string) {
+	if h.activity == nil {
+		return
+	}
+	_ = h.activity.Record(ctx, activity.ActionStatusChange, "application", id, fiber.Map{"from": from, "to": to})
 }

@@ -12,6 +12,7 @@ import { OnboardingPanel } from "@/components/resume/OnboardingPanel";
 import { FitAnalysisPanel } from "@/components/resume/FitAnalysisPanel";
 import { InterviewPanel } from "@/components/resume/InterviewPanel";
 import { InterviewRoundsPanel } from "@/components/resume/InterviewRoundsPanel";
+import { JourneyPanel } from "@/components/resume/JourneyPanel";
 import {
   LineManagerScorecard,
   ScorecardSummary,
@@ -65,6 +66,7 @@ export default function ApplicationDetailPage() {
             <TaScorecard applicationId={app.id} status={app.status} />
             <LineManagerScorecard applicationId={app.id} status={app.status} />
             <FitAnalysisPanel applicationId={app.id} app={app} />
+            <JourneyPanel candidateId={app.candidate_id} />
           </aside>
         </div>
       )}
