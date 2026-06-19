@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/nexto/hr-ats/internal/rbac"
 )
 
 // Onboarding documents (Module-3 3.8). After offer accept advances an application
@@ -54,16 +56,9 @@ func validOnbDecision(d string) bool {
 	return d == OnbDecisionApprove || d == OnbDecisionReject
 }
 
-// onboardingWriteRoles may review documents — the candidate-managing HR roles
-// (the same wider set as letters; super_admin always included).
-var onboardingWriteRoles = map[string]bool{
-	"super_admin": true,
-	"hr_manager":  true,
-	"hr_staff":    true,
-	"sgm":         true,
-}
-
-func canManageOnboarding(role string) bool { return onboardingWriteRoles[role] }
+// canManageOnboarding may review documents — now resolved via dynamic RBAC
+// (rbac.PermOnboardingWrite).
+func canManageOnboarding(role string) bool { return rbac.Can(role, rbac.PermOnboardingWrite) }
 
 // Upload constraints (mirror the candidateauth resume upload — 10MB + the same
 // accepted content types).

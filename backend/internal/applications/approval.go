@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/nexto/hr-ats/internal/rbac"
 )
 
 // ErrApprovalConflict signals that an approval write lost a race — the request was
@@ -48,23 +50,19 @@ var approvalChain = []struct {
 	{4, "regional_director"},
 }
 
-// approvalLevelRoles is the per-level write gate. super_admin may act on any level
-// (mirrors the scorecard allowlists). Mirrors the TA/LM map[string]bool pattern.
-var approvalLevelRoles = map[int]map[string]bool{
-	1: {"hr_staff": true, "super_admin": true},
-	2: {"hr_manager": true, "super_admin": true},
-	3: {"sgm": true, "super_admin": true},
-	4: {"regional_director": true, "super_admin": true},
-}
-
-// canDecideLevel reports whether role may decide the given approval level.
+// canDecideLevel reports whether role may decide the given approval level —
+// resolved via dynamic RBAC (rbac.PermApprovalDecideL1..L4). super_admin holds all.
 func canDecideLevel(role string, level int) bool {
-	return approvalLevelRoles[level][role]
+	perm := rbac.ApprovalDecidePermForLevel(level)
+	if perm == "" {
+		return false
+	}
+	return rbac.Can(role, perm)
 }
 
-// canSubmitApproval reports whether role may open an approval request (level 1).
+// canSubmitApproval reports whether role may open an approval request.
 func canSubmitApproval(role string) bool {
-	return canDecideLevel(role, 1)
+	return rbac.Can(role, rbac.PermApprovalSubmit)
 }
 
 // validDecision reports whether d is a recognised decision verb.

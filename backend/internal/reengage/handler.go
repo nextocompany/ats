@@ -5,15 +5,9 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/nexto/hr-ats/internal/middleware"
+	"github.com/nexto/hr-ats/internal/rbac"
 	"github.com/nexto/hr-ats/pkg/httpx"
 )
-
-// rolesAllowed may manually trigger re-engagement (broad-visibility roles only).
-var rolesAllowed = map[string]bool{
-	"super_admin":        true,
-	"regional_director":  true,
-	"operation_director": true,
-}
 
 // Handler serves the manual re-engagement trigger.
 type Handler struct{ trigger *Trigger }
@@ -31,7 +25,7 @@ func RegisterRoutes(app *fiber.App, h *Handler) {
 // of matching candidates for the position. Restricted to broad-visibility roles.
 func (h *Handler) Reengage(c *fiber.Ctx) error {
 	u, _ := c.Locals(middleware.UserContextKey).(middleware.DevUser)
-	if !rolesAllowed[u.Role] {
+	if !rbac.Can(u.Role, rbac.PermReengageTrigger) {
 		return fiber.NewError(fiber.StatusForbidden, "insufficient role for re-engagement")
 	}
 	id, err := uuid.Parse(c.Params("id"))

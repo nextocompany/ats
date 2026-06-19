@@ -11,21 +11,13 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/nexto/hr-ats/internal/middleware"
+	"github.com/nexto/hr-ats/internal/rbac"
 	"github.com/nexto/hr-ats/pkg/httpx"
 )
 
 // maxBulkFiles caps a single bulk-upload request. Each file is still bounded by
 // maxResumeBytes (10MB); the cap keeps one request's total body bounded.
 const maxBulkFiles = 50
-
-// bulkIntakeRoles may upload CVs in bulk (HR roles that add candidates; auditor is
-// read-only and excluded). Mirrored in the frontend lib/roles.ts gate.
-var bulkIntakeRoles = map[string]bool{
-	"super_admin": true,
-	"hr_manager":  true,
-	"sgm":         true,
-	"hr_staff":    true,
-}
 
 // bulkIntaker is the narrow slice of the intake Service the bulk handler needs.
 // *Service satisfies it; tests inject a fake.
@@ -71,7 +63,7 @@ type bulkResult struct {
 // (filename); the pipeline overwrites it from the parsed profile.
 func (h *BulkHandler) BulkIntake(c *fiber.Ctx) error {
 	u, _ := c.Locals(middleware.UserContextKey).(middleware.DevUser)
-	if !bulkIntakeRoles[u.Role] {
+	if !rbac.Can(u.Role, rbac.PermBulkUpload) {
 		return fiber.NewError(fiber.StatusForbidden, "insufficient role to upload CVs")
 	}
 	positionID, err := uuid.Parse(c.FormValue("position_id"))

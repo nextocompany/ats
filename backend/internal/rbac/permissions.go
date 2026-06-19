@@ -10,7 +10,7 @@ package rbac
 const (
 	PermSettingsAdmin    = "settings.admin"     // system settings (allow-all-tenants)
 	PermUsersAdmin       = "users.admin"        // HR user-account CRUD
-	PermRBACAdmin        = "rbac.admin"          // role/permission CRUD (this feature)
+	PermRBACAdmin        = "rbac.admin"         // role/permission CRUD (this feature)
 	PermExecutiveView    = "executive.view"     // company-wide executive overview
 	PermReportsView      = "reports.view"       // ATS reports page
 	PermReportsExport    = "reports.export"     // on-demand report export

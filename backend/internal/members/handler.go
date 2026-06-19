@@ -12,6 +12,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/nexto/hr-ats/internal/middleware"
+	"github.com/nexto/hr-ats/internal/rbac"
 	"github.com/nexto/hr-ats/pkg/httpx"
 )
 
@@ -23,17 +24,9 @@ const maxSearchLen = 200
 
 const actionMemberViewDetail = "member_view_detail"
 
-// memberAdminRoles may use the member-management console. Destructive PDPA
-// actions (Phase B) gate on a stricter super_admin-only allowlist.
-var memberAdminRoles = map[string]bool{"super_admin": true, "hr_manager": true}
-
 const resumeURLTTL = 10 * time.Minute
 
 const actionMemberViewResume = "member_view_resume"
-
-// memberEraseRoles may run the irreversible PDPA anonymize. Stricter than
-// memberAdminRoles: hr_manager can suspend/edit, only super_admin can erase.
-var memberEraseRoles = map[string]bool{"super_admin": true}
 
 // ResumeSigner produces a short-lived signed URL for a stored blob URL.
 type ResumeSigner interface {
@@ -73,7 +66,7 @@ func (h *Handler) authorized(c *fiber.Ctx) bool {
 	if !ok || u.ID == "" {
 		return false // no auth context → treat as unauthenticated, fail closed
 	}
-	return memberAdminRoles[u.Role]
+	return rbac.Can(u.Role, rbac.PermMembersAdmin)
 }
 
 // authorizedErase gates the super_admin-only destructive anonymize action.
@@ -82,7 +75,7 @@ func (h *Handler) authorizedErase(c *fiber.Ctx) bool {
 	if !ok || u.ID == "" {
 		return false
 	}
-	return memberEraseRoles[u.Role]
+	return rbac.Can(u.Role, rbac.PermMembersErase)
 }
 
 // actorID parses the authenticated user's id as a UUID for the suspended_by /

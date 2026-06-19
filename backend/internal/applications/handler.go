@@ -15,6 +15,7 @@ import (
 	"github.com/nexto/hr-ats/internal/candidates"
 	"github.com/nexto/hr-ats/internal/middleware"
 	"github.com/nexto/hr-ats/internal/notify"
+	"github.com/nexto/hr-ats/internal/rbac"
 	"github.com/nexto/hr-ats/internal/stores"
 	"github.com/nexto/hr-ats/pkg/httpx"
 )
@@ -232,11 +233,6 @@ func (h *Handler) recordStatusChange(ctx context.Context, id uuid.UUID, from, to
 	_ = h.activity.Record(ctx, activity.ActionStatusChange, "application", id, fiber.Map{"from": from, "to": to})
 }
 
-// assignmentRoles may manually (re)assign a candidate's placement. Store-locked
-// roles (hr_staff) are excluded — reassignment can move an application out of their
-// own scope, so it's reserved for broader-visibility roles.
-var assignmentRoles = map[string]bool{"super_admin": true, "hr_manager": true, "sgm": true}
-
 type assignmentReq struct {
 	StoreNo    *int `json:"store_no"`    // target store; omit/null to use the central pool
 	TalentPool bool `json:"talent_pool"` // explicit "move to central pool"
@@ -252,7 +248,7 @@ func (h *Handler) UpdateAssignment(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, "invalid application id")
 	}
 	u, _ := c.Locals(middleware.UserContextKey).(middleware.DevUser)
-	if !assignmentRoles[u.Role] {
+	if !rbac.Can(u.Role, rbac.PermAssignmentWrite) {
 		return fiber.NewError(fiber.StatusForbidden, "insufficient role to reassign placement")
 	}
 	if ok, serr := h.apps.ExistsInScope(c.UserContext(), id, scopeFrom(c)); serr != nil {

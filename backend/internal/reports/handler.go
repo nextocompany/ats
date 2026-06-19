@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/nexto/hr-ats/internal/middleware"
+	"github.com/nexto/hr-ats/internal/rbac"
 	"github.com/nexto/hr-ats/pkg/httpx"
 )
 
@@ -17,9 +18,6 @@ const (
 	// from the list days after generation still works.
 	downloadSignedTTL = 7 * 24 * time.Hour
 )
-
-// exportRolesAllowed may trigger an on-demand export (broad-visibility roles).
-var exportRolesAllowed = map[string]bool{"super_admin": true, "regional_director": true}
 
 // BlobSigner signs stored blob URLs for download links.
 type BlobSigner interface {
@@ -143,7 +141,7 @@ func (h *Handler) ListExports(c *fiber.Ctx) error {
 // TriggerExport handles POST /api/v1/reports/exports — runs an on-demand export.
 func (h *Handler) TriggerExport(c *fiber.Ctx) error {
 	u, _ := c.Locals(middleware.UserContextKey).(middleware.DevUser)
-	if !exportRolesAllowed[u.Role] {
+	if !rbac.Can(u.Role, rbac.PermReportsExport) {
 		return fiber.NewError(fiber.StatusForbidden, "insufficient role to trigger an export")
 	}
 	if h.exporter == nil {

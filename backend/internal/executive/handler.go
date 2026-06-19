@@ -6,17 +6,9 @@ import (
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/nexto/hr-ats/internal/middleware"
+	"github.com/nexto/hr-ats/internal/rbac"
 	"github.com/nexto/hr-ats/pkg/httpx"
 )
-
-// executiveRolesAllowed are the company-wide (KindAll) roles permitted to view
-// the executive overview. The server is the real gate; the dashboard also hides
-// the nav entry for other roles.
-var executiveRolesAllowed = map[string]bool{
-	"super_admin":       true,
-	"regional_director": true,
-	"auditor":           true,
-}
 
 // Handler serves the executive overview endpoint.
 type Handler struct {
@@ -37,7 +29,7 @@ func RegisterRoutes(app *fiber.App, h *Handler) {
 // Overview handles GET /api/v1/executive/overview.
 func (h *Handler) Overview(c *fiber.Ctx) error {
 	u, _ := c.Locals(middleware.UserContextKey).(middleware.DevUser)
-	if !executiveRolesAllowed[u.Role] {
+	if !rbac.Can(u.Role, rbac.PermExecutiveView) {
 		return fiber.NewError(fiber.StatusForbidden, "executive overview is restricted to leadership roles")
 	}
 	ov, err := h.svc.Overview(c.UserContext())

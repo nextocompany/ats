@@ -15,19 +15,14 @@ import (
 
 // Per-perspective write allowlists. Reads are open to anyone with RBAC visibility
 // of the application; only the relevant decision-maker may write each scorecard.
-// The TA (recruiter) scorecard is for hr_staff/hr_manager; the Line-Manager
-// scorecard is for sgm (store GM ≈ line manager). super_admin may record either.
-var (
-	taRecordRoles = map[string]bool{"super_admin": true, "hr_manager": true, "hr_staff": true}
-	lmRecordRoles = map[string]bool{"super_admin": true, "sgm": true}
-)
-
 // canRecordPerspective reports whether role may write a scorecard for perspective.
+// Resolved via dynamic RBAC: the TA (recruiter) scorecard gates on scorecard.ta,
+// the Line-Manager scorecard on scorecard.lm. super_admin holds both.
 func canRecordPerspective(role, perspective string) bool {
 	if perspective == PerspectiveLineManager {
-		return lmRecordRoles[role]
+		return rbac.Can(role, rbac.PermScorecardLM)
 	}
-	return taRecordRoles[role] // default + "ta"
+	return rbac.Can(role, rbac.PermScorecardTA) // default + "ta"
 }
 
 // feedbackStore is the narrow slice of the repository this handler needs (accept

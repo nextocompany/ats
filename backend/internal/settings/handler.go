@@ -4,12 +4,9 @@ import (
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/nexto/hr-ats/internal/middleware"
+	"github.com/nexto/hr-ats/internal/rbac"
 	"github.com/nexto/hr-ats/pkg/httpx"
 )
-
-// adminRolesAllowed may read or change system settings. Restricted to the
-// highest-privilege role — this gates who can open sign-in to other tenants.
-var adminRolesAllowed = map[string]bool{"super_admin": true}
 
 // Handler serves the admin system-settings endpoints.
 type Handler struct{ svc *Service }
@@ -44,7 +41,7 @@ func (h *Handler) Get(c *fiber.Ctx) error {
 // Update handles PATCH /api/v1/admin/settings — persists the flags.
 func (h *Handler) Update(c *fiber.Ctx) error {
 	u, _ := c.Locals(middleware.UserContextKey).(middleware.DevUser)
-	if !adminRolesAllowed[u.Role] {
+	if !rbac.Can(u.Role, rbac.PermSettingsAdmin) {
 		return fiber.NewError(fiber.StatusForbidden, "insufficient role for system settings")
 	}
 	var body dto
@@ -59,5 +56,5 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 
 func (h *Handler) authorized(c *fiber.Ctx) bool {
 	u, _ := c.Locals(middleware.UserContextKey).(middleware.DevUser)
-	return adminRolesAllowed[u.Role]
+	return rbac.Can(u.Role, rbac.PermSettingsAdmin)
 }
