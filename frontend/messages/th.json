@@ -201,6 +201,26 @@
     "good": "ดี",
     "veryGood": "ดีมาก"
   },
+  "candidates": {
+    "eyebrow": "บุคลากร",
+    "title": "ผู้สมัคร",
+    "meta": "ผู้สมัคร {count} คน · ทุกสาขา",
+    "sumOnFile": "ในระบบ",
+    "sumActive": "ใช้งานอยู่",
+    "sumActiveHint": "ในหน้านี้",
+    "sumProvinces": "จังหวัด",
+    "sumProvincesHint": "ที่ปรากฏที่นี่",
+    "sumChannels": "ช่องทางสรรหา",
+    "sumChannelsHint": "ในมุมมองนี้",
+    "colCandidate": "ผู้สมัคร",
+    "colLocation": "พื้นที่",
+    "colSource": "ช่องทาง",
+    "colStatus": "สถานะ",
+    "noProvince": "ไม่ระบุจังหวัด",
+    "emptyTitle": "ยังไม่มีผู้สมัครในระบบ",
+    "emptyBody": "ข้อมูลจะปรากฏที่นี่โดยอัตโนมัติเมื่อมีใบสมัครเข้ามาและถูกประมวลผล",
+    "emptyBodyLong": "ข้อมูลจะปรากฏที่นี่โดยอัตโนมัติเมื่อมีใบสมัครเข้ามาและถูกประมวลผลโดยระบบคัดกรอง"
+  },
   "inbox": {
     "title": "ใบสมัคร",
     "centralPool": "พูลกลาง · รอจัดสาขา",

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import { useTranslations } from "next-intl";
 import { MapPin, Users } from "lucide-react";
 
 import { Pagination } from "@/components/ui/pagination";
@@ -23,6 +24,7 @@ function summarize(items: Candidate[], total: number) {
 }
 
 function CandidatesInner() {
+  const t = useTranslations("candidates");
   const params = useSearchParams();
   const router = useRouter();
   const page = Math.max(1, Number(params.get("page") ?? "1"));
@@ -36,22 +38,18 @@ function CandidatesInner() {
   return (
     <div className="settle space-y-6">
       <PageHeader
-        eyebrow="People"
-        title="Candidates"
-        meta={
-          <span className="tabular-nums">
-            {total} candidate{total === 1 ? "" : "s"} on file · all stores
-          </span>
-        }
+        eyebrow={t("eyebrow")}
+        title={t("title")}
+        meta={<span className="tabular-nums">{t("meta", { count: total })}</span>}
       />
 
       {/* Header summary strip — the roster never reads as a lonely single row. */}
       <SummaryStrip
         stats={[
-          { label: "On file", value: <span className="tabular-nums">{total}</span>, lead: true, accent: true },
-          { label: "Active", value: <span className="tabular-nums">{s.active}</span>, hint: "on this page" },
-          { label: "Provinces", value: <span className="tabular-nums">{s.provinces}</span>, hint: "represented here" },
-          { label: "Sourcing channels", value: <span className="tabular-nums">{s.channels}</span>, hint: "in this view" },
+          { label: t("sumOnFile"), value: <span className="tabular-nums">{total}</span>, lead: true, accent: true },
+          { label: t("sumActive"), value: <span className="tabular-nums">{s.active}</span>, hint: t("sumActiveHint") },
+          { label: t("sumProvinces"), value: <span className="tabular-nums">{s.provinces}</span>, hint: t("sumProvincesHint") },
+          { label: t("sumChannels"), value: <span className="tabular-nums">{s.channels}</span>, hint: t("sumChannelsHint") },
         ]}
       />
 
@@ -79,10 +77,8 @@ function CandidatesInner() {
             >
               <Users className="size-6" strokeWidth={1.75} />
             </span>
-            <p className="text-base font-semibold text-foreground">No candidates on file yet</p>
-            <p className="mx-auto mt-1.5 max-w-xs text-sm text-muted-foreground">
-              Records appear here automatically as applications are received and parsed.
-            </p>
+            <p className="text-base font-semibold text-foreground">{t("emptyTitle")}</p>
+            <p className="mx-auto mt-1.5 max-w-xs text-sm text-muted-foreground">{t("emptyBody")}</p>
             <span className="mx-auto mt-6 block h-px w-10 bg-hairline" aria-hidden />
           </li>
         )}
@@ -111,7 +107,7 @@ function CandidatesInner() {
                     {c.province}
                   </span>
                 ) : (
-                  <span className="text-sm text-muted-foreground">No province on file</span>
+                  <span className="text-sm text-muted-foreground">{t("noProvince")}</span>
                 )}
                 <StatusPill status={c.status} />
               </div>
@@ -125,10 +121,10 @@ function CandidatesInner() {
           <table className="w-full min-w-[640px] text-sm">
             <thead className="ledger-head text-left">
               <tr>
-                <th className="py-3 pl-5 pr-3">Candidate</th>
-                <th className="px-3 py-3">Location</th>
-                <th className="px-3 py-3">Source</th>
-                <th className="w-36 py-3 pl-3 pr-5 text-right">Status</th>
+                <th className="py-3 pl-5 pr-3">{t("colCandidate")}</th>
+                <th className="px-3 py-3">{t("colLocation")}</th>
+                <th className="px-3 py-3">{t("colSource")}</th>
+                <th className="w-36 py-3 pl-3 pr-5 text-right">{t("colStatus")}</th>
               </tr>
             </thead>
             <tbody>
@@ -155,10 +151,9 @@ function CandidatesInner() {
                     >
                       <Users className="size-6" strokeWidth={1.75} />
                     </span>
-                    <p className="text-base font-semibold text-foreground">No candidates on file yet</p>
+                    <p className="text-base font-semibold text-foreground">{t("emptyTitle")}</p>
                     <p className="mx-auto mt-1.5 max-w-sm text-sm text-muted-foreground">
-                      Records appear here automatically as applications are received and parsed by the
-                      screening engine.
+                      {t("emptyBodyLong")}
                     </p>
                     <span className="mx-auto mt-6 block h-px w-10 bg-hairline" aria-hidden />
                   </td>
