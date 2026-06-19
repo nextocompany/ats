@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { ShieldAlert, ShieldCheck } from "lucide-react";
 
 import { PageHeader } from "@/components/shell/PageHeader";
@@ -9,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { useAdminSettings, useMe, useUpdateAdminSettings } from "@/lib/queries";
 
 export default function AdminPage() {
+  const t = useTranslations("admin");
   const { data: me, isLoading: meLoading } = useMe();
   const isSuperAdmin = me?.role === "super_admin";
 
@@ -33,12 +35,13 @@ export default function AdminPage() {
   if (!isSuperAdmin) {
     return (
       <div className="settle space-y-8">
-        <PageHeader eyebrow="Administration" title="Admin" />
+        <PageHeader eyebrow={t("eyebrow")} title={t("title")} />
         <section className="flex items-start gap-3 rounded-xl bg-card p-6 ring-1 ring-hairline">
           <ShieldAlert className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
           <p className="text-sm text-muted-foreground">
-            These settings are restricted to <span className="font-medium text-foreground">super admins</span>.
-            Ask an administrator if you need access.
+            {t.rich("restricted", {
+              b: (chunks) => <span className="font-medium text-foreground">{chunks}</span>,
+            })}
           </p>
         </section>
       </div>
@@ -47,19 +50,13 @@ export default function AdminPage() {
 
   return (
     <div className="settle space-y-8">
-      <PageHeader
-        eyebrow="Administration"
-        title="Admin"
-        meta="System-wide settings. Changes apply to everyone — handle with care."
-      />
+      <PageHeader eyebrow={t("eyebrow")} title={t("title")} meta={t("meta")} />
 
       <section className="rounded-xl bg-card ring-1 ring-hairline">
         <header className="border-b border-hairline px-6 py-4">
-          <p className="eyebrow">Microsoft sign-in</p>
-          <h2 className="mt-1 font-heading text-lg font-semibold tracking-tight">Tenant access</h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            Controls which Microsoft organizations may sign in to the console.
-          </p>
+          <p className="eyebrow">{t("ssoEyebrow")}</p>
+          <h2 className="mt-1 font-heading text-lg font-semibold tracking-tight">{t("tenantAccess")}</h2>
+          <p className="mt-0.5 text-sm text-muted-foreground">{t("tenantAccessDesc")}</p>
         </header>
 
         <div className="p-6">
@@ -70,12 +67,12 @@ export default function AdminPage() {
               <div className="flex items-start justify-between gap-6">
                 <div className="min-w-0">
                   <label htmlFor="allow-all-tenants" className="text-sm font-medium">
-                    Allow all organizations
+                    {t("allowAll")}
                   </label>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    When <span className="font-medium text-foreground">off</span>, only tenants on the configured
-                    allowlist can sign in. When <span className="font-medium text-foreground">on</span>, any Microsoft
-                    work/school organization can sign in.
+                    {t.rich("allowAllHelp", {
+                      b: (chunks) => <span className="font-medium text-foreground">{chunks}</span>,
+                    })}
                   </p>
                 </div>
                 <Switch
@@ -83,7 +80,7 @@ export default function AdminPage() {
                   checked={allowAll}
                   onCheckedChange={onToggle}
                   disabled={update.isPending}
-                  aria-label="Allow all organizations to sign in"
+                  aria-label={t("allowAllAria")}
                 />
               </div>
 
@@ -92,27 +89,22 @@ export default function AdminPage() {
                 <div className="mt-5 flex items-start gap-3 rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive">
                   <ShieldAlert className="mt-0.5 size-4 shrink-0" />
                   <p>
-                    Sign-in is open to <span className="font-semibold">any</span> Microsoft organization. Tokens are
-                    still cryptographically verified, and users without an assigned role get the most restricted view —
-                    but anyone with a work/school account can reach the console. Prefer the allowlist unless you
-                    explicitly need open access.
+                    {t.rich("advisoryOpen", {
+                      b: (chunks) => <span className="font-semibold">{chunks}</span>,
+                    })}
                   </p>
                 </div>
               ) : (
                 <div className="mt-5 flex items-start gap-3 rounded-lg bg-muted px-4 py-3 text-sm text-muted-foreground">
                   <ShieldCheck className="mt-0.5 size-4 shrink-0 text-brand" />
-                  <p>Restricted to the configured tenant allowlist (recommended).</p>
+                  <p>{t("advisoryRestricted")}</p>
                 </div>
               )}
 
-              <p className="mt-4 text-xs text-muted-foreground">
-                Note: this controls backend acceptance only. For other organizations to actually reach the Microsoft
-                login, the dashboard must be built with the multi-tenant authority and the Entra app registration must
-                be multi-tenant.
-              </p>
+              <p className="mt-4 text-xs text-muted-foreground">{t("tenantNote")}</p>
 
               {update.isError && (
-                <p className="mt-3 text-sm text-destructive">Could not save. Please try again.</p>
+                <p className="mt-3 text-sm text-destructive">{t("saveError")}</p>
               )}
             </>
           )}
