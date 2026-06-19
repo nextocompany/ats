@@ -20,11 +20,23 @@ const ACCEPTED_TYPES = new Set([
   "image/png",
 ]);
 
+// ApplyPrefill carries values from an external source (e.g. an "Apply with SEEK"
+// deep link). They seed the editable fields, taking precedence over the saved
+// account values so the candidate sees the data they came in with.
+export interface ApplyPrefill {
+  fullName?: string;
+  email?: string;
+  phone?: string;
+  province?: string;
+}
+
 interface ApplyStepperProps {
   positionId: string;
   positionTitle: string;
   // The logged-in member — used to prefill the form and enable quick-apply.
   account: Account;
+  // Optional external prefill (SEEK/job-board deep link); overrides account values.
+  prefill?: ApplyPrefill;
 }
 
 function validateFile(file: File): string | null {
@@ -36,12 +48,14 @@ function validateFile(file: File): string | null {
 // ApplyStepper is account-first. It opens on a prefilled review with a one-tap
 // "apply with saved resume", or lets the member edit details / upload a different
 // resume before submitting.
-export function ApplyStepper({ positionId, positionTitle, account }: ApplyStepperProps) {
+export function ApplyStepper({ positionId, positionTitle, account, prefill }: ApplyStepperProps) {
+  // External prefill (e.g. SEEK deep link) takes precedence over saved account
+  // values; a blank prefill field falls back to the account.
   const [mode, setMode] = useState<"review" | "edit">("review");
-  const [fullName, setFullName] = useState(account.full_name);
-  const [phone, setPhone] = useState(account.phone);
-  const [email, setEmail] = useState(account.email);
-  const [province, setProvince] = useState(account.province);
+  const [fullName, setFullName] = useState(prefill?.fullName || account.full_name);
+  const [phone, setPhone] = useState(prefill?.phone || account.phone);
+  const [email, setEmail] = useState(prefill?.email || account.email);
+  const [province, setProvince] = useState(prefill?.province || account.province);
   const [file, setFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [statusToken, setStatusToken] = useState<string | null>(null);
@@ -150,11 +164,11 @@ export function ApplyStepper({ positionId, positionTitle, account }: ApplySteppe
           <dl className="space-y-3 rounded-xl border border-line bg-surface-muted p-4 text-sm">
             <div className="flex justify-between gap-3">
               <dt className="text-muted-foreground">ชื่อ-นามสกุล</dt>
-              <dd className="font-medium">{account.full_name || "—"}</dd>
+              <dd className="font-medium">{fullName || "—"}</dd>
             </div>
             <div className="flex justify-between gap-3">
               <dt className="text-muted-foreground">เบอร์โทรศัพท์</dt>
-              <dd className="font-medium">{account.phone || "—"}</dd>
+              <dd className="font-medium">{phone || "—"}</dd>
             </div>
             <div className="flex justify-between gap-3">
               <dt className="text-muted-foreground">เรซูเม่</dt>
