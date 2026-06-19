@@ -2,6 +2,7 @@
 
 // Share a job to LINE / Facebook / native share sheet, or copy the link. Reads the
 // canonical job URL from window.location at click time (no SSR/hydration mismatch).
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 interface Props {
@@ -14,6 +15,7 @@ function shareUrl(): string {
 }
 
 export function ShareButtons({ title }: Props) {
+  const t = useTranslations("share");
   const [copied, setCopied] = useState(false);
 
   function openShare(target: "line" | "facebook") {
@@ -50,16 +52,16 @@ export function ShareButtons({ title }: Props) {
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-xs text-muted-foreground">แชร์ตำแหน่งนี้</p>
+      <p className="text-xs text-muted-foreground">{t("label")}</p>
       <div className="grid grid-cols-3 gap-2">
-        <button type="button" onClick={() => openShare("line")} className={btn} aria-label="แชร์ไปยัง LINE">
+        <button type="button" onClick={() => openShare("line")} className={btn} aria-label={t("toLine")}>
           LINE
         </button>
-        <button type="button" onClick={() => openShare("facebook")} className={btn} aria-label="แชร์ไปยัง Facebook">
+        <button type="button" onClick={() => openShare("facebook")} className={btn} aria-label={t("toFacebook")}>
           Facebook
         </button>
-        <button type="button" onClick={nativeOrCopy} className={btn} aria-label="คัดลอกลิงก์หรือแชร์">
-          {copied ? "คัดลอกแล้ว ✓" : "คัดลอกลิงก์"}
+        <button type="button" onClick={nativeOrCopy} className={btn} aria-label={t("copyOrShare")}>
+          {copied ? t("copied") : t("copy")}
         </button>
       </div>
     </div>

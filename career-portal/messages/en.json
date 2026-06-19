@@ -65,5 +65,49 @@
     "doc_health_check": "Health certificate",
     "doc_military_certificate": "Military certificate (Sor.Dor.43)",
     "doc_name_change": "Name change certificate"
+  },
+  "jobs": {
+    "loading": "Loading positions…",
+    "countFound": "<num>{count}</num> positions found",
+    "loadError": "Couldn't load positions right now",
+    "retry": "Try again",
+    "emptyFiltered": "No positions match your filters",
+    "emptyNone": "No open positions yet",
+    "emptyFilteredHint": "Try a different search or level",
+    "emptyNoneHint": "Please check back later",
+    "clearFilters": "Clear filters",
+    "heroEyebrow": "Join CP Axtra",
+    "heroTitle": "Open positions",
+    "heroLead": "Search and filter roles that fit you, then apply in a few steps",
+    "openings": "openings",
+    "notFound": "Position not found",
+    "backToAll": "Back to all positions",
+    "aboutHeading": "About this role",
+    "about": "Be part of a team that cares about great service and growing together. We're looking for motivated people who love serving customers and are eager to learn, to deliver a great experience at every store.",
+    "offerHeading": "What we offer",
+    "offer": [
+      "Competitive pay with a performance bonus",
+      "Health insurance and staff benefits",
+      "A clear career growth path",
+      "Continuous training and skill development"
+    ],
+    "stepsHeading": "How to apply",
+    "steps": [
+      "Sign in or sign up, then give PDPA consent",
+      "Review your details and attach your resume",
+      "Submit your application and track its status anytime"
+    ],
+    "interested": "Interested in this role?",
+    "applyToday": "Apply today",
+    "applyCta": "Apply",
+    "applyNote": "Takes only a few minutes · HR will be in touch"
+  },
+  "share": {
+    "label": "Share this job",
+    "copied": "Copied ✓",
+    "copy": "Copy link",
+    "toLine": "Share to LINE",
+    "toFacebook": "Share to Facebook",
+    "copyOrShare": "Copy link or share"
   }
 }
