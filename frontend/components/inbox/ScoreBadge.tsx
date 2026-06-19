@@ -40,6 +40,7 @@ export function FitLabel({ score }: ScoreBadgeProps) {
    merely-average score never competes with the amber "review" flag. LOW (<50)
    → clay (weak fit). Amber/clay is reserved for genuine signal, never the mid band. */
 export function ScoreBadge({ score }: ScoreBadgeProps) {
+  const t = useTranslations("fit");
   if (score === null || score === undefined) {
     return <span className="inline-block w-9 text-center text-xs text-muted-foreground tabular-nums">—</span>;
   }
@@ -59,7 +60,7 @@ export function ScoreBadge({ score }: ScoreBadgeProps) {
   return (
     <span
       className={`inline-flex min-w-9 items-center justify-center rounded-md px-1.5 py-1 text-xs font-semibold tabular-nums ring-1 ring-inset ${cls}`}
-      aria-label={`AI score ${rounded}`}
+      aria-label={t("scoreAria", { score: rounded })}
     >
       {rounded}
     </span>
