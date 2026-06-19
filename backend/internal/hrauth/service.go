@@ -39,11 +39,32 @@ type Service struct {
 	repo       Repository
 	sessionTTL time.Duration
 	now        func() time.Time
+	// roleValid optionally validates an assignable role against a dynamic source
+	// (the rbac_roles table). When nil, or on validator error, the built-in
+	// allowedRoles set is used (fail-safe: never widens beyond the known roles).
+	roleValid func(ctx context.Context, role string) (bool, error)
 }
 
 // NewService builds the hrauth service.
 func NewService(repo Repository, sessionTTL time.Duration) *Service {
 	return &Service{repo: repo, sessionTTL: sessionTTL, now: time.Now}
+}
+
+// SetRoleValidator installs a dynamic role-assignability check (e.g. backed by the
+// rbac_roles table) so custom roles become assignable to local accounts.
+func (s *Service) SetRoleValidator(f func(ctx context.Context, role string) (bool, error)) {
+	s.roleValid = f
+}
+
+// roleAllowed reports whether a role may be assigned. Prefers the dynamic
+// validator; falls back to the built-in allowlist when unset or on error.
+func (s *Service) roleAllowed(ctx context.Context, role string) bool {
+	if s.roleValid != nil {
+		if ok, err := s.roleValid(ctx, role); err == nil {
+			return ok
+		}
+	}
+	return allowedRoles[role]
 }
 
 // normalizeEmail lower-cases and trims so login matches creation regardless of
@@ -127,7 +148,7 @@ func (s *Service) CreateUser(ctx context.Context, in NewUserInput) (User, error)
 	if email == "" {
 		return User{}, ErrInvalidCredentials
 	}
-	if !allowedRoles[in.Role] {
+	if !s.roleAllowed(ctx, in.Role) {
 		return User{}, ErrInvalidRole
 	}
 	if err := validatePassword(in.Password); err != nil {
@@ -152,7 +173,7 @@ var ErrSelfLockout = errors.New("hrauth: cannot disable or demote your own accou
 // deactivate or demote (away from super_admin) their OWN account, to avoid
 // locking themselves — potentially the last super_admin — out.
 func (s *Service) UpdateUser(ctx context.Context, id uuid.UUID, callerID string, in UpdateUserInput) (User, error) {
-	if in.Role != nil && !allowedRoles[*in.Role] {
+	if in.Role != nil && !s.roleAllowed(ctx, *in.Role) {
 		return User{}, ErrInvalidRole
 	}
 	if callerID == id.String() {
