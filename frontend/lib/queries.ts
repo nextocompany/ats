@@ -18,6 +18,7 @@ import type {
   Funnel,
   HRUser,
   InterviewAppointment,
+  StoreOption,
   InterviewFeedback,
   InterviewFeedbackInput,
   InterviewInviteResult,
@@ -274,6 +275,30 @@ export function useScheduleInterview(id: string) {
   return useMutation({
     mutationFn: (vars: { scheduled_at: string; duration_min: number; mode: "onsite" | "online"; location_text?: string }) =>
       api.post<InterviewAppointment>(`/api/v1/applications/${id}/interview-schedule`, vars).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["application", id] });
+      qc.invalidateQueries({ queryKey: ["applications"] });
+      qc.invalidateQueries({ queryKey: ["interview-appointments", id] });
+    },
+  });
+}
+
+// useStores loads the store directory for the placement/reassign picker.
+export function useStores() {
+  return useQuery({
+    queryKey: ["stores"],
+    queryFn: () => api.get<StoreOption[]>("/api/v1/stores").then((r) => r.data),
+    staleTime: 5 * 60_000, // reference data — rarely changes
+  });
+}
+
+// useReassign manually (re)assigns an application to a store, or moves it to the
+// central pool ({ talent_pool: true }). Refreshes the application + inbox + journey.
+export function useReassign(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { store_no: number } | { talent_pool: true }) =>
+      api.patch(`/api/v1/applications/${id}/assignment`, vars),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["application", id] });
       qc.invalidateQueries({ queryKey: ["applications"] });

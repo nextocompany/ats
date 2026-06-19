@@ -21,6 +21,8 @@ type Store struct {
 // Repository is the store data-access contract.
 type Repository interface {
 	FindByNo(ctx context.Context, no int) (*Store, error)
+	// List returns all stores ordered by name, for dashboard pickers.
+	List(ctx context.Context) ([]Store, error)
 }
 
 type pgRepository struct {
@@ -44,4 +46,25 @@ func (r *pgRepository) FindByNo(ctx context.Context, no int) (*Store, error) {
 		return nil, fmt.Errorf("stores: find by no: %w", err)
 	}
 	return &s, nil
+}
+
+func (r *pgRepository) List(ctx context.Context) ([]Store, error) {
+	const q = `
+		SELECT store_no, store_name, COALESCE(format_type,''), COALESCE(subregion,''),
+		       COALESCE(province,''), latitude, longitude
+		FROM stores ORDER BY store_name`
+	rows, err := r.pool.Query(ctx, q)
+	if err != nil {
+		return nil, fmt.Errorf("stores: list: %w", err)
+	}
+	defer rows.Close()
+	var out []Store
+	for rows.Next() {
+		var s Store
+		if err := rows.Scan(&s.StoreNo, &s.StoreName, &s.FormatType, &s.Subregion, &s.Province, &s.Latitude, &s.Longitude); err != nil {
+			return nil, fmt.Errorf("stores: scan: %w", err)
+		}
+		out = append(out, s)
+	}
+	return out, rows.Err()
 }

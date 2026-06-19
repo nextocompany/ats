@@ -61,6 +61,14 @@ export interface Application {
 }
 
 // InterviewAppointment is a scheduled human interview (mirrors applications.Appointment).
+// StoreOption is the slim store projection for the placement/reassign picker.
+export interface StoreOption {
+  store_no: number;
+  store_name: string;
+  subregion: string;
+  province: string;
+}
+
 export interface InterviewAppointment {
   id: string;
   application_id: string;

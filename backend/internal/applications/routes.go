@@ -8,5 +8,6 @@ func RegisterRoutes(app *fiber.App, h *Handler) {
 	v1.Post("/applications", h.Intake)
 	v1.Get("/applications/:id", h.Get)
 	v1.Patch("/applications/:id/status", h.UpdateStatus)
+	v1.Patch("/applications/:id/assignment", h.UpdateAssignment)
 	v1.Get("/ai/jobs/:job_id", h.JobStatus)
 }
