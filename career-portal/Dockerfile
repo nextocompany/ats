@@ -26,6 +26,10 @@ ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 # stub; set → real LIFF login.
 ARG NEXT_PUBLIC_LIFF_ID
 ENV NEXT_PUBLIC_LIFF_ID=${NEXT_PUBLIC_LIFF_ID}
+# Portal public origin for absolute Open Graph share links (LINE/Facebook previews).
+# Unset → falls back to localhost (share buttons still work via window.location).
+ARG NEXT_PUBLIC_PORTAL_BASE_URL
+ENV NEXT_PUBLIC_PORTAL_BASE_URL=${NEXT_PUBLIC_PORTAL_BASE_URL}
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm build
 
