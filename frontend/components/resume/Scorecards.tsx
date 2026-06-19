@@ -5,6 +5,7 @@
 // growth/leadership. Both feed a combined aggregate. Reads are open to anyone who
 // can see the application; each form is server-gated to the relevant role.
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -32,12 +33,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-const REC_LABEL: Record<InterviewRecommendation, string> = {
-  pass: "ผ่าน",
-  hold: "รอพิจารณา",
-  fail: "ไม่ผ่าน",
-};
-
 function recTone(rec: string): string {
   if (rec === "pass") return "var(--score-high)";
   if (rec === "hold") return "var(--score-mid)";
@@ -46,20 +41,17 @@ function recTone(rec: string): string {
 }
 
 type Comp = keyof InterviewCompetencies;
-const TA_COMPS: { key: Comp; label: string }[] = [
-  { key: "technical", label: "ความรู้/ทักษะงาน" },
-  { key: "communication", label: "การสื่อสาร" },
-  { key: "experience", label: "ประสบการณ์" },
-  { key: "attitude", label: "ทัศนคติ" },
+const TA_COMPS: { key: Comp; labelKey: string }[] = [
+  { key: "technical", labelKey: "comp_technical" },
+  { key: "communication", labelKey: "comp_communication" },
+  { key: "experience", labelKey: "comp_experience" },
+  { key: "attitude", labelKey: "comp_attitude" },
 ];
-const LM_COMPS: { key: Comp; label: string }[] = [
-  { key: "culture_fit", label: "วัฒนธรรมองค์กร" },
-  { key: "growth_potential", label: "ศักยภาพการเติบโต" },
-  { key: "leadership", label: "ภาวะผู้นำ" },
+const LM_COMPS: { key: Comp; labelKey: string }[] = [
+  { key: "culture_fit", labelKey: "comp_culture_fit" },
+  { key: "growth_potential", labelKey: "comp_growth_potential" },
+  { key: "leadership", labelKey: "comp_leadership" },
 ];
-const COMP_LABEL: Record<string, string> = Object.fromEntries(
-  [...TA_COMPS, ...LM_COMPS].map((c) => [c.key, c.label]),
-);
 
 const emptyComp: InterviewCompetencies = {
   communication: 0,
@@ -92,19 +84,20 @@ const STAGE_OPEN = (status: string) => status === "interview" || status === "int
 
 // ─── Aggregate summary ──────────────────────────────────────────────────────
 export function ScorecardSummary({ applicationId }: { applicationId: string }) {
+  const t = useTranslations("resume");
   const { data } = useScorecardSummary(applicationId);
   if (!data || (!data.ta && !data.line_manager)) return null;
   return (
     <div className="mt-6 space-y-3 border-t border-hairline pt-6">
       <div className="flex items-baseline justify-between">
         <div>
-          <p className="eyebrow">Scorecard</p>
-          <h2 className="mt-1 font-heading text-lg font-semibold tracking-tight">สรุปคะแนนสัมภาษณ์</h2>
+          <p className="eyebrow">{t("scEyebrow")}</p>
+          <h2 className="mt-1 font-heading text-lg font-semibold tracking-tight">{t("scSummaryTitle")}</h2>
         </div>
         {data.composite_score != null && (
           <span className="num text-2xl font-semibold tabular-nums text-brand">
             {data.composite_score}
-            <span className="ml-1 text-xs font-normal text-muted-foreground">composite</span>
+            <span className="ml-1 text-xs font-normal text-muted-foreground">{t("scComposite")}</span>
           </span>
         )}
       </div>
@@ -117,6 +110,7 @@ export function ScorecardSummary({ applicationId }: { applicationId: string }) {
 }
 
 function AggCard({ title, agg }: { title: string; agg: import("@/lib/types").PerspectiveAgg | null }) {
+  const t = useTranslations("resume");
   return (
     <div className="rounded-lg bg-muted/40 p-3 ring-1 ring-hairline">
       <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{title}</p>
@@ -124,18 +118,18 @@ function AggCard({ title, agg }: { title: string; agg: import("@/lib/types").Per
         <>
           <p className="mt-1">
             <span className="num text-xl font-semibold tabular-nums text-foreground">{agg.avg_overall}</span>
-            <span className="text-xs text-muted-foreground"> /5 · {agg.count} ราย</span>
+            <span className="text-xs text-muted-foreground"> {t("scPerCount", { count: agg.count })}</span>
           </p>
           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[0.6875rem] text-muted-foreground">
             {Object.entries(agg.avg_competencies).map(([k, v]) => (
               <span key={k}>
-                {COMP_LABEL[k] ?? k} <span className="font-medium tabular-nums text-foreground">{v}</span>
+                {t.has(`comp_${k}`) ? t(`comp_${k}`) : k} <span className="font-medium tabular-nums text-foreground">{v}</span>
               </span>
             ))}
           </div>
         </>
       ) : (
-        <p className="mt-1 text-xs text-muted-foreground">ยังไม่มี</p>
+        <p className="mt-1 text-xs text-muted-foreground">{t("scNone")}</p>
       )}
     </div>
   );
@@ -143,14 +137,15 @@ function AggCard({ title, agg }: { title: string; agg: import("@/lib/types").Per
 
 // ─── Per-perspective scorecard (form + list) ────────────────────────────────
 export function TaScorecard({ applicationId, status }: { applicationId: string; status: string }) {
+  const t = useTranslations("resume");
   const { data: me } = useMe();
   return (
     <Scorecard
       applicationId={applicationId}
       status={status}
       perspective="ta"
-      eyebrow="TA scorecard"
-      title="สกอร์การ์ด — TA"
+      eyebrow={t("scTaEyebrow")}
+      title={t("scTaTitle")}
       comps={TA_COMPS}
       canRecord={canRecordTaScorecard(me?.role)}
     />
@@ -158,14 +153,15 @@ export function TaScorecard({ applicationId, status }: { applicationId: string; 
 }
 
 export function LineManagerScorecard({ applicationId, status }: { applicationId: string; status: string }) {
+  const t = useTranslations("resume");
   const { data: me } = useMe();
   return (
     <Scorecard
       applicationId={applicationId}
       status={status}
       perspective="line_manager"
-      eyebrow="Line manager scorecard"
-      title="สกอร์การ์ด — ผู้จัดการสาขา"
+      eyebrow={t("scLmEyebrow")}
+      title={t("scLmTitle")}
       comps={LM_COMPS}
       canRecord={canRecordLmScorecard(me?.role)}
     />
@@ -186,9 +182,10 @@ function Scorecard({
   perspective: ScorecardPerspective;
   eyebrow: string;
   title: string;
-  comps: { key: Comp; label: string }[];
+  comps: { key: Comp; labelKey: string }[];
   canRecord: boolean;
 }) {
+  const t = useTranslations("resume");
   const { data: list, isLoading } = useInterviewFeedback(applicationId);
   const add = useAddInterviewFeedback(applicationId);
   const mine = (list ?? []).filter((f) => f.perspective === perspective);
@@ -227,11 +224,11 @@ function Scorecard({
       },
       {
         onSuccess: () => {
-          toast.success("บันทึกสกอร์การ์ดแล้ว");
+          toast.success(t("scSaved"));
           reset();
           setOpen(false);
         },
-        onError: (err) => toast.error(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ"),
+        onError: (err) => toast.error(err instanceof Error ? err.message : t("scSaveFailed")),
       },
     );
   }
@@ -248,7 +245,7 @@ function Scorecard({
         </div>
         {showForm && !open && (
           <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>
-            + บันทึกผล
+            {t("scAddResult")}
           </Button>
         )}
       </div>
@@ -257,22 +254,22 @@ function Scorecard({
         <form onSubmit={submit} className="space-y-3 rounded-lg bg-muted/40 p-4 ring-1 ring-hairline">
           <div className="grid grid-cols-2 gap-3">
             <label className="block space-y-1.5">
-              <Label>ผลสรุป</Label>
+              <Label>{t("scResult")}</Label>
               <Select value={rec} onValueChange={(v) => setRec((v as InterviewRecommendation) ?? "")}>
-                <SelectTrigger className="w-full" aria-label="ผลสรุป">
-                  <SelectValue placeholder="เลือกผล…" />
+                <SelectTrigger className="w-full" aria-label={t("scResult")}>
+                  <SelectValue placeholder={t("scResultPlaceholder")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="pass">ผ่าน</SelectItem>
-                  <SelectItem value="hold">รอพิจารณา</SelectItem>
-                  <SelectItem value="fail">ไม่ผ่าน</SelectItem>
+                  <SelectItem value="pass">{t("rec_pass")}</SelectItem>
+                  <SelectItem value="hold">{t("rec_hold")}</SelectItem>
+                  <SelectItem value="fail">{t("rec_fail")}</SelectItem>
                 </SelectContent>
               </Select>
             </label>
             <label className="block space-y-1.5">
-              <Label>คะแนนรวม</Label>
+              <Label>{t("scOverall")}</Label>
               <Select value={rating} onValueChange={(v) => setRating(v ?? "3")}>
-                <SelectTrigger className="w-full" aria-label="คะแนนรวม">
+                <SelectTrigger className="w-full" aria-label={t("scOverall")}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -288,17 +285,17 @@ function Scorecard({
 
           <div>
             <p className="mb-2 text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-              คะแนนรายด้าน
+              {t("scPerCompetency")}
             </p>
             <div className="grid grid-cols-2 gap-3">
               {comps.map((c) => (
                 <label key={c.key} className="flex items-center justify-between gap-2">
-                  <span className="text-xs text-foreground">{c.label}</span>
+                  <span className="text-xs text-foreground">{t(c.labelKey)}</span>
                   <Select
                     value={String(comp[c.key])}
                     onValueChange={(v) => setComp((prev) => ({ ...prev, [c.key]: Number(v ?? "0") }))}
                   >
-                    <SelectTrigger className="w-20" aria-label={c.label}>
+                    <SelectTrigger className="w-20" aria-label={t(c.labelKey)}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -316,16 +313,16 @@ function Scorecard({
           </div>
 
           <label className="block space-y-1.5">
-            <Label>จุดแข็ง</Label>
-            <Textarea value={strengths} onChange={(e) => setStrengths(e.target.value)} placeholder="เช่น สื่อสารชัดเจน" />
+            <Label>{t("scStrengths")}</Label>
+            <Textarea value={strengths} onChange={(e) => setStrengths(e.target.value)} placeholder={t("scStrengthsPlaceholder")} />
           </label>
           <label className="block space-y-1.5">
-            <Label>จุดอ่อน / ข้อสังเกต</Label>
-            <Textarea value={concerns} onChange={(e) => setConcerns(e.target.value)} placeholder="เช่น ยังขาดประสบการณ์ด้าน…" />
+            <Label>{t("scConcerns")}</Label>
+            <Textarea value={concerns} onChange={(e) => setConcerns(e.target.value)} placeholder={t("scConcernsPlaceholder")} />
           </label>
           <label className="block space-y-1.5">
-            <Label>บันทึกเพิ่มเติม</Label>
-            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="รายละเอียดอื่น ๆ" />
+            <Label>{t("scNotes")}</Label>
+            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t("scNotesPlaceholder")} />
           </label>
 
           <div className="flex justify-end gap-2">
@@ -338,11 +335,11 @@ function Scorecard({
                 setOpen(false);
               }}
             >
-              ยกเลิก
+              {t("scCancel")}
             </Button>
             <Button type="submit" size="sm" disabled={!rec || add.isPending} className="gap-2">
               {add.isPending && <Loader2 className="size-4 animate-spin" />}
-              บันทึก
+              {t("scSave")}
             </Button>
           </div>
         </form>
@@ -359,13 +356,14 @@ function Scorecard({
   );
 }
 
-function ScorecardCard({ f, comps }: { f: InterviewFeedback; comps: { key: Comp; label: string }[] }) {
+function ScorecardCard({ f, comps }: { f: InterviewFeedback; comps: { key: Comp; labelKey: string }[] }) {
+  const t = useTranslations("resume");
   const rated = comps.filter((c) => f.competencies[c.key] > 0);
   return (
     <li className="rounded-lg bg-card p-4 ring-1 ring-hairline">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-foreground">{f.interviewer_name || "ผู้สัมภาษณ์"}</p>
+          <p className="truncate text-sm font-medium text-foreground">{f.interviewer_name || t("scInterviewer")}</p>
           <p className="text-xs text-muted-foreground">{new Date(f.created_at).toLocaleString()}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -376,7 +374,7 @@ function ScorecardCard({ f, comps }: { f: InterviewFeedback; comps: { key: Comp;
             className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold text-white"
             style={{ backgroundColor: recTone(f.recommendation) }}
           >
-            {REC_LABEL[f.recommendation] ?? f.recommendation}
+            {t.has(`rec_${f.recommendation}`) ? t(`rec_${f.recommendation}`) : f.recommendation}
           </span>
         </div>
       </div>
@@ -385,7 +383,7 @@ function ScorecardCard({ f, comps }: { f: InterviewFeedback; comps: { key: Comp;
         <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
           {rated.map((c) => (
             <span key={c.key}>
-              {c.label} <span className="font-medium text-foreground tabular-nums">{f.competencies[c.key]}/5</span>
+              {t(c.labelKey)} <span className="font-medium text-foreground tabular-nums">{f.competencies[c.key]}/5</span>
             </span>
           ))}
         </div>
@@ -393,13 +391,13 @@ function ScorecardCard({ f, comps }: { f: InterviewFeedback; comps: { key: Comp;
 
       {f.strengths && (
         <p className="mt-3 text-sm text-foreground">
-          <span className="font-medium">จุดแข็ง: </span>
+          <span className="font-medium">{t("scStrengthsLabel")}</span>
           {f.strengths}
         </p>
       )}
       {f.concerns && (
         <p className="mt-1.5 text-sm text-foreground">
-          <span className="font-medium">ข้อสังเกต: </span>
+          <span className="font-medium">{t("scConcernsLabel")}</span>
           {f.concerns}
         </p>
       )}

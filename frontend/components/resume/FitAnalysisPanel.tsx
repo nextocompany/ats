@@ -1,18 +1,12 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import type { Application, FitAnalysis } from "@/lib/types";
 import { useFitAnalysis, useGenerateFitAnalysis } from "@/lib/queries";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-
-const OVERALL_LABEL: Record<FitAnalysis["overall_fit"], string> = {
-  strong: "เหมาะสมอย่างยิ่ง",
-  moderate: "เหมาะสม",
-  weak: "ควรพิจารณา",
-  none: "ไม่เหมาะสมกับตำแหน่งใดเลย",
-};
 
 function overallTone(fit: FitAnalysis["overall_fit"]): string {
   if (fit === "strong") return "var(--score-high)";
@@ -28,13 +22,14 @@ function scoreTone(score: number): string {
 }
 
 export function FitAnalysisPanel({ applicationId, app }: { applicationId: string; app: Application }) {
+  const t = useTranslations("resume");
   const { data, isLoading, isError } = useFitAnalysis(applicationId);
   const gen = useGenerateFitAnalysis(applicationId);
 
   const generate = () =>
     gen.mutate(undefined, {
-      onSuccess: () => toast.success("วิเคราะห์ความเหมาะสมเรียบร้อย"),
-      onError: (e) => toast.error(e instanceof Error ? e.message : "วิเคราะห์ไม่สำเร็จ"),
+      onSuccess: () => toast.success(t("fitDone")),
+      onError: (e) => toast.error(e instanceof Error ? e.message : t("fitFailed")),
     });
 
   if (isLoading) return null;
@@ -42,12 +37,12 @@ export function FitAnalysisPanel({ applicationId, app }: { applicationId: string
   const header = (
     <div className="flex items-center justify-between">
       <div>
-        <p className="eyebrow">AI fit analysis</p>
-        <h2 className="mt-1 font-heading text-lg font-semibold tracking-tight">ความเหมาะสมกับตำแหน่ง</h2>
+        <p className="eyebrow">{t("fitEyebrow")}</p>
+        <h2 className="mt-1 font-heading text-lg font-semibold tracking-tight">{t("fitTitle")}</h2>
       </div>
       {data && (
         <Badge variant="secondary" className="capitalize">
-          {OVERALL_LABEL[data.overall_fit]}
+          {t(`fit_${data.overall_fit}`)}
         </Badge>
       )}
     </div>
@@ -59,17 +54,15 @@ export function FitAnalysisPanel({ applicationId, app }: { applicationId: string
       <div className="mt-6 space-y-4 border-t border-hairline pt-6" aria-busy={gen.isPending}>
         {header}
         {isError ? (
-          <p className="text-xs text-muted-foreground">โหลดผลวิเคราะห์ไม่สำเร็จ</p>
+          <p className="text-xs text-muted-foreground">{t("fitLoadFailed")}</p>
         ) : (
-          <p className="text-sm text-muted-foreground">
-            ยังไม่ได้วิเคราะห์ความเหมาะสม — รวมผล Screening และ AI Interview เพื่อแนะนำตำแหน่งที่เหมาะสมในองค์กร
-          </p>
+          <p className="text-sm text-muted-foreground">{t("fitNotYet")}</p>
         )}
         <Button size="sm" disabled={gen.isPending || app.ai_score === null} onClick={() => generate()} className="w-full">
-          {gen.isPending ? "กำลังวิเคราะห์…" : "วิเคราะห์ความเหมาะสม"}
+          {gen.isPending ? t("fitAnalyzing") : t("fitGenerate")}
         </Button>
         {app.ai_score === null && (
-          <p className="text-xs text-muted-foreground">ต้องผ่านการ Screening และ AI Interview ก่อนจึงจะวิเคราะห์ได้</p>
+          <p className="text-xs text-muted-foreground">{t("fitNeedScore")}</p>
         )}
       </div>
     );
@@ -84,7 +77,7 @@ export function FitAnalysisPanel({ applicationId, app }: { applicationId: string
             className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold text-white"
             style={{ backgroundColor: overallTone(data.overall_fit) }}
           >
-            {OVERALL_LABEL[data.overall_fit]}
+            {t(`fit_${data.overall_fit}`)}
           </span>
           <p className="mt-2 text-sm leading-relaxed text-foreground">{data.summary}</p>
         </div>
@@ -92,7 +85,7 @@ export function FitAnalysisPanel({ applicationId, app }: { applicationId: string
 
       {data.strengths.length > 0 && (
         <div>
-          <p className="mb-2 text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">จุดเด่น</p>
+          <p className="mb-2 text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{t("fitStrengths")}</p>
           <ul className="space-y-1.5 text-sm text-foreground">
             {data.strengths.map((t, i) => (
               <li key={i} className="flex gap-2">
@@ -107,7 +100,7 @@ export function FitAnalysisPanel({ applicationId, app }: { applicationId: string
       {data.concerns.length > 0 && (
         <div>
           <p className="mb-2 text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-            จุดที่ต้องพิจารณา
+            {t("fitConcerns")}
           </p>
           <ul className="space-y-1.5 text-sm text-foreground">
             {data.concerns.map((t, i) => (
@@ -122,14 +115,14 @@ export function FitAnalysisPanel({ applicationId, app }: { applicationId: string
 
       {data.overall_fit === "none" ? (
         <div className="rounded-lg bg-[var(--score-low)]/10 p-4 text-sm text-foreground ring-1 ring-[var(--score-low)]/20">
-          <p className="font-medium">ไม่เหมาะสมกับตำแหน่งใดเลย</p>
+          <p className="font-medium">{t("fit_none")}</p>
           {data.no_match_reason && <p className="mt-1 text-muted-foreground">{data.no_match_reason}</p>}
         </div>
       ) : (
         data.recommended.length > 0 && (
           <div>
             <p className="mb-2 text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-              ตำแหน่งที่แนะนำ
+              {t("fitRecommended")}
             </p>
             <ul className="space-y-3">
               {data.recommended.map((r) => (
@@ -139,7 +132,7 @@ export function FitAnalysisPanel({ applicationId, app }: { applicationId: string
                     <span
                       className="grid size-9 shrink-0 place-items-center rounded-md text-sm font-semibold tabular-nums text-white"
                       style={{ backgroundColor: scoreTone(r.fit_score) }}
-                      aria-label={`คะแนนความเหมาะสม ${r.fit_score}`}
+                      aria-label={t("fitScoreAria", { score: r.fit_score })}
                     >
                       {r.fit_score}
                     </span>
@@ -167,7 +160,7 @@ export function FitAnalysisPanel({ applicationId, app }: { applicationId: string
         disabled={gen.isPending}
         className="text-xs font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm disabled:opacity-50"
       >
-        {gen.isPending ? "กำลังวิเคราะห์…" : "วิเคราะห์ใหม่"}
+        {gen.isPending ? t("fitAnalyzing") : t("fitRegenerate")}
       </button>
     </div>
   );
