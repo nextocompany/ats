@@ -24,6 +24,9 @@ const body = IBM_Plex_Sans_Thai_Looped({
 });
 
 export const metadata: Metadata = {
+  // Resolves relative Open Graph URLs (e.g. per-job /jobs/[id]) to absolute links
+  // for LINE/Facebook previews. Falls back to localhost in dev when unset.
+  metadataBase: new URL(process.env.NEXT_PUBLIC_PORTAL_BASE_URL ?? "http://localhost:3000"),
   title: "ร่วมงานกับเรา | สมัครงาน",
   description: "ดูตำแหน่งงานที่เปิดรับและสมัครงานได้ในไม่กี่ขั้นตอน",
   // PWA (Sprint 6c): App Router serves the manifest at /manifest.webmanifest.
