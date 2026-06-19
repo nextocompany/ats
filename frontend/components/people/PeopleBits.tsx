@@ -1,3 +1,6 @@
+"use client";
+
+import { useTranslations } from "next-intl";
 import { Store, Globe, Megaphone, UserPlus, Building2, type LucideIcon } from "lucide-react";
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -67,6 +70,7 @@ function prettyChannel(raw: string): string {
 
 // Source rendered as a small labeled chip with a channel glyph — never plain text.
 export function SourceChip({ channel }: { channel: string }) {
+  const t = useTranslations("source");
   if (!channel) {
     return <span className="text-sm text-muted-foreground">—</span>;
   }
@@ -75,7 +79,7 @@ export function SourceChip({ channel }: { channel: string }) {
   return (
     <span className="inline-flex items-center gap-1.5 rounded-md border border-hairline bg-secondary/60 px-2 py-1 text-xs font-medium text-secondary-foreground">
       <Icon className="size-3.5 text-muted-foreground" strokeWidth={1.75} />
-      {prettyChannel(channel)}
+      {t.has(key) ? t(key) : prettyChannel(channel)}
     </span>
   );
 }
@@ -144,46 +148,14 @@ export function toneForStatus(status: string): PillTone {
   return "neutral";
 }
 
-// Plain-language status words — the single source of truth so every list
-// surface (Inbox, Candidates, Search) speaks the same vocabulary instead of
-// echoing the raw pipeline status ("scored", "parsed"). Unknown values fall
-// back to a capitalized form, preserving prior behavior.
-const STATUS_LABELS: Record<string, string> = {
-  // application pipeline
-  pending: "Awaiting screening",
-  parsed: "Profile ready",
-  scored: "Screened",
-  passed: "Passed screening",
-  ai_interview: "AI interview",
-  ai_interviewed: "AI interview done",
-  shortlisted: "Shortlisted",
-  interview: "Interview scheduled",
-  interviewed: "Interviewed",
-  offer: "Offer",
-  hired: "Hired",
-  rejected: "Not selected",
-  failed: "Could not process",
-  // review / waiting states (cover every value toneForStatus recognizes so no
-  // raw token like "in_review" ever reaches the UI)
-  review: "Under review",
-  in_review: "Under review",
-  waiting: "Awaiting review",
-  // candidate record states
-  available: "Available",
-  active: "Active",
-  onboarded: "Onboarded",
-  inactive: "Inactive",
-  dropped: "Withdrawn",
-  withdrawn: "Withdrawn",
-};
-
-export function statusLabel(status: string): string {
-  const key = (status ?? "").toLowerCase();
-  if (!key) return "—";
-  return STATUS_LABELS[key] ?? status[0].toUpperCase() + status.slice(1);
-}
-
+// Plain-language status words — resolved from the shared `status` catalog so
+// every list surface (Inbox, Candidates, Search) speaks the same vocabulary in
+// the active locale instead of echoing the raw pipeline token ("scored",
+// "parsed"). Unknown values fall back to a capitalized form (prior behavior).
 export function StatusPill({ status }: { status: string }) {
+  const t = useTranslations("status");
   const tone = toneForStatus(status);
-  return <Pill tone={tone}>{statusLabel(status)}</Pill>;
+  const key = (status ?? "").toLowerCase();
+  const label = !key ? "—" : t.has(key) ? t(key) : status[0].toUpperCase() + status.slice(1);
+  return <Pill tone={tone}>{label}</Pill>;
 }
