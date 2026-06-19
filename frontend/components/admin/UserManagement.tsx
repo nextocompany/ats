@@ -4,11 +4,10 @@
 // path that runs alongside Entra SSO). List, provision, edit role/status, and
 // reset passwords. The backend is the real gate; this UI mirrors it.
 import { useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { KeyRound, Loader2, UserPlus } from "lucide-react";
 
-import { useCreateHRUser, useHRUsers, useUpdateHRUser } from "@/lib/queries";
-import { HR_ROLES } from "@/lib/roles";
+import { useCreateHRUser, useHRUsers, useRbacRoles, useUpdateHRUser } from "@/lib/queries";
 import type { CreateHRUserInput, HRUser, UpdateHRUserInput } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -341,17 +340,24 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+// RoleSelect offers the live role list from the dynamic-RBAC matrix (useRbacRoles)
+// so a newly created role is immediately assignable. Built-in roles keep their
+// curated i18n label (roleFull_*); custom roles fall back to the locale label.
 function RoleSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const t = useTranslations("admin");
+  const locale = useLocale();
+  const { data: roles } = useRbacRoles();
+  const label = (r: { key: string; label_en: string; label_th: string }) =>
+    t.has(`roleFull_${r.key}`) ? t(`roleFull_${r.key}`) : locale === "th" ? r.label_th : r.label_en;
   return (
     <Select value={value} onValueChange={(v) => onChange(v ?? value)}>
       <SelectTrigger className="w-full">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        {HR_ROLES.map((r) => (
-          <SelectItem key={r.value} value={r.value}>
-            {t(`roleFull_${r.value}`)}
+        {(roles ?? []).map((r) => (
+          <SelectItem key={r.key} value={r.key}>
+            {label(r)}
           </SelectItem>
         ))}
       </SelectContent>
