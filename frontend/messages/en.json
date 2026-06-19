@@ -201,6 +201,26 @@
     "good": "Good",
     "veryGood": "Excellent"
   },
+  "candidates": {
+    "eyebrow": "People",
+    "title": "Candidates",
+    "meta": "{count, plural, one {# candidate} other {# candidates}} on file · all stores",
+    "sumOnFile": "On file",
+    "sumActive": "Active",
+    "sumActiveHint": "on this page",
+    "sumProvinces": "Provinces",
+    "sumProvincesHint": "represented here",
+    "sumChannels": "Sourcing channels",
+    "sumChannelsHint": "in this view",
+    "colCandidate": "Candidate",
+    "colLocation": "Location",
+    "colSource": "Source",
+    "colStatus": "Status",
+    "noProvince": "No province on file",
+    "emptyTitle": "No candidates on file yet",
+    "emptyBody": "Records appear here automatically as applications are received and parsed.",
+    "emptyBodyLong": "Records appear here automatically as applications are received and parsed by the screening engine."
+  },
   "inbox": {
     "title": "Applications",
     "centralPool": "Central pool · awaiting branch",
