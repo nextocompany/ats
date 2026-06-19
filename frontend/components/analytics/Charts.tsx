@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { ArrowUpRight } from "lucide-react";
 
 import type { Funnel, KPI, Source } from "@/lib/types";
@@ -25,14 +26,15 @@ export function KpiCards({
   /** "hero" = bold filled CP Axtra blue band (Overview). "reporting" = compact outline strip (Analytics). */
   variant?: "hero" | "reporting";
 }) {
+  const t = useTranslations("analytics");
   // Derived, presentational deltas (share of pipeline) — no data changes.
   const passRate = kpi.applied > 0 ? Math.round((kpi.passed / kpi.applied) * 100) : 0;
   const onboardRate = kpi.passed > 0 ? Math.round((kpi.onboarded / kpi.passed) * 100) : 0;
 
   const supporting: Metric[] = [
-    { label: "Passed screening", value: kpi.passed, hint: `${passRate}% of applied` },
-    { label: "Onboarded", value: kpi.onboarded, hint: `${onboardRate}% of passed` },
-    { label: "Waiting for you", value: kpi.waiting, hint: "awaiting your review" },
+    { label: t("kpiPassed"), value: kpi.passed, hint: t("kpiPassedHint", { rate: passRate }) },
+    { label: t("kpiOnboarded"), value: kpi.onboarded, hint: t("kpiOnboardedHint", { rate: onboardRate }) },
+    { label: t("kpiWaiting"), value: kpi.waiting, hint: t("kpiWaitingHint") },
   ];
 
   if (variant === "reporting") {
@@ -55,15 +57,13 @@ export function KpiCards({
           style={{ background: "var(--brass)" }}
         />
         <p className="pl-3.5 text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-brand-foreground/70">
-          Total applications
+          {t("kpiTotal")}
         </p>
         <div className="mt-3 pl-3.5">
           <span className="num block font-semibold tabular-nums leading-none [font-size:var(--text-stat)] tracking-tight">
             {fmt.format(kpi.applied)}
           </span>
-          <p className="mt-3 text-sm text-brand-foreground/80">
-            Across all stores · current intake cycle
-          </p>
+          <p className="mt-3 text-sm text-brand-foreground/80">{t("kpiTotalHeroSub")}</p>
         </div>
       </div>
 
@@ -95,6 +95,7 @@ export function KpiCards({
    ────────────────────────────────────────────────────────────────────── */
 
 function KpiStrip({ kpi, supporting }: { kpi: KPI; supporting: Metric[] }) {
+  const t = useTranslations("analytics");
   const passRate = kpi.applied > 0 ? Math.round((kpi.passed / kpi.applied) * 100) : 0;
   return (
     // Bento, not a flat 4-up: one dominant lead panel (Total applications) with a
@@ -111,10 +112,10 @@ function KpiStrip({ kpi, supporting }: { kpi: KPI; supporting: Metric[] }) {
         />
         <div className="flex items-baseline justify-between pl-3.5">
           <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-            Total applications
+            {t("kpiTotal")}
           </p>
           <p className="text-[0.6875rem] uppercase tracking-[0.12em] text-muted-foreground/70">
-            this cycle
+            {t("kpiThisCycle")}
           </p>
         </div>
         <div className="mt-4 pl-3.5">
@@ -129,7 +130,7 @@ function KpiStrip({ kpi, supporting }: { kpi: KPI; supporting: Metric[] }) {
               />
             </span>
             <span className="text-xs font-medium tabular-nums text-muted-foreground">
-              {passRate}% clear screening
+              {t("kpiClearScreening", { rate: passRate })}
             </span>
           </div>
         </div>
@@ -166,10 +167,10 @@ function KpiStrip({ kpi, supporting }: { kpi: KPI; supporting: Metric[] }) {
    ────────────────────────────────────────────────────────────────────── */
 
 const FUNNEL_STAGES = [
-  { key: "applied", label: "Applied" },
-  { key: "passed_ai", label: "Passed screening" },
-  { key: "reviewed", label: "Reviewed" },
-  { key: "hired", label: "Hired" },
+  { key: "applied", labelKey: "stageApplied" },
+  { key: "passed_ai", labelKey: "stagePassed" },
+  { key: "reviewed", labelKey: "stageReviewed" },
+  { key: "hired", labelKey: "stageHired" },
 ] as const;
 
 // Floor so even a 2-of-23 stage keeps a legible, brass-terminated band.
@@ -188,6 +189,7 @@ const FUNNEL_SHADES = [
 ] as const;
 
 export function FunnelChart({ funnel }: { funnel: Funnel }) {
+  const t = useTranslations("analytics");
   // Applied is the top of funnel and the proportional reference.
   const max = Math.max(funnel.applied, 1);
   const endToEnd = max > 0 ? Math.round((funnel.hired / max) * 100) : 0;
@@ -205,11 +207,11 @@ export function FunnelChart({ funnel }: { funnel: Funnel }) {
     <section className="rounded-xl bg-card p-6 ring-1 ring-hairline">
       <header className="mb-6 flex items-baseline justify-between">
         <div>
-          <p className="eyebrow brass-underline inline-block">Pipeline</p>
-          <h2 className="mt-3 font-heading text-lg font-semibold tracking-tight">Recruitment Funnel</h2>
+          <p className="eyebrow brass-underline inline-block">{t("funnelEyebrow")}</p>
+          <h2 className="mt-3 font-heading text-lg font-semibold tracking-tight">{t("funnelTitle")}</h2>
         </div>
         <span className="text-xs text-muted-foreground tabular-nums">
-          {endToEnd}% end-to-end
+          {t("funnelEndToEnd", { rate: endToEnd })}
         </span>
       </header>
 
@@ -257,7 +259,7 @@ export function FunnelChart({ funnel }: { funnel: Funnel }) {
                   </div>
                   {/* Step-conversion delta riding the neck of the funnel */}
                   <span className="absolute inset-0 grid place-items-center text-[0.6875rem] font-medium tabular-nums text-muted-foreground">
-                    {step}% pass
+                    {t("funnelStepPass", { rate: step })}
                   </span>
                 </div>
               )}
@@ -269,7 +271,7 @@ export function FunnelChart({ funnel }: { funnel: Funnel }) {
                 style={{ width: `${widthPct}%`, minWidth: "8.5rem" }}
               >
                 <span className="text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                  {stage.label}
+                  {t(stage.labelKey)}
                 </span>
                 <span className="flex items-baseline gap-1 tabular-nums">
                   <span className="text-sm font-semibold leading-none text-foreground">
@@ -315,7 +317,7 @@ export function FunnelChart({ funnel }: { funnel: Funnel }) {
                   className="mx-auto mt-1.5 text-[0.6875rem] uppercase tracking-[0.12em] text-brass"
                   style={{ width: `${widthPct}%`, minWidth: "8.5rem" }}
                 >
-                  {endToEnd}% end-to-end
+                  {t("funnelEndToEnd", { rate: endToEnd })}
                 </p>
               )}
             </li>
@@ -344,6 +346,7 @@ function channelShade(index: number, count: number): string {
 }
 
 export function SourcesChart({ sources }: { sources: Source[] }) {
+  const t = useTranslations("analytics");
   const ranked = [...sources].sort((a, b) => b.applied - a.applied);
   const maxApplied = Math.max(...ranked.map((s) => s.applied), 1);
   const bestConv = Math.max(...ranked.map((s) => s.conversion), 0);
@@ -356,10 +359,10 @@ export function SourcesChart({ sources }: { sources: Source[] }) {
     <section className="flex flex-col self-start rounded-xl bg-card p-6 ring-1 ring-hairline">
       <header className="mb-5 flex items-baseline justify-between">
         <div>
-          <p className="eyebrow brass-underline inline-block">Channels</p>
-          <h2 className="mt-3 font-heading text-lg font-semibold tracking-tight">Sourcing Efficiency</h2>
+          <p className="eyebrow brass-underline inline-block">{t("sourcesEyebrow")}</p>
+          <h2 className="mt-3 font-heading text-lg font-semibold tracking-tight">{t("sourcesTitle")}</h2>
         </div>
-        <span className="hidden text-xs text-muted-foreground sm:inline">volume · conversion</span>
+        <span className="hidden text-xs text-muted-foreground sm:inline">{t("sourcesAxis")}</span>
       </header>
 
       {ranked.length === 0 ? (
@@ -370,11 +373,8 @@ export function SourcesChart({ sources }: { sources: Source[] }) {
           >
             <ArrowUpRight className="size-5" />
           </span>
-          <p className="text-sm font-semibold text-foreground">No sourcing data yet</p>
-          <p className="mx-auto mt-1 max-w-xs text-xs text-muted-foreground">
-            Channel performance appears here once applications carry a source. Walk-in,
-            website, and campaign volumes will rank below.
-          </p>
+          <p className="text-sm font-semibold text-foreground">{t("sourcesEmptyTitle")}</p>
+          <p className="mx-auto mt-1 max-w-xs text-xs text-muted-foreground">{t("sourcesEmptyHint")}</p>
           <span className="mx-auto mt-5 block h-px w-10 bg-hairline" aria-hidden />
         </div>
       ) : (
@@ -410,7 +410,8 @@ export function SourcesChart({ sources }: { sources: Source[] }) {
                           isBest ? "font-semibold text-brass" : "text-muted-foreground"
                         }`}
                       >
-                        {conv}% conv{isBest ? " · best" : ""}
+                        {t("sourcesConv", { rate: conv })}
+                        {isBest ? t("sourcesBestSuffix") : ""}
                       </span>
                     </span>
                   </div>
@@ -451,11 +452,14 @@ export function SourcesChart({ sources }: { sources: Source[] }) {
           <footer className="mt-5 flex items-center justify-between border-t border-hairline pt-4 text-xs">
             <span className="flex items-center gap-1.5 text-muted-foreground">
               <span aria-hidden className="size-1.5 rounded-full" style={{ background: "var(--brass)" }} />
-              Brass marks the best converter
+              {t("sourcesBestLegend")}
             </span>
             <span className="tabular-nums text-muted-foreground">
-              <span className="font-semibold text-foreground">{fmt.format(totalApplied)}</span> applied ·{" "}
-              <span className="font-semibold text-foreground">{fmt.format(totalHired)}</span> hired
+              {t.rich("sourcesFooter", {
+                applied: fmt.format(totalApplied),
+                hired: fmt.format(totalHired),
+                b: (chunks) => <span className="font-semibold text-foreground">{chunks}</span>,
+              })}
             </span>
           </footer>
         </div>
