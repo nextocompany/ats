@@ -28,8 +28,12 @@ type Repository interface {
 	SetRejection(ctx context.Context, id uuid.UUID, reason string) error
 	SetParseResults(ctx context.Context, id uuid.UUID, r ParseResult) error
 	// Interview appointments (human interview scheduling, state-machine feature).
+	// CreateAppointment assigns the next round_no for the application atomically.
 	CreateAppointment(ctx context.Context, a Appointment) (Appointment, error)
+	// FindAppointment returns the latest round's appointment (nil if none).
 	FindAppointment(ctx context.Context, applicationID uuid.UUID) (*Appointment, error)
+	// ListAppointments returns every round for an application, ordered by round_no.
+	ListAppointments(ctx context.Context, applicationID uuid.UUID) ([]Appointment, error)
 	// Interview feedback (structured panel outcome; many rows per application).
 	CreateFeedback(ctx context.Context, f InterviewFeedback) (InterviewFeedback, error)
 	ListFeedback(ctx context.Context, applicationID uuid.UUID) ([]InterviewFeedback, error)
@@ -180,35 +184,46 @@ func (r *pgRepository) SetRejection(ctx context.Context, id uuid.UUID, reason st
 }
 
 func (r *pgRepository) CreateAppointment(ctx context.Context, a Appointment) (Appointment, error) {
+	// round_no is assigned atomically as max+1 for the application; the unique
+	// index (application_id, round_no) is the backstop against a concurrent double.
 	const q = `
 		INSERT INTO interview_appointments
-			(application_id, scheduled_at, duration_min, mode, location_text, online_join_url, calendar_event_id, created_by)
-		VALUES ($1, $2, $3, $4, NULLIF($5,''), NULLIF($6,''), NULLIF($7,''), $8)
-		RETURNING id, created_at`
+			(application_id, round_no, scheduled_at, duration_min, mode, location_text, online_join_url, calendar_event_id, created_by)
+		VALUES (
+			$1,
+			(SELECT COALESCE(MAX(round_no), 0) + 1 FROM interview_appointments WHERE application_id = $1),
+			$2, $3, $4, NULLIF($5,''), NULLIF($6,''), NULLIF($7,''), $8
+		)
+		RETURNING id, round_no, created_at`
 	err := r.pool.QueryRow(ctx, q,
 		a.ApplicationID, a.ScheduledAt, a.DurationMin, a.Mode,
 		a.LocationText, a.OnlineJoinURL, a.CalendarEventID, a.CreatedBy,
-	).Scan(&a.ID, &a.CreatedAt)
+	).Scan(&a.ID, &a.RoundNo, &a.CreatedAt)
 	if err != nil {
 		return Appointment{}, fmt.Errorf("applications: create appointment: %w", err)
 	}
 	return a, nil
 }
 
-func (r *pgRepository) FindAppointment(ctx context.Context, applicationID uuid.UUID) (*Appointment, error) {
-	const q = `
-		SELECT id, application_id, scheduled_at, duration_min, mode,
+const appointmentCols = `id, application_id, round_no, scheduled_at, duration_min, mode,
 		       COALESCE(location_text,''), COALESCE(online_join_url,''),
-		       COALESCE(calendar_event_id,''), created_at
-		FROM interview_appointments
-		WHERE application_id = $1
-		ORDER BY created_at DESC
-		LIMIT 1`
-	var a Appointment
-	err := r.pool.QueryRow(ctx, q, applicationID).Scan(
-		&a.ID, &a.ApplicationID, &a.ScheduledAt, &a.DurationMin, &a.Mode,
+		       COALESCE(calendar_event_id,''), created_at`
+
+func scanAppointment(row pgx.Row, a *Appointment) error {
+	return row.Scan(
+		&a.ID, &a.ApplicationID, &a.RoundNo, &a.ScheduledAt, &a.DurationMin, &a.Mode,
 		&a.LocationText, &a.OnlineJoinURL, &a.CalendarEventID, &a.CreatedAt,
 	)
+}
+
+func (r *pgRepository) FindAppointment(ctx context.Context, applicationID uuid.UUID) (*Appointment, error) {
+	q := `SELECT ` + appointmentCols + `
+		FROM interview_appointments
+		WHERE application_id = $1
+		ORDER BY round_no DESC
+		LIMIT 1`
+	var a Appointment
+	err := scanAppointment(r.pool.QueryRow(ctx, q, applicationID), &a)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil // no appointment yet — not an error
 	}
@@ -216,6 +231,28 @@ func (r *pgRepository) FindAppointment(ctx context.Context, applicationID uuid.U
 		return nil, fmt.Errorf("applications: find appointment: %w", err)
 	}
 	return &a, nil
+}
+
+func (r *pgRepository) ListAppointments(ctx context.Context, applicationID uuid.UUID) ([]Appointment, error) {
+	q := `SELECT ` + appointmentCols + `
+		FROM interview_appointments
+		WHERE application_id = $1
+		ORDER BY round_no ASC`
+	rows, err := r.pool.Query(ctx, q, applicationID)
+	if err != nil {
+		return nil, fmt.Errorf("applications: list appointments: %w", err)
+	}
+	defer rows.Close()
+
+	var out []Appointment
+	for rows.Next() {
+		var a Appointment
+		if err := scanAppointment(rows, &a); err != nil {
+			return nil, fmt.Errorf("applications: scan appointment: %w", err)
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
 }
 
 func (r *pgRepository) CreateFeedback(ctx context.Context, f InterviewFeedback) (InterviewFeedback, error) {

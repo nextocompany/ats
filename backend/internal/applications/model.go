@@ -91,6 +91,7 @@ type ScoreBreakdown struct {
 type Appointment struct {
 	ID              uuid.UUID  `json:"id"`
 	ApplicationID   uuid.UUID  `json:"application_id"`
+	RoundNo         int        `json:"round_no"`
 	ScheduledAt     time.Time  `json:"scheduled_at"`
 	DurationMin     int        `json:"duration_min"`
 	Mode            string     `json:"mode"` // "onsite" | "online"

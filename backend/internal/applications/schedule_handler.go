@@ -52,9 +52,32 @@ func (h *ScheduleHandler) SetNotifier(n notify.Notifier, cands candidates.Reposi
 	h.notifyDeps = statusNotifyDeps{notifier: n, cands: cands, portalBaseURL: portalBaseURL}
 }
 
-// RegisterScheduleRoutes mounts the interview-schedule endpoint.
+// RegisterScheduleRoutes mounts the interview-schedule + rounds-list endpoints.
 func RegisterScheduleRoutes(app *fiber.App, h *ScheduleHandler) {
 	app.Post("/api/v1/applications/:id/interview-schedule", h.Schedule)
+	app.Get("/api/v1/applications/:id/interview-appointments", h.List)
+}
+
+// List handles GET /api/v1/applications/:id/interview-appointments — every
+// scheduled round for the application, ordered by round number.
+func (h *ScheduleHandler) List(c *fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "invalid application id")
+	}
+	if ok, serr := h.apps.ExistsInScope(c.UserContext(), id, scopeFrom(c)); serr != nil {
+		return serr
+	} else if !ok {
+		return fiber.NewError(fiber.StatusNotFound, "application not found")
+	}
+	appts, err := h.apps.ListAppointments(c.UserContext(), id)
+	if err != nil {
+		return err
+	}
+	if appts == nil {
+		appts = []Appointment{}
+	}
+	return httpx.OK(c, appts)
 }
 
 type scheduleReq struct {
@@ -80,7 +103,10 @@ func (h *ScheduleHandler) Schedule(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	if !CanTransition(app.Status, StatusInterview) {
+	// First round: a legal transition into interview (ai_interviewed/shortlisted).
+	// Additional rounds: already at interview/interviewed — book the next round
+	// (status stays/returns to interview). See CanScheduleInterview.
+	if !CanScheduleInterview(app.Status) {
 		return fiber.NewError(fiber.StatusBadRequest, "cannot schedule an interview from "+app.Status)
 	}
 
