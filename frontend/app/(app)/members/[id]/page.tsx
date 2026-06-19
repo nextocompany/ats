@@ -32,7 +32,7 @@ export default function MemberDetailPage() {
   const dateLocale = locale === "th" ? "th-TH" : "en-GB";
   const { id } = useParams<{ id: string }>();
   const { data: me, isLoading: meLoading } = useMe();
-  const allowed = isMemberAdmin(me?.role);
+  const allowed = isMemberAdmin(me);
   const { data: m, isLoading, isError } = useMember(allowed ? id : "");
 
   const viewResume = async () => {
@@ -146,7 +146,7 @@ export default function MemberDetailPage() {
               />
             </div>
             <TagEditor memberId={m.id} />
-            <MemberActions member={m} role={me?.role} />
+            <MemberActions member={m} me={me} />
           </aside>
         </div>
       )}

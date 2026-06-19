@@ -56,7 +56,7 @@ export function MobileBar() {
             <div className="mx-5 h-px bg-sidebar-border" />
             <nav aria-label="Main navigation" className="flex-1 px-3 py-4">
               <ul className="flex flex-col gap-0.5">
-                {navForRole(me?.role).map((item) => {
+                {navForRole(me).map((item) => {
                   const active = pathname.startsWith(item.href);
                   const Icon = item.icon;
                   return (

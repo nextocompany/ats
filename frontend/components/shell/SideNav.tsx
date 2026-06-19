@@ -72,7 +72,7 @@ export function SideNav() {
           Workspace
         </p>
         <ul className="flex flex-col gap-1">
-          {navForRole(me?.role).map((item) => {
+          {navForRole(me).map((item) => {
             const active = pathname.startsWith(item.href);
             const Icon = item.icon;
             return (

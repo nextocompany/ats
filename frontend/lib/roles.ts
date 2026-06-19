@@ -1,167 +1,129 @@
-// Member-management access: who may use the /members console. Mirrors the backend
-// `memberAdminRoles` allowlist in internal/members/handler.go. The server is the
-// real gate; this is the UI gate.
-export const MEMBER_ADMIN_ROLES = ["super_admin", "hr_manager"];
+// Frontend capability gates for dynamic RBAC. The backend is the real gate; these
+// only decide what to render. Every check resolves against the caller's resolved
+// permission set (Me.permissions, from GET /users/me) instead of hardcoded role
+// lists — so changing a role's permissions in the Admin console takes effect here
+// without a code change. Permission keys mirror the Go catalog in internal/rbac.
 
-export function isMemberAdmin(role?: string): boolean {
-  return !!role && MEMBER_ADMIN_ROLES.includes(role);
+// PermHolder is anything carrying a resolved permission set (typically `Me`).
+type PermHolder = { permissions?: string[]; role?: string } | undefined | null;
+
+// PERMS mirrors the backend permission catalog (internal/rbac/permissions.go).
+export const PERMS = {
+  settingsAdmin: "settings.admin",
+  usersAdmin: "users.admin",
+  rbacAdmin: "rbac.admin",
+  executiveView: "executive.view",
+  reportsView: "reports.view",
+  reportsExport: "reports.export",
+  reengageTrigger: "reengage.trigger",
+  membersAdmin: "members.admin",
+  membersErase: "members.erase",
+  bulkUpload: "bulk.upload",
+  assignmentWrite: "assignment.write",
+  offerWrite: "offer.write",
+  onboardingWrite: "onboarding.write",
+  letterWrite: "letter.write",
+  scorecardTa: "scorecard.ta",
+  scorecardLm: "scorecard.lm",
+  approvalSubmit: "approval.submit",
+} as const;
+
+// can reports whether the user holds a permission key.
+export function can(me: PermHolder, perm: string): boolean {
+  return !!me?.permissions?.includes(perm);
 }
 
-// isSuperAdmin gates the irreversible PDPA erasure (anonymize). Mirrors the
-// backend `memberEraseRoles` super_admin-only allowlist.
-export function isSuperAdmin(role?: string): boolean {
-  return role === "super_admin";
+// isSuperAdmin is a role-identity check (super_admin holds every permission via a
+// backend code bypass). Kept role-based for the admin-console gate.
+export function isSuperAdmin(me: PermHolder): boolean {
+  return me?.role === "super_admin";
 }
 
-// INTERVIEW_FEEDBACK_ROLES may record structured interview feedback. Mirrors the
-// backend `feedbackRecordRoles` allowlist in internal/applications/feedback_handler.go
-// (sgm ≈ line manager who runs the interview). The server is the real gate; this
-// only decides whether to render the form.
-export const INTERVIEW_FEEDBACK_ROLES = ["super_admin", "hr_manager", "sgm"];
-
-export function canRecordInterviewFeedback(role?: string): boolean {
-  return !!role && INTERVIEW_FEEDBACK_ROLES.includes(role);
+// isLineManager gates the Shortlist (the store GM's own ranked view). This is a
+// role identity, not a permission — the shortlist has no permission key.
+export function isLineManager(me: PermHolder): boolean {
+  return me?.role === "sgm";
 }
 
-// TA_SCORECARD_ROLES may record the TA (recruiter) scorecard; LINE_MANAGER_ROLES
-// (sgm = store GM ≈ line manager) record the LM scorecard. Mirrors the backend
-// taRecordRoles / lmRecordRoles allowlists in feedback_handler.go. Server is the
-// real gate.
-export const TA_SCORECARD_ROLES = ["super_admin", "hr_manager", "hr_staff"];
-export const LINE_MANAGER_ROLES = ["sgm"];
-
-export function canRecordTaScorecard(role?: string): boolean {
-  return !!role && TA_SCORECARD_ROLES.includes(role);
+export function isMemberAdmin(me: PermHolder): boolean {
+  return can(me, PERMS.membersAdmin);
 }
 
-export function isLineManager(role?: string): boolean {
-  return !!role && LINE_MANAGER_ROLES.includes(role);
+// canEraseMember gates the irreversible PDPA anonymize.
+export function canEraseMember(me: PermHolder): boolean {
+  return can(me, PERMS.membersErase);
 }
 
-// canRecordLmScorecard: the line manager plus super_admin (who may record either).
-export function canRecordLmScorecard(role?: string): boolean {
-  return role === "super_admin" || isLineManager(role);
+export function canBulkUpload(me: PermHolder): boolean {
+  return can(me, PERMS.bulkUpload);
 }
 
-// BULK_UPLOAD_ROLES may bulk-upload CVs. Mirrors the backend `bulkIntakeRoles`
-// allowlist in internal/applications/bulk_handler.go (auditor is read-only).
-export const BULK_UPLOAD_ROLES = ["super_admin", "hr_manager", "sgm", "hr_staff"];
-
-export function canBulkUpload(role?: string): boolean {
-  return !!role && BULK_UPLOAD_ROLES.includes(role);
+export function canViewExecutive(me: PermHolder): boolean {
+  return can(me, PERMS.executiveView);
 }
 
-// EXECUTIVE_ROLES may view the company-wide Executive Overview. Mirrors the
-// backend `executiveRolesAllowed` allowlist in internal/executive/handler.go —
-// the company-wide (KindAll) roles. The server is the real gate.
-export const EXECUTIVE_ROLES = ["super_admin", "regional_director", "auditor"];
-
-export function canViewExecutive(role?: string): boolean {
-  return !!role && EXECUTIVE_ROLES.includes(role);
+export function canViewReports(me: PermHolder): boolean {
+  return can(me, PERMS.reportsView);
 }
 
-// APPROVAL workflow (Module-3 3.5): the four-level hiring sign-off chain. Mirrors
-// the backend approvalLevelRoles map in internal/applications/approval.go. Server
-// is the real gate; these only decide what to render.
-export const APPROVAL_LEVEL_ROLES: Record<number, string> = {
-  1: "hr_staff",
-  2: "hr_manager",
-  3: "sgm",
-  4: "regional_director",
-};
-
-// APPROVAL_ROLES may reach the Approvals queue (any chain role, plus super_admin).
-export const APPROVAL_ROLES = ["super_admin", "hr_staff", "hr_manager", "sgm", "regional_director"];
-
-export function canAccessApprovals(role?: string): boolean {
-  return !!role && APPROVAL_ROLES.includes(role);
+export function canReassignPlacement(me: PermHolder): boolean {
+  return can(me, PERMS.assignmentWrite);
 }
 
-// roleLevel returns the chain level a role decides (0 if none / super_admin, which
-// may decide any level).
-export function roleLevel(role?: string): number {
-  if (!role) return 0;
-  for (const [lvl, r] of Object.entries(APPROVAL_LEVEL_ROLES)) {
-    if (r === role) return Number(lvl);
-  }
-  return 0;
+export function canManageOffer(me: PermHolder): boolean {
+  return can(me, PERMS.offerWrite);
 }
 
-// canDecideApprovalLevel mirrors the backend per-level gate: the level's role, or
-// super_admin (who may decide any level).
-export function canDecideApprovalLevel(role: string | undefined, level: number): boolean {
-  return role === "super_admin" || (!!role && APPROVAL_LEVEL_ROLES[level] === role);
+export function canManageLetters(me: PermHolder): boolean {
+  return can(me, PERMS.letterWrite);
 }
 
-// canSubmitApproval gates opening a request (the level-1 / Staff sign-off).
-export function canSubmitApproval(role?: string): boolean {
-  return role === "super_admin" || role === "hr_staff";
+export function canManageOnboarding(me: PermHolder): boolean {
+  return can(me, PERMS.onboardingWrite);
 }
 
-// OFFER_ROLES may compose/send offers. Mirrors the backend offerWriteRoles map in
-// internal/applications/offer.go (hr_manager + super_admin).
-export const OFFER_ROLES = ["super_admin", "hr_manager"];
-
-export function canManageOffer(role?: string): boolean {
-  return !!role && OFFER_ROLES.includes(role);
+export function canRecordTaScorecard(me: PermHolder): boolean {
+  return can(me, PERMS.scorecardTa);
 }
 
-// LETTER_ROLES may generate PDF letters. Mirrors the backend letterWriteRoles map
-// in internal/applications/letter.go (the candidate-managing HR roles).
-export const LETTER_ROLES = ["super_admin", "hr_manager", "hr_staff", "sgm"];
-
-export function canManageLetters(role?: string): boolean {
-  return !!role && LETTER_ROLES.includes(role);
+export function canRecordLmScorecard(me: PermHolder): boolean {
+  return can(me, PERMS.scorecardLm);
 }
 
-// REASSIGN_ROLES may manually (re)assign a candidate's branch / move them to the
-// central pool. Mirrors the backend assignmentRoles map in
-// internal/applications/handler.go (store-locked hr_staff excluded).
-export const REASSIGN_ROLES = ["super_admin", "hr_manager", "sgm"];
-
-export function canReassignPlacement(role?: string): boolean {
-  return !!role && REASSIGN_ROLES.includes(role);
+export function canRecordInterviewFeedback(me: PermHolder): boolean {
+  return can(me, PERMS.scorecardTa) || can(me, PERMS.scorecardLm);
 }
 
-// ONBOARDING_ROLES may review onboarding documents. Mirrors the backend
-// onboardingWriteRoles map in internal/applications/onboarding.go (the
-// candidate-managing HR roles, same wider set as letters).
-export const ONBOARDING_ROLES = ["super_admin", "hr_manager", "hr_staff", "sgm"];
-
-export function canManageOnboarding(role?: string): boolean {
-  return !!role && ONBOARDING_ROLES.includes(role);
+// canSubmitApproval gates opening a hiring-approval request.
+export function canSubmitApproval(me: PermHolder): boolean {
+  return can(me, PERMS.approvalSubmit);
 }
 
-// REPORT_VIEW_ROLES may view the ATS Reports page. Mirrors the backend
-// reportViewRoles map in internal/reports/ats_report_handler.go — everyone with
-// dashboard access; results are RBAC-scoped server-side (store roles see their store).
-export const REPORT_VIEW_ROLES = [
-  "super_admin",
-  "regional_director",
-  "operation_director",
-  "auditor",
-  "sgm",
-  "hr_manager",
-  "hr_staff",
+// canDecideApprovalLevel gates the per-level decision (approval.decide.l1..l4).
+export function canDecideApprovalLevel(me: PermHolder, level: number): boolean {
+  return can(me, `approval.decide.l${level}`);
+}
+
+// canAccessApprovals: anyone who can submit or decide any level may open the queue.
+export function canAccessApprovals(me: PermHolder): boolean {
+  return (
+    can(me, PERMS.approvalSubmit) ||
+    canDecideApprovalLevel(me, 1) ||
+    canDecideApprovalLevel(me, 2) ||
+    canDecideApprovalLevel(me, 3) ||
+    canDecideApprovalLevel(me, 4)
+  );
+}
+
+// HR_ROLES are the built-in role keys the UserManagement role <Select> offers.
+// Phase 6 replaces this with the API-driven role list (useRbacRoles); kept here as
+// a transitional fallback so the role picker still works.
+export const HR_ROLES: { value: string }[] = [
+  { value: "super_admin" },
+  { value: "regional_director" },
+  { value: "auditor" },
+  { value: "operation_director" },
+  { value: "sgm" },
+  { value: "hr_manager" },
+  { value: "hr_staff" },
 ];
-
-export function canViewReports(role?: string): boolean {
-  return !!role && REPORT_VIEW_ROLES.includes(role);
-}
-
-// HR_ROLES are the roles a local password account may hold. Mirrors the backend
-// `allowedRoles` set in internal/hrauth/model.go; the label is what super_admins
-// pick from when provisioning an account.
-export const HR_ROLES: { value: string; label: string }[] = [
-  { value: "super_admin", label: "Super admin — full access" },
-  { value: "regional_director", label: "Regional director — all stores" },
-  { value: "auditor", label: "Auditor — read-only, all stores" },
-  { value: "operation_director", label: "Operation director — subregion" },
-  { value: "sgm", label: "Store GM — single store" },
-  { value: "hr_manager", label: "HR manager — single store" },
-  { value: "hr_staff", label: "HR staff — single store" },
-];
-
-export function roleLabel(role: string): string {
-  return HR_ROLES.find((r) => r.value === role)?.label.split(" — ")[0] ?? role;
-}

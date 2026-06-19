@@ -23,19 +23,19 @@ import {
   useSetMemberStatus,
   useUpdateMember,
 } from "@/lib/queries";
-import { isSuperAdmin } from "@/lib/roles";
-import type { Member } from "@/lib/types";
+import { canEraseMember } from "@/lib/roles";
+import type { Me, Member } from "@/lib/types";
 
 interface MemberActionsProps {
   member: Member;
-  role?: string;
+  me?: Me;
 }
 
 function errMsg(e: unknown, fallback: string): string {
   return e instanceof Error ? e.message : fallback;
 }
 
-export function MemberActions({ member, role }: MemberActionsProps) {
+export function MemberActions({ member, me }: MemberActionsProps) {
   const t = useTranslations("members");
   const setStatus = useSetMemberStatus(member.id);
   const forceLogout = useForceLogout(member.id);
@@ -118,7 +118,7 @@ export function MemberActions({ member, role }: MemberActionsProps) {
         <EditProfileDialog member={member} />
 
         {/* PDPA erasure — super_admin only */}
-        {isSuperAdmin(role) && (
+        {canEraseMember(me) && (
           <>
             <div className="my-1 border-t border-hairline" />
             <ConfirmButton

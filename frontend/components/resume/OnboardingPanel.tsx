@@ -31,7 +31,7 @@ export function OnboardingPanel({ applicationId, app }: Props) {
   const t = useTranslations("onboarding");
   const { data: me } = useMe();
   const { data: status } = useOnboarding(applicationId);
-  const canManage = canManageOnboarding(me?.role);
+  const canManage = canManageOnboarding(me);
 
   // Onboarding only applies once hired; HR-only surface.
   if (app.status !== "hired" || !canManage || !status) return null;

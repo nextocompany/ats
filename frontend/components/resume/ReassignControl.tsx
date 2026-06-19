@@ -28,7 +28,7 @@ export function ReassignControl({ applicationId, app }: { applicationId: string;
   const reassign = useReassign(applicationId);
   const [value, setValue] = useState<string>(app.assigned_store_id ? String(app.assigned_store_id) : "");
 
-  if (!canReassignPlacement(me?.role)) return null;
+  if (!canReassignPlacement(me)) return null;
 
   const current = app.store_name ?? (app.talent_pool ? t("badgePool") : "—");
 

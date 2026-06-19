@@ -71,7 +71,7 @@ function MembersInner() {
   const params = useSearchParams();
   const router = useRouter();
   const { data: me, isLoading: meLoading } = useMe();
-  const allowed = isMemberAdmin(me?.role);
+  const allowed = isMemberAdmin(me);
 
   const search = params.get("search") ?? "";
   const provider = params.get("provider") ?? "";

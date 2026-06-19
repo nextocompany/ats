@@ -18,7 +18,7 @@ export default function ExecutivePage() {
   const t = useTranslations("executive");
   const { data: me } = useMe();
   // Gate the fetch too: a non-leadership role would only get a 403.
-  const allowed = canViewExecutive(me?.role);
+  const allowed = canViewExecutive(me);
   const { data, isLoading } = useExecutiveOverview(me ? allowed : false);
 
   // Wait for identity before deciding; only block once we know the role.
