@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Search as SearchIcon, MapPin } from "lucide-react";
 
 import { Pagination } from "@/components/ui/pagination";
@@ -20,6 +21,7 @@ const LIMIT = 20;
 const DEBOUNCE_MS = 300;
 
 function SearchInner() {
+  const t = useTranslations("search");
   const params = useSearchParams();
   const router = useRouter();
 
@@ -53,22 +55,18 @@ function SearchInner() {
 
   return (
     <div className="settle space-y-6">
-      <PageHeader
-        eyebrow="Lookup"
-        title="Search candidates"
-        meta="By name or province — across the entire pipeline."
-      />
+      <PageHeader eyebrow={t("eyebrow")} title={t("title")} meta={t("meta")} />
 
       <div className="relative max-w-2xl">
         <SearchIcon className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-brand" />
         <Input
           type="search"
           autoFocus
-          placeholder="ค้นหาด้วยชื่อหรือจังหวัด — search by name or province…"
+          placeholder={t("placeholder")}
           value={text}
           onChange={(e) => setText(e.target.value)}
           className="h-14 rounded-xl bg-card pl-12 text-lg ring-1 ring-hairline focus-visible:ring-2"
-          aria-label="Search candidates"
+          aria-label={t("ariaLabel")}
         />
       </div>
 
@@ -76,19 +74,18 @@ function SearchInner() {
         <section className="settle overflow-hidden rounded-xl bg-card ring-1 ring-hairline">
           {/* Editorial prompt — a confident signature, not a dashed placeholder */}
           <div className="border-b border-hairline px-7 py-10">
-            <p className="eyebrow brass-underline inline-block">National roster</p>
+            <p className="eyebrow brass-underline inline-block">{t("promptEyebrow")}</p>
             <p className="mt-4 max-w-xl font-heading text-2xl font-semibold leading-snug tracking-tight text-foreground">
-              Find anyone across the pipeline — by{" "}
-              <span className="text-brand">name</span> or{" "}
-              <span className="text-brand">province</span>.
+              {t.rich("promptHeading", {
+                name: (chunks) => <span className="text-brand">{chunks}</span>,
+                province: (chunks) => <span className="text-brand">{chunks}</span>,
+              })}
             </p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Search spans every store and every intake cycle. Jump in with a province below.
-            </p>
+            <p className="mt-2 text-sm text-muted-foreground">{t("promptBody")}</p>
           </div>
           <div className="px-7 py-6">
             <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-              Quick filters · จังหวัด
+              {t("quickFilters")}
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               {PROVINCES.map((p) => (
@@ -107,22 +104,22 @@ function SearchInner() {
         </section>
       ) : isError ? (
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-          {error instanceof Error ? error.message : "Search failed. Try a different term."}
+          {error instanceof Error ? error.message : t("searchFailed")}
         </div>
       ) : (
         <>
           <p className="text-sm text-muted-foreground tabular-nums">
-            {total} result{total === 1 ? "" : "s"} for “{q}”
+            {t("results", { count: total, q })}
           </p>
           <div className="overflow-hidden rounded-xl bg-card ring-1 ring-hairline">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[600px] text-sm">
                 <thead className="ledger-head text-left">
                   <tr>
-                    <th className="w-16 py-3 pl-5 pr-3">Score</th>
-                    <th className="px-3 py-3">Candidate</th>
-                    <th className="w-40 px-3 py-3">Province</th>
-                    <th className="w-32 py-3 pl-3 pr-5 text-right">Status</th>
+                    <th className="w-16 py-3 pl-5 pr-3">{t("colScore")}</th>
+                    <th className="px-3 py-3">{t("colCandidate")}</th>
+                    <th className="w-40 px-3 py-3">{t("colProvince")}</th>
+                    <th className="w-32 py-3 pl-3 pr-5 text-right">{t("colStatus")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -143,9 +140,9 @@ function SearchInner() {
                         >
                           <SearchIcon className="size-5" strokeWidth={1.75} />
                         </span>
-                        <p className="text-sm font-semibold text-foreground">No candidates match “{q}”</p>
+                        <p className="text-sm font-semibold text-foreground">{t("emptyTitle", { q })}</p>
                         <p className="mx-auto mt-1 max-w-xs text-sm text-muted-foreground">
-                          Check the spelling, or try a province name instead of a full name.
+                          {t("emptyBody")}
                         </p>
                       </td>
                     </tr>
