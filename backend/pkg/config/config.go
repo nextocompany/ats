@@ -187,6 +187,12 @@ type Config struct {
 	ApprovalSLACron    string
 	ApprovalSLAHours   int
 
+	// Time-based re-engagement sweep: the scheduler enqueues 6mo + 12mo sweeps that
+	// nudge dormant candidates back to the portal. Disabled by default; opt in once
+	// real candidate volume warrants it (a fresh DB has no dormant cohort).
+	ReengageSweepEnabled bool
+	ReengageSweepCron    string
+
 	// Public API rate limit (Sprint 7): max requests per IP per minute on
 	// /api/v1/public/*. Enforced cluster-wide via the Redis-backed store.
 	RateLimitPublicMax int
@@ -316,6 +322,9 @@ func Load() (*Config, error) {
 		ApprovalSLAEnabled: getenvBool("APPROVAL_SLA_ENABLED", false),
 		ApprovalSLACron:    getenv("APPROVAL_SLA_CRON", "0 * * * *"), // hourly
 		ApprovalSLAHours:   getenvInt("APPROVAL_SLA_HOURS", 48),
+
+		ReengageSweepEnabled: getenvBool("REENGAGE_SWEEP_ENABLED", false),
+		ReengageSweepCron:    getenv("REENGAGE_SWEEP_CRON", "0 2 * * *"), // daily 02:00
 
 		RateLimitPublicMax: getenvInt("RATE_LIMIT_PUBLIC_MAX", 30),
 		RateLimitLoginMax:  getenvInt("RATE_LIMIT_LOGIN_MAX", 10),

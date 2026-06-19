@@ -63,6 +63,44 @@ type ReengageVacancyPayload struct {
 	PositionID string `json:"position_id"`
 }
 
+// TypeReengageSweep is the asynq task type for the time-based re-engagement sweep:
+// nudge dormant candidates whose most recent application is older than a threshold.
+const TypeReengageSweep = "reengage:sweep"
+
+// reengageSweepUniqueTTL dedups overlapping sweep enqueues during a rolling deploy.
+// Keyed by type+payload, so the 6mo and 12mo sweeps do not dedup each other.
+const reengageSweepUniqueTTL = 6 * time.Hour
+
+// ReengageSweepPayload carries the dormancy threshold (in months) for a sweep.
+type ReengageSweepPayload struct {
+	MonthsSince int `json:"months_since"`
+}
+
+// NewReengageSweepTask builds a time-based re-engagement sweep task.
+func NewReengageSweepTask(p ReengageSweepPayload) (*asynq.Task, error) {
+	body, err := json.Marshal(p)
+	if err != nil {
+		return nil, fmt.Errorf("queue: marshal payload: %w", err)
+	}
+	return asynq.NewTask(
+		TypeReengageSweep,
+		body,
+		asynq.MaxRetry(taskMaxRetry),
+		asynq.Timeout(taskTimeout),
+		asynq.Retention(taskRetention),
+		asynq.Unique(reengageSweepUniqueTTL),
+	), nil
+}
+
+// ParseReengageSweepPayload decodes a time-based re-engagement sweep task body.
+func ParseReengageSweepPayload(body []byte) (ReengageSweepPayload, error) {
+	var p ReengageSweepPayload
+	if err := json.Unmarshal(body, &p); err != nil {
+		return p, fmt.Errorf("queue: unmarshal payload: %w", err)
+	}
+	return p, nil
+}
+
 // NewReengageVacancyTask builds the re-engagement task with retry/timeout policy.
 func NewReengageVacancyTask(p ReengageVacancyPayload) (*asynq.Task, error) {
 	body, err := json.Marshal(p)
