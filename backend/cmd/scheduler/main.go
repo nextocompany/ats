@@ -92,6 +92,25 @@ func main() {
 		log.Info().Msg("scheduler: approval SLA sweep disabled (APPROVAL_SLA_ENABLED=false)")
 	}
 
+	// Time-based re-engagement: nudge dormant candidates at 6 and 12 months. One
+	// daily run; each threshold is its own task (suppressed at-most-once per trigger).
+	// Disabled by default so a fresh environment never messages anyone until opted in.
+	if cfg.ReengageSweepEnabled {
+		for _, months := range []int{6, 12} {
+			task, err := queue.NewReengageSweepTask(queue.ReengageSweepPayload{MonthsSince: months})
+			if err != nil {
+				log.Fatal().Err(err).Int("months", months).Msg("build reengage sweep task failed")
+			}
+			id, err := scheduler.Register(cfg.ReengageSweepCron, task)
+			if err != nil {
+				log.Fatal().Err(err).Str("cron", cfg.ReengageSweepCron).Int("months", months).Msg("register reengage sweep failed")
+			}
+			log.Info().Str("cron", cfg.ReengageSweepCron).Int("months", months).Str("entry_id", id).Msg("scheduler: reengage:sweep registered")
+		}
+	} else {
+		log.Info().Msg("scheduler: time-based re-engagement disabled (REENGAGE_SWEEP_ENABLED=false)")
+	}
+
 	if err := scheduler.Run(); err != nil {
 		log.Fatal().Err(err).Msg("scheduler error")
 	}

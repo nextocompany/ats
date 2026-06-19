@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS uq_reengagement_logs_candidate_trigger;

@@ -31,6 +31,14 @@ type Repo interface {
 	// RecordContact inserts a suppression row; reports whether it created one
 	// (false means the candidate was already contacted for this position).
 	RecordContact(ctx context.Context, candidateID, positionID uuid.UUID, channel string) (bool, error)
+	// DormantCandidates returns contactable, never-hired candidates whose most
+	// recent application is older than `months` months and who have not yet been
+	// nudged under triggerType (e.g. "time_6mo"). Drives the time-based sweep.
+	DormantCandidates(ctx context.Context, months int, triggerType string) ([]Target, error)
+	// RecordTimeContact logs a time-based nudge; reports whether it created the row
+	// (false ⇒ the candidate was already nudged for this trigger). At-most-once per
+	// (candidate, trigger_type) via the partial unique index.
+	RecordTimeContact(ctx context.Context, candidateID uuid.UUID, triggerType string) (bool, error)
 }
 
 type pgRepo struct{ pool *pgxpool.Pool }
@@ -82,6 +90,59 @@ func (r *pgRepo) RecordContact(ctx context.Context, candidateID, positionID uuid
 	}
 	if err != nil {
 		return false, fmt.Errorf("reengage: record contact: %w", err)
+	}
+	return true, nil
+}
+
+func (r *pgRepo) DormantCandidates(ctx context.Context, months int, triggerType string) ([]Target, error) {
+	// Contactable, never-hired candidates whose most recent application is older
+	// than `months` months and who have not yet been nudged under this trigger.
+	// Grouped so the age test is on the latest application; excludes merged dupes.
+	const q = `
+		SELECT c.id, c.full_name, COALESCE(c.phone,''), COALESCE(c.email,''), COALESCE(c.province,''), COALESCE(c.line_user_id,'')
+		FROM candidates c
+		JOIN applications a ON a.candidate_id = c.id
+		WHERE c.is_duplicate_of IS NULL
+		  AND (COALESCE(c.line_user_id,'') <> '' OR COALESCE(c.email,'') <> '')
+		  AND NOT EXISTS (
+		      SELECT 1 FROM applications h WHERE h.candidate_id = c.id AND h.status = 'hired'
+		  )
+		  AND NOT EXISTS (
+		      SELECT 1 FROM reengagement_logs rl
+		      WHERE rl.candidate_id = c.id AND rl.trigger_type = $2
+		  )
+		GROUP BY c.id, c.full_name, c.phone, c.email, c.province, c.line_user_id
+		HAVING MAX(a.created_at) < now() - make_interval(months => $1)`
+	rows, err := r.pool.Query(ctx, q, months, triggerType)
+	if err != nil {
+		return nil, fmt.Errorf("reengage: dormant candidates: %w", err)
+	}
+	defer rows.Close()
+
+	var out []Target
+	for rows.Next() {
+		var t Target
+		if err := rows.Scan(&t.CandidateID, &t.FullName, &t.Phone, &t.Email, &t.Province, &t.LineUserID); err != nil {
+			return nil, fmt.Errorf("reengage: scan dormant target: %w", err)
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
+}
+
+func (r *pgRepo) RecordTimeContact(ctx context.Context, candidateID uuid.UUID, triggerType string) (bool, error) {
+	const q = `
+		INSERT INTO reengagement_logs (candidate_id, trigger_type)
+		VALUES ($1, $2)
+		ON CONFLICT (candidate_id, trigger_type) WHERE trigger_type IS NOT NULL DO NOTHING
+		RETURNING id`
+	var id uuid.UUID
+	err := r.pool.QueryRow(ctx, q, candidateID, triggerType).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil // already nudged for this trigger
+	}
+	if err != nil {
+		return false, fmt.Errorf("reengage: record time contact: %w", err)
 	}
 	return true, nil
 }

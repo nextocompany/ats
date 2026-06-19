@@ -156,6 +156,7 @@ func main() {
 	mux := asynq.NewServeMux()
 	mux.HandleFunc(queue.TypeProcessApplication, processor.HandleProcessApplication)
 	mux.HandleFunc(queue.TypeReengageVacancy, reengageSvc.HandleReengageVacancy)
+	mux.HandleFunc(queue.TypeReengageSweep, reengageSvc.HandleReengageSweep)
 	mux.HandleFunc(queue.TypeExportReport, exportSvc.HandleExportReport)
 	mux.HandleFunc(queue.TypeRetentionSweep, retentionSvc.HandleRetentionSweep)
 	mux.HandleFunc(queue.TypeAuthCleanup, authCleanupSvc.HandleAuthCleanup)

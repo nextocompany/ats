@@ -14,6 +14,11 @@ type fakeRepo struct {
 	targets   []Target
 	contacted map[uuid.UUID]bool // candidates already contacted
 	recorded  []uuid.UUID
+
+	dormant        []Target        // returned by DormantCandidates
+	timeContacted  map[string]bool // "candidateID|trigger" already nudged
+	dormantMonths  int             // last months arg seen
+	dormantTrigger string          // last trigger arg seen
 }
 
 func (f *fakeRepo) MatchingCandidates(_ context.Context, _ uuid.UUID) ([]Target, error) {
@@ -29,6 +34,24 @@ func (f *fakeRepo) RecordContact(_ context.Context, candidateID, _ uuid.UUID, _ 
 	}
 	f.contacted[candidateID] = true
 	f.recorded = append(f.recorded, candidateID)
+	return true, nil
+}
+
+func (f *fakeRepo) DormantCandidates(_ context.Context, months int, trigger string) ([]Target, error) {
+	f.dormantMonths = months
+	f.dormantTrigger = trigger
+	return f.dormant, nil
+}
+
+func (f *fakeRepo) RecordTimeContact(_ context.Context, candidateID uuid.UUID, trigger string) (bool, error) {
+	if f.timeContacted == nil {
+		f.timeContacted = map[string]bool{}
+	}
+	key := candidateID.String() + "|" + trigger
+	if f.timeContacted[key] {
+		return false, nil
+	}
+	f.timeContacted[key] = true
 	return true, nil
 }
 
