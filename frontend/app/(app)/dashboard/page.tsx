@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { ArrowRight, Inbox, AlertTriangle, ScanLine } from "lucide-react";
 
 import { KpiCards } from "@/components/analytics/Charts";
@@ -10,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useKpi, useOpenRoles, useWaitingByStore } from "@/lib/queries";
 
 export default function DashboardPage() {
+  const t = useTranslations("dashboard");
   const { data: kpi } = useKpi();
   const { data: byStore } = useWaitingByStore();
   const { data: openRoles } = useOpenRoles();
@@ -21,19 +23,17 @@ export default function DashboardPage() {
       <header className="border-b border-hairline pb-7">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="max-w-prose">
-            <p className="eyebrow brass-underline inline-block">Today</p>
+            <p className="eyebrow brass-underline inline-block">{t("eyebrow")}</p>
             <h1 className="mt-4 font-heading text-4xl font-semibold leading-[1.02] tracking-tight sm:text-[2.75rem]">
-              Overview
+              {t("title")}
             </h1>
-            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-              A live read of recruitment across all stores — intake, screening, and onboarding.
-            </p>
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{t("desc")}</p>
           </div>
           <Link
             href="/applications"
             className={buttonVariants({ size: "default", className: "h-10 gap-1.5 px-5 shadow-sm" })}
           >
-            Open inbox
+            {t("openInbox")}
             <ArrowRight className="size-4" />
           </Link>
         </div>
@@ -54,12 +54,12 @@ export default function DashboardPage() {
           <section className="rounded-xl bg-card p-6 ring-1 ring-hairline">
             <header className="flex items-baseline justify-between">
               <div>
-                <p className="eyebrow">Action</p>
-                <h2 className="mt-1 font-heading text-lg font-semibold tracking-tight">Needs your attention</h2>
+                <p className="eyebrow">{t("actionEyebrow")}</p>
+                <h2 className="mt-1 font-heading text-lg font-semibold tracking-tight">{t("actionTitle")}</h2>
               </div>
               {kpi && (
                 <span className="rounded-full bg-brass-soft px-2.5 py-1 text-[0.6875rem] font-semibold tabular-nums text-[color-mix(in_oklch,var(--brass)_70%,black)]">
-                  {kpi.waiting} open
+                  {t("openCount", { count: kpi.waiting })}
                 </span>
               )}
             </header>
@@ -67,20 +67,20 @@ export default function DashboardPage() {
               <QuickAction
                 href="/applications?status=scored"
                 icon={<Inbox className="size-4" />}
-                title="Review screened candidates"
-                hint={kpi ? `${kpi.waiting} waiting for you` : "—"}
+                title={t("qaReviewTitle")}
+                hint={kpi ? t("qaReviewHint", { count: kpi.waiting }) : "—"}
               />
               <QuickAction
                 href="/applications?min_score=75"
                 icon={<ScanLine className="size-4" />}
-                title="Best-fit candidates"
-                hint="Score 75+ — fast-track these"
+                title={t("qaBestFitTitle")}
+                hint={t("qaBestFitHint")}
               />
               <QuickAction
                 href="/applications"
                 icon={<AlertTriangle className="size-4 text-brass" />}
-                title="Needs a human check"
-                hint="Unclear scans or possible duplicates"
+                title={t("qaHumanTitle")}
+                hint={t("qaHumanHint")}
               />
             </ul>
           </section>
@@ -94,7 +94,7 @@ export default function DashboardPage() {
                 style={{ background: "var(--brass)" }}
               />
               <p className="pl-3 text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-brand-foreground/70">
-                Screening pass rate
+                {t("passRateLabel")}
               </p>
               {(() => {
                 const rate = kpi.applied > 0 ? Math.round((kpi.passed / kpi.applied) * 100) : 0;
@@ -115,8 +115,12 @@ export default function DashboardPage() {
                       </span>
                     </div>
                     <p className="mt-3 text-sm text-brand-foreground/80">
-                      of applicants pass screening.{" "}
-                      <span className="font-semibold tabular-nums text-brand-foreground">{kpi.onboarded}</span> onboarded this cycle.
+                      {t.rich("passRateBody", {
+                        onboarded: kpi.onboarded,
+                        b: (chunks) => (
+                          <span className="font-semibold tabular-nums text-brand-foreground">{chunks}</span>
+                        ),
+                      })}
                     </p>
                   </div>
                 );

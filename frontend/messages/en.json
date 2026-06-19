@@ -220,6 +220,23 @@
     "good": "Good",
     "veryGood": "Excellent"
   },
+  "dashboard": {
+    "eyebrow": "Today",
+    "title": "Overview",
+    "desc": "A live read of recruitment across all stores — intake, screening, and onboarding.",
+    "openInbox": "Open inbox",
+    "actionEyebrow": "Action",
+    "actionTitle": "Needs your attention",
+    "openCount": "{count} open",
+    "qaReviewTitle": "Review screened candidates",
+    "qaReviewHint": "{count} waiting for you",
+    "qaBestFitTitle": "Best-fit candidates",
+    "qaBestFitHint": "Score 75+ — fast-track these",
+    "qaHumanTitle": "Needs a human check",
+    "qaHumanHint": "Unclear scans or possible duplicates",
+    "passRateLabel": "Screening pass rate",
+    "passRateBody": "of applicants pass screening. <b>{onboarded}</b> onboarded this cycle."
+  },
   "candidates": {
     "eyebrow": "People",
     "title": "Candidates",
