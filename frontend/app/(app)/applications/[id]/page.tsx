@@ -11,6 +11,7 @@ import { LettersPanel } from "@/components/resume/LettersPanel";
 import { OnboardingPanel } from "@/components/resume/OnboardingPanel";
 import { FitAnalysisPanel } from "@/components/resume/FitAnalysisPanel";
 import { InterviewPanel } from "@/components/resume/InterviewPanel";
+import { InterviewRoundsPanel } from "@/components/resume/InterviewRoundsPanel";
 import {
   LineManagerScorecard,
   ScorecardSummary,
@@ -58,6 +59,7 @@ export default function ApplicationDetailPage() {
             <OfferPanel applicationId={app.id} app={app} />
             <LettersPanel applicationId={app.id} app={app} />
             <OnboardingPanel applicationId={app.id} app={app} />
+            <InterviewRoundsPanel applicationId={app.id} />
             <InterviewPanel applicationId={app.id} />
             <ScorecardSummary applicationId={app.id} />
             <TaScorecard applicationId={app.id} status={app.status} />

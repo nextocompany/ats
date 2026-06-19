@@ -74,3 +74,23 @@ func TestCanRequestApproval(t *testing.T) {
 		}
 	}
 }
+
+func TestCanScheduleInterview(t *testing.T) {
+	cases := []struct {
+		status string
+		want   bool
+	}{
+		{StatusAIInterviewed, true}, // first round (transition)
+		{StatusShortlisted, true},   // first round (transition)
+		{StatusInterview, true},     // additional round
+		{StatusInterviewed, true},   // additional round after marking done
+		{StatusScored, false},       // too early
+		{StatusOffer, false},        // past interviews
+		{StatusRejected, false},
+	}
+	for _, c := range cases {
+		if got := CanScheduleInterview(c.status); got != c.want {
+			t.Errorf("CanScheduleInterview(%q) = %v, want %v", c.status, got, c.want)
+		}
+	}
+}

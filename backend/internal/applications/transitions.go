@@ -53,6 +53,15 @@ func RequiresSchedule(to string) bool {
 	return to == StatusInterview
 }
 
+// CanScheduleInterview reports whether an interview round may be booked from the
+// given status: a first round (a legal transition into interview), or an additional
+// round while already at interview/interviewed (multi-round). Used by the schedule
+// endpoint and mirrored in the frontend status machine.
+func CanScheduleInterview(status string) bool {
+	return CanTransition(status, StatusInterview) ||
+		status == StatusInterview || status == StatusInterviewed
+}
+
 // RequiresReason reports whether a target status must carry a reason.
 func RequiresReason(to string) bool {
 	return to == StatusRejected

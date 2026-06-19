@@ -22,9 +22,11 @@ export function allowedActions(status: string): Action[] {
     case "shortlisted":
       return ["interview", "reject"];
     case "interview":
-      return ["mark_interviewed", "reject"];
+      // "interview" here re-opens the scheduler for an additional round.
+      return ["mark_interviewed", "interview", "reject"];
     case "interviewed":
-      return ["submit_approval", "reject"];
+      // Allow another round after a completed one, or submit for approval.
+      return ["submit_approval", "interview", "reject"];
     case "pending_approval":
       return []; // the ApprovalPanel drives approve/reject for the active level
     case "offer":

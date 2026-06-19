@@ -64,6 +64,7 @@ export interface Application {
 export interface InterviewAppointment {
   id: string;
   application_id: string;
+  round_no: number;
   scheduled_at: string;
   duration_min: number;
   mode: "onsite" | "online";

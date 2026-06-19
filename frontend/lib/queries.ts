@@ -277,7 +277,19 @@ export function useScheduleInterview(id: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["application", id] });
       qc.invalidateQueries({ queryKey: ["applications"] });
+      qc.invalidateQueries({ queryKey: ["interview-appointments", id] });
     },
+  });
+}
+
+// useInterviewAppointments loads every scheduled human-interview round for an
+// application, ordered by round number.
+export function useInterviewAppointments(id: string) {
+  return useQuery({
+    queryKey: ["interview-appointments", id],
+    queryFn: () =>
+      api.get<InterviewAppointment[]>(`/api/v1/applications/${id}/interview-appointments`).then((r) => r.data),
+    enabled: !!id,
   });
 }
 
