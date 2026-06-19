@@ -6,8 +6,21 @@ import (
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/nexto/hr-ats/internal/middleware"
+	"github.com/nexto/hr-ats/internal/rbac"
 	"github.com/nexto/hr-ats/pkg/httpx"
 )
+
+// meResponse is the authenticated identity plus its resolved RBAC capabilities,
+// so the dashboard gates UI on permissions (not hardcoded role lists).
+type meResponse struct {
+	ID          string   `json:"id"`
+	Email       string   `json:"email"`
+	Role        string   `json:"role"`
+	StoreID     *int     `json:"store_id"`
+	Subregion   string   `json:"subregion"`
+	Permissions []string `json:"permissions"`
+	Scope       string   `json:"scope"`
+}
 
 // Handler serves user endpoints.
 type Handler struct{}
@@ -26,5 +39,13 @@ func (h *Handler) Me(c *fiber.Ctx) error {
 	if !ok {
 		return fiber.NewError(fiber.StatusUnauthorized, "not authenticated")
 	}
-	return httpx.OK(c, u)
+	return httpx.OK(c, meResponse{
+		ID:          u.ID,
+		Email:       u.Email,
+		Role:        u.Role,
+		StoreID:     u.StoreID,
+		Subregion:   u.Subregion,
+		Permissions: rbac.Permissions(u.Role),
+		Scope:       rbac.ScopeKindFor(u.Role),
+	})
 }

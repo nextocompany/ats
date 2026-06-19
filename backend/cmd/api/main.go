@@ -41,6 +41,7 @@ import (
 	"github.com/nexto/hr-ats/internal/profiles"
 	"github.com/nexto/hr-ats/internal/public"
 	"github.com/nexto/hr-ats/internal/rbac"
+	"github.com/nexto/hr-ats/internal/rbacadmin"
 	"github.com/nexto/hr-ats/internal/reengage"
 	"github.com/nexto/hr-ats/internal/reports"
 	"github.com/nexto/hr-ats/internal/search"
@@ -95,6 +96,7 @@ func main() {
 	// legacy fallback active (identical to pre-RBAC behavior), never fail-open. A
 	// background ticker refreshes every replica within the TTL after an admin edit.
 	rbacRepo := rbac.NewRepository(pool)
+	var rbacAuthz *rbac.Authorizer // non-nil once the dynamic matrix is installed
 	if roles, err := rbacRepo.ListRoles(ctx); err != nil {
 		log.Warn().Err(err).Msg("rbac: could not load roles; using legacy fallback matrix")
 	} else if len(roles) == 0 {
@@ -106,6 +108,7 @@ func main() {
 		} else {
 			rbac.SetDefault(authz)
 			authz.Start(ctx)
+			rbacAuthz = authz
 			log.Info().Int("roles", len(roles)).Msg("rbac: dynamic authorizer installed")
 		}
 	}
@@ -203,6 +206,9 @@ func main() {
 	// validates session cookies for the auth middleware and serves login/logout +
 	// super_admin account management. secureCookie ⇒ Secure + SameSite=None in prod.
 	hrAuthSvc := hrauth.NewService(hrauth.NewRepository(pool), cfg.HRSessionTTL)
+	// Dynamic RBAC: allow assigning any role defined in rbac_roles (custom roles),
+	// not just the seven built-ins. Falls back to the built-in allowlist on error.
+	hrAuthSvc.SetRoleValidator(rbacRepo.RoleExists)
 	authMW, err := middleware.Auth(ctx, cfg, settingsSvc, hrAuthSvc)
 	if err != nil {
 		log.Fatal().Err(err).Msg("auth middleware init failed")
@@ -274,6 +280,11 @@ func main() {
 
 	// Admin system settings (super_admin only) — e.g. the allow-all-tenants toggle.
 	settings.RegisterRoutes(app, settings.NewHandler(settingsSvc))
+
+	// Dynamic RBAC admin API (rbac.admin permission) — CRUD roles + the
+	// role→permission matrix + per-role scope. Writes refresh the local
+	// authorizer immediately; other replicas converge on the TTL.
+	rbacadmin.RegisterRoutes(app, rbacadmin.NewHandler(rbacRepo, rbacAuthz))
 
 	// Public Career API (consumed by the Next.js portal in Sprint 4). Rate-limited
 	// per IP (Sprint 6a) — apply/status are the public abuse surface.
