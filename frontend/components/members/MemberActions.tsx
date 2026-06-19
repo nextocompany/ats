@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { LogOut, Pencil, ShieldCheck, ShieldOff, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -35,6 +36,7 @@ function errMsg(e: unknown, fallback: string): string {
 }
 
 export function MemberActions({ member, role }: MemberActionsProps) {
+  const t = useTranslations("members");
   const setStatus = useSetMemberStatus(member.id);
   const forceLogout = useForceLogout(member.id);
   const anonymize = useAnonymizeMember(member.id);
@@ -43,10 +45,8 @@ export function MemberActions({ member, role }: MemberActionsProps) {
   if (member.status === "anonymized") {
     return (
       <div className="rounded-xl bg-card p-5 ring-1 ring-hairline">
-        <h2 className="eyebrow mb-2">การจัดการ</h2>
-        <p className="text-xs text-muted-foreground">
-          บัญชีนี้ถูกลบข้อมูลตาม PDPA แล้ว — ไม่สามารถจัดการเพิ่มเติมได้
-        </p>
+        <h2 className="eyebrow mb-2">{t("manage")}</h2>
+        <p className="text-xs text-muted-foreground">{t("anonymizedNotice")}</p>
       </div>
     );
   }
@@ -56,21 +56,21 @@ export function MemberActions({ member, role }: MemberActionsProps) {
   const toggleSuspend = () => {
     const next = suspended ? "active" : "suspended";
     setStatus.mutate(next, {
-      onSuccess: () => toast.success(suspended ? "เปิดใช้งานบัญชีแล้ว" : "ระงับบัญชีแล้ว"),
-      onError: (e) => toast.error(errMsg(e, "ดำเนินการไม่สำเร็จ")),
+      onSuccess: () => toast.success(suspended ? t("reactivated") : t("suspendedToast")),
+      onError: (e) => toast.error(errMsg(e, t("actionFailed"))),
     });
   };
 
   const doForceLogout = () => {
     forceLogout.mutate(undefined, {
-      onSuccess: () => toast.success("ออกจากระบบทุกอุปกรณ์แล้ว"),
-      onError: (e) => toast.error(errMsg(e, "ดำเนินการไม่สำเร็จ")),
+      onSuccess: () => toast.success(t("forceLoggedOut")),
+      onError: (e) => toast.error(errMsg(e, t("actionFailed"))),
     });
   };
 
   return (
     <div className="rounded-xl bg-card p-5 ring-1 ring-hairline">
-      <h2 className="eyebrow mb-3">การจัดการ</h2>
+      <h2 className="eyebrow mb-3">{t("manage")}</h2>
       <div className="flex flex-col gap-2">
         {/* Suspend (confirmed) / reactivate (direct) */}
         {suspended ? (
@@ -81,19 +81,20 @@ export function MemberActions({ member, role }: MemberActionsProps) {
             disabled={setStatus.isPending}
             onClick={toggleSuspend}
           >
-            <ShieldCheck className="size-4" /> เปิดใช้งานบัญชี
+            <ShieldCheck className="size-4" /> {t("reactivate")}
           </Button>
         ) : (
           <ConfirmButton
             triggerVariant="destructive"
             triggerChildren={
               <>
-                <ShieldOff className="size-4" /> ระงับบัญชี
+                <ShieldOff className="size-4" /> {t("suspend")}
               </>
             }
-            title="ยืนยันการระงับบัญชี"
-            description="สมาชิกจะถูกบังคับออกจากระบบทันที และจะเข้าสู่ระบบไม่ได้จนกว่าจะเปิดใช้งานอีกครั้ง"
-            confirmLabel="ระงับบัญชี"
+            title={t("confirmSuspendTitle")}
+            description={t("confirmSuspendDesc")}
+            confirmLabel={t("suspend")}
+            cancelLabel={t("cancel")}
             pending={setStatus.isPending}
             onConfirm={toggleSuspend}
           />
@@ -107,7 +108,7 @@ export function MemberActions({ member, role }: MemberActionsProps) {
           disabled={forceLogout.isPending || member.active_sessions === 0}
           onClick={doForceLogout}
         >
-          <LogOut className="size-4" /> ออกจากระบบทุกอุปกรณ์
+          <LogOut className="size-4" /> {t("forceLogout")}
           {member.active_sessions > 0 && (
             <span className="ml-1 tabular-nums text-muted-foreground">({member.active_sessions})</span>
           )}
@@ -124,17 +125,18 @@ export function MemberActions({ member, role }: MemberActionsProps) {
               triggerVariant="destructive"
               triggerChildren={
                 <>
-                  <Trash2 className="size-4" /> ลบข้อมูลถาวร (PDPA)
+                  <Trash2 className="size-4" /> {t("eraseTrigger")}
                 </>
               }
-              title="ยืนยันการลบข้อมูลสมาชิก"
-              description="การลบข้อมูลตาม PDPA จะลบชื่อ อีเมล เบอร์โทร ผู้ให้บริการล็อกอิน และเรซูเม่อย่างถาวร — ย้อนกลับไม่ได้"
-              confirmLabel="ลบถาวร"
+              title={t("confirmEraseTitle")}
+              description={t("confirmEraseDesc")}
+              confirmLabel={t("eraseConfirm")}
+              cancelLabel={t("cancel")}
               pending={anonymize.isPending}
               onConfirm={() =>
                 anonymize.mutate(undefined, {
-                  onSuccess: () => toast.success("ลบข้อมูลสมาชิกแล้ว"),
-                  onError: (e) => toast.error(errMsg(e, "ลบข้อมูลไม่สำเร็จ")),
+                  onSuccess: () => toast.success(t("erased")),
+                  onError: (e) => toast.error(errMsg(e, t("eraseFailed"))),
                 })
               }
             />
@@ -151,6 +153,7 @@ interface ConfirmButtonProps {
   title: string;
   description: string;
   confirmLabel: string;
+  cancelLabel: string;
   onConfirm: () => void;
   pending?: boolean;
 }
@@ -163,6 +166,7 @@ function ConfirmButton({
   title,
   description,
   confirmLabel,
+  cancelLabel,
   onConfirm,
   pending,
 }: ConfirmButtonProps) {
@@ -178,7 +182,7 @@ function ConfirmButton({
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <DialogClose render={<Button variant="outline" />}>ยกเลิก</DialogClose>
+          <DialogClose render={<Button variant="outline" />}>{cancelLabel}</DialogClose>
           <Button
             variant="destructive"
             disabled={pending}
@@ -196,6 +200,7 @@ function ConfirmButton({
 }
 
 function EditProfileDialog({ member }: { member: Member }) {
+  const t = useTranslations("members");
   const [open, setOpen] = useState(false);
   const update = useUpdateMember(member.id);
   const [form, setForm] = useState({
@@ -213,16 +218,16 @@ function EditProfileDialog({ member }: { member: Member }) {
     if (form.province && form.province !== member.province) changed.province = form.province;
     if (form.email && form.email !== member.email) changed.email = form.email;
     if (Object.keys(changed).length === 0) {
-      toast.info("ไม่มีการเปลี่ยนแปลง");
+      toast.info(t("noChanges"));
       setOpen(false);
       return;
     }
     update.mutate(changed, {
       onSuccess: () => {
-        toast.success("บันทึกข้อมูลแล้ว");
+        toast.success(t("saved"));
         setOpen(false);
       },
-      onError: (e) => toast.error(errMsg(e, "บันทึกไม่สำเร็จ")),
+      onError: (e) => toast.error(errMsg(e, t("saveFailed"))),
     });
   };
 
@@ -240,23 +245,23 @@ function EditProfileDialog({ member }: { member: Member }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button variant="outline" size="sm" className="justify-start" />}>
-        <Pencil className="size-4" /> แก้ไขข้อมูล
+        <Pencil className="size-4" /> {t("editProfile")}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>แก้ไขข้อมูลสมาชิก</DialogTitle>
-          <DialogDescription>เว้นว่างไว้เพื่อคงค่าเดิม</DialogDescription>
+          <DialogTitle>{t("editTitle")}</DialogTitle>
+          <DialogDescription>{t("editDesc")}</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
-          {field("ชื่อ-นามสกุล", "full_name")}
-          {field("อีเมล", "email", "email")}
-          {field("เบอร์โทร", "phone")}
-          {field("จังหวัด", "province")}
+          {field(t("fieldFullName"), "full_name")}
+          {field(t("fieldEmail"), "email", "email")}
+          {field(t("fieldPhone"), "phone")}
+          {field(t("fieldProvince"), "province")}
         </div>
         <DialogFooter>
-          <DialogClose render={<Button variant="outline" />}>ยกเลิก</DialogClose>
+          <DialogClose render={<Button variant="outline" />}>{t("cancel")}</DialogClose>
           <Button onClick={save} disabled={update.isPending}>
-            บันทึก
+            {t("save")}
           </Button>
         </DialogFooter>
       </DialogContent>

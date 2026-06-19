@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,7 @@ interface MemberBulkBarProps {
 // members. Mirrors the applications BulkActionBar but with member actions; the
 // irreversible erase is deliberately NOT here (single, super_admin-only, confirmed).
 export function MemberBulkBar({ selected, onDone }: MemberBulkBarProps) {
+  const t = useTranslations("members");
   const bulk = useMemberBulk();
   const [tag, setTag] = useState("");
   if (selected.length === 0) return null;
@@ -25,18 +27,19 @@ export function MemberBulkBar({ selected, onDone }: MemberBulkBarProps) {
       { ids: selected, action, value },
       {
         onSuccess: (res) => {
-          toast.success(`${label}: ${res.updated} สำเร็จ${res.failed ? ` · ${res.failed} ล้มเหลว` : ""}`);
+          const base = t("bulkOk", { label, updated: res.updated });
+          toast.success(res.failed ? base + t("bulkFailSuffix", { failed: res.failed }) : base);
           onDone();
         },
-        onError: (e) => toast.error(e instanceof Error ? e.message : "ดำเนินการไม่สำเร็จ"),
+        onError: (e) => toast.error(e instanceof Error ? e.message : t("actionFailed")),
       },
     );
   };
 
   const applyTag = () => {
-    const t = tag.trim();
-    if (!t) return;
-    run("tag", t, `ติดแท็ก "${t}"`);
+    const value = tag.trim();
+    if (!value) return;
+    run("tag", value, t("bulkTagLabel", { tag: value }));
     setTag("");
   };
 
@@ -50,7 +53,7 @@ export function MemberBulkBar({ selected, onDone }: MemberBulkBarProps) {
         <span className="grid size-5 place-items-center rounded-full bg-sidebar-primary text-[0.6875rem] font-semibold text-sidebar-primary-foreground tabular-nums">
           {selected.length}
         </span>
-        เลือก
+        {t("bulkSelected")}
       </span>
       <span className="mx-1 h-5 w-px bg-sidebar-border" />
       <span className="flex items-center gap-1.5">
@@ -60,20 +63,20 @@ export function MemberBulkBar({ selected, onDone }: MemberBulkBarProps) {
           onKeyDown={(e) => {
             if (e.key === "Enter") applyTag();
           }}
-          placeholder="แท็ก…"
+          placeholder={t("bulkTagPlaceholder")}
           maxLength={50}
           className="h-7 w-24 bg-background/90 text-foreground"
         />
         <Button size="sm" variant="secondary" disabled={bulk.isPending || !tag.trim()} onClick={applyTag}>
-          ติดแท็ก
+          {t("bulkTag")}
         </Button>
       </span>
       <span className="mx-1 h-5 w-px bg-sidebar-border" />
-      <Button size="sm" variant="secondary" disabled={bulk.isPending} onClick={() => run("reactivate", undefined, "เปิดใช้งาน")}>
-        เปิดใช้งาน
+      <Button size="sm" variant="secondary" disabled={bulk.isPending} onClick={() => run("reactivate", undefined, t("bulkReactivate"))}>
+        {t("bulkReactivate")}
       </Button>
-      <Button size="sm" variant="destructive" disabled={bulk.isPending} onClick={() => run("suspend", undefined, "ระงับ")}>
-        ระงับ
+      <Button size="sm" variant="destructive" disabled={bulk.isPending} onClick={() => run("suspend", undefined, t("bulkSuspend"))}>
+        {t("bulkSuspend")}
       </Button>
     </div>
   );

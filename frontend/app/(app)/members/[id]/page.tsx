@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useTranslations, useLocale } from "next-intl";
 import { ArrowLeft, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 
@@ -26,6 +27,9 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 export default function MemberDetailPage() {
+  const t = useTranslations("members");
+  const locale = useLocale();
+  const dateLocale = locale === "th" ? "th-TH" : "en-GB";
   const { id } = useParams<{ id: string }>();
   const { data: me, isLoading: meLoading } = useMe();
   const allowed = isMemberAdmin(me?.role);
@@ -36,7 +40,7 @@ export default function MemberDetailPage() {
       const { data } = await api.get<{ url: string }>(`/api/v1/admin/members/${id}/resume`);
       window.open(data.url, "_blank", "noopener,noreferrer");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "เปิดเรซูเม่ไม่สำเร็จ");
+      toast.error(e instanceof Error ? e.message : t("resumeOpenFailed"));
     }
   };
 
@@ -46,7 +50,9 @@ export default function MemberDetailPage() {
       <div className="settle flex items-start gap-3 rounded-xl bg-card p-6 ring-1 ring-hairline">
         <ShieldAlert className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
         <p className="text-sm text-muted-foreground">
-          หน้านี้จำกัดเฉพาะ <span className="font-medium text-foreground">super admin และ HR manager</span>
+          {t.rich("restricted", {
+            b: (chunks) => <span className="font-medium text-foreground">{chunks}</span>,
+          })}
         </p>
       </div>
     );
@@ -64,13 +70,13 @@ export default function MemberDetailPage() {
         href="/members"
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
       >
-        <ArrowLeft className="size-4" /> กลับไปรายชื่อสมาชิก
+        <ArrowLeft className="size-4" /> {t("back")}
       </Link>
 
       {isLoading && <Skeleton className="h-[60vh] w-full rounded-xl" />}
       {isError && (
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-          ไม่พบสมาชิก หรือถูกลบไปแล้ว
+          {t("notFound")}
         </div>
       )}
 
@@ -81,44 +87,49 @@ export default function MemberDetailPage() {
               <div className="flex items-start gap-4">
                 <InitialChip name={m.full_name || m.email || "?"} size="lg" />
                 <div className="min-w-0 flex-1">
-                  <p className="eyebrow brass-underline inline-block">Member</p>
-                  <h1 className="mt-3 font-heading text-2xl font-semibold tracking-tight">{m.full_name || "(ไม่มีชื่อ)"}</h1>
+                  <p className="eyebrow brass-underline inline-block">{t("memberEyebrow")}</p>
+                  <h1 className="mt-3 font-heading text-2xl font-semibold tracking-tight">{m.full_name || t("noName")}</h1>
                   <div className="mt-2 flex items-center gap-2">
                     <MemberStatusBadge status={m.status} />
                     <span className="text-xs text-muted-foreground">
-                      สมัครเมื่อ {new Date(m.created_at).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" })}
+                      {t("joinedOn", {
+                        date: new Date(m.created_at).toLocaleDateString(dateLocale, { day: "numeric", month: "short", year: "numeric" }),
+                      })}
                     </span>
                   </div>
                 </div>
               </div>
 
               <div className="mt-6">
-                <Row label="อีเมล" value={m.email ? `${m.email}${m.email_verified ? " ✓" : ""}` : "—"} />
-                <Row label="เบอร์โทร" value={m.phone || "—"} />
-                <Row label="จังหวัด" value={m.province || "—"} />
-                <Row label="ช่องทางเข้าสู่ระบบ" value={providers.length ? providers.join(" · ") : "—"} />
+                <Row label={t("fieldEmail")} value={m.email ? `${m.email}${m.email_verified ? " ✓" : ""}` : "—"} />
+                <Row label={t("fieldPhone")} value={m.phone || "—"} />
+                <Row label={t("fieldProvince")} value={m.province || "—"} />
+                <Row label={t("fieldLoginProviders")} value={providers.length ? providers.join(" · ") : "—"} />
                 <Row
-                  label="เรซูเม่"
+                  label={t("fieldResume")}
                   value={
                     m.has_resume ? (
                       <Button size="xs" variant="outline" onClick={viewResume}>
-                        ดูเรซูเม่ ({m.resume_file_type || "file"})
+                        {t("viewResume", { type: m.resume_file_type || "file" })}
                       </Button>
                     ) : (
                       "—"
                     )
                   }
                 />
-                <Row label="PDPA" value={m.pdpa_consent ? `ยินยอม (v${m.pdpa_version || "?"})` : "ยังไม่ยินยอม"} />
+                <Row
+                  label={t("fieldPdpa")}
+                  value={m.pdpa_consent ? t("pdpaConsented", { version: m.pdpa_version || "?" }) : t("pdpaNotConsented")}
+                />
               </div>
             </section>
 
             <section>
-              <h2 className="eyebrow mb-3">ใบสมัคร ({m.applications_count})</h2>
+              <h2 className="eyebrow mb-3">{t("applicationsHeading", { count: m.applications_count })}</h2>
               <div className="rounded-xl bg-card p-5 text-sm text-muted-foreground ring-1 ring-hairline">
                 {m.applications_count === 0
-                  ? "สมาชิกรายนี้ยังไม่เคยสมัครงาน"
-                  : `มี ${m.applications_count} ใบสมัคร — ดูได้จากหน้า Inbox (ค้นด้วยชื่อ/อีเมล)`}
+                  ? t("noApplications")
+                  : t("hasApplications", { count: m.applications_count })}
               </div>
             </section>
 
@@ -127,11 +138,11 @@ export default function MemberDetailPage() {
 
           <aside aria-label="Account" className="space-y-6">
             <div className="rounded-xl bg-card p-5 ring-1 ring-hairline">
-              <h2 className="eyebrow mb-3">บัญชี</h2>
-              <Row label="เซสชันที่ใช้งาน" value={<span className="tabular-nums">{m.active_sessions}</span>} />
+              <h2 className="eyebrow mb-3">{t("account")}</h2>
+              <Row label={t("activeSessions")} value={<span className="tabular-nums">{m.active_sessions}</span>} />
               <Row
-                label="เข้าสู่ระบบล่าสุด"
-                value={m.last_login_at ? new Date(m.last_login_at).toLocaleString("th-TH") : "—"}
+                label={t("lastLogin")}
+                value={m.last_login_at ? new Date(m.last_login_at).toLocaleString(dateLocale) : "—"}
               />
             </div>
             <TagEditor memberId={m.id} />
