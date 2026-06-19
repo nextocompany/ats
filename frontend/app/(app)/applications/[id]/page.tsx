@@ -13,6 +13,7 @@ import { FitAnalysisPanel } from "@/components/resume/FitAnalysisPanel";
 import { InterviewPanel } from "@/components/resume/InterviewPanel";
 import { InterviewRoundsPanel } from "@/components/resume/InterviewRoundsPanel";
 import { JourneyPanel } from "@/components/resume/JourneyPanel";
+import { ReassignControl } from "@/components/resume/ReassignControl";
 import {
   LineManagerScorecard,
   ScorecardSummary,
@@ -60,6 +61,7 @@ export default function ApplicationDetailPage() {
             <OfferPanel applicationId={app.id} app={app} />
             <LettersPanel applicationId={app.id} app={app} />
             <OnboardingPanel applicationId={app.id} app={app} />
+            <ReassignControl applicationId={app.id} app={app} />
             <InterviewRoundsPanel applicationId={app.id} />
             <InterviewPanel applicationId={app.id} />
             <ScorecardSummary applicationId={app.id} />

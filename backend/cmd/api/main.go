@@ -44,6 +44,7 @@ import (
 	"github.com/nexto/hr-ats/internal/reports"
 	"github.com/nexto/hr-ats/internal/search"
 	"github.com/nexto/hr-ats/internal/settings"
+	"github.com/nexto/hr-ats/internal/stores"
 	"github.com/nexto/hr-ats/internal/users"
 	"github.com/nexto/hr-ats/internal/vacancies"
 	"github.com/nexto/hr-ats/pkg/blob"
@@ -221,6 +222,8 @@ func main() {
 	intakeHandler := applications.NewHandler(intakeSvc, appRepo, inspector, psService)
 	intakeHandler.SetNotifier(notifier, candidateRepo, cfg.PortalBaseURL)
 	intakeHandler.SetActivity(activity.New(pool)) // record single status changes onto the journey
+	storeRepo := stores.NewRepository(pool)
+	intakeHandler.SetStores(storeRepo) // validate target store on manual reassignment
 	applications.RegisterRoutes(app, intakeHandler)
 
 	// PeopleSoft integration (Direction A webhooks + Direction B sync). Vacancy
@@ -376,6 +379,7 @@ func main() {
 	// + pipeline job each. Positions list powers the picker.
 	applications.RegisterBulkRoutes(app, applications.NewBulkHandler(intakeSvc))
 	positions.RegisterRoutes(app, positions.NewHandler(positionRepo))
+	stores.RegisterRoutes(app, stores.NewHandler(storeRepo))
 	interview.RegisterDashboardRoutes(app, interviewHandler)
 	// AI cross-position fit analysis: HR-triggered verdict combining the CV-screening
 	// result + the AI pre-interview, matched against the whole Master JD catalogue.

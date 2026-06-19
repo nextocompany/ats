@@ -19,6 +19,8 @@ const (
 	ActionViewResume   = "view_resume"
 	ActionConsent      = "consent"
 	ActionReengage     = "reengage"
+	// ActionAssignment records a manual branch (re)assignment or move to the pool.
+	ActionAssignment = "assignment"
 	// ActionRetentionAnonymize records a PDPA retention-sweep anonymization (S7).
 	ActionRetentionAnonymize = "retention_anonymize"
 )

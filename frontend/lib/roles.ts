@@ -114,6 +114,15 @@ export function canManageLetters(role?: string): boolean {
   return !!role && LETTER_ROLES.includes(role);
 }
 
+// REASSIGN_ROLES may manually (re)assign a candidate's branch / move them to the
+// central pool. Mirrors the backend assignmentRoles map in
+// internal/applications/handler.go (store-locked hr_staff excluded).
+export const REASSIGN_ROLES = ["super_admin", "hr_manager", "sgm"];
+
+export function canReassignPlacement(role?: string): boolean {
+  return !!role && REASSIGN_ROLES.includes(role);
+}
+
 // ONBOARDING_ROLES may review onboarding documents. Mirrors the backend
 // onboardingWriteRoles map in internal/applications/onboarding.go (the
 // candidate-managing HR roles, same wider set as letters).

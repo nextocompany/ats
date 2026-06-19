@@ -2,16 +2,20 @@ package applications
 
 import (
 	"context"
+	"errors"
 	"io"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/nexto/hr-ats/internal/activity"
 	"github.com/nexto/hr-ats/internal/candidates"
+	"github.com/nexto/hr-ats/internal/middleware"
 	"github.com/nexto/hr-ats/internal/notify"
+	"github.com/nexto/hr-ats/internal/stores"
 	"github.com/nexto/hr-ats/pkg/httpx"
 )
 
@@ -39,6 +43,12 @@ type Handler struct {
 	hired      HiredSyncer
 	notifyDeps statusNotifyDeps
 	activity   activity.Writer // optional; records status changes onto the candidate journey
+	stores     storeReader     // optional; validates a store on manual reassignment
+}
+
+// storeReader is the narrow read the assignment handler needs to validate a store.
+type storeReader interface {
+	FindByNo(ctx context.Context, no int) (*stores.Store, error)
 }
 
 // SetNotifier wires best-effort candidate notifications on status changes. Unset
@@ -50,6 +60,10 @@ func (h *Handler) SetNotifier(n notify.Notifier, cands candidates.Repository, po
 // SetActivity wires the audit/journey writer so single status changes are recorded
 // onto the candidate timeline (mirrors the bulk handler). Unset → not recorded.
 func (h *Handler) SetActivity(w activity.Writer) { h.activity = w }
+
+// SetStores wires the store directory so manual reassignment can validate a target
+// store. Unset → reassign-to-store returns 503 (move-to-pool still works).
+func (h *Handler) SetStores(r storeReader) { h.stores = r }
 
 // NewHandler builds the applications handler.
 func NewHandler(svc *Service, apps Repository, inspector JobInspector, hired HiredSyncer) *Handler {
@@ -216,4 +230,71 @@ func (h *Handler) recordStatusChange(ctx context.Context, id uuid.UUID, from, to
 		return
 	}
 	_ = h.activity.Record(ctx, activity.ActionStatusChange, "application", id, fiber.Map{"from": from, "to": to})
+}
+
+// assignmentRoles may manually (re)assign a candidate's placement. Store-locked
+// roles (hr_staff) are excluded — reassignment can move an application out of their
+// own scope, so it's reserved for broader-visibility roles.
+var assignmentRoles = map[string]bool{"super_admin": true, "hr_manager": true, "sgm": true}
+
+type assignmentReq struct {
+	StoreNo    *int `json:"store_no"`    // target store; omit/null to use the central pool
+	TalentPool bool `json:"talent_pool"` // explicit "move to central pool"
+}
+
+// UpdateAssignment handles PATCH /api/v1/applications/:id/assignment — manually
+// (re)assign a candidate to a store, or move them to the central pool (the holding
+// area for candidates with no nearby branch). Branch assignment is otherwise
+// automatic at intake; this is the manual override HR asked for.
+func (h *Handler) UpdateAssignment(c *fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "invalid application id")
+	}
+	u, _ := c.Locals(middleware.UserContextKey).(middleware.DevUser)
+	if !assignmentRoles[u.Role] {
+		return fiber.NewError(fiber.StatusForbidden, "insufficient role to reassign placement")
+	}
+	if ok, serr := h.apps.ExistsInScope(c.UserContext(), id, scopeFrom(c)); serr != nil {
+		return serr
+	} else if !ok {
+		return fiber.NewError(fiber.StatusNotFound, "application not found")
+	}
+	var req assignmentReq
+	if err := c.BodyParser(&req); err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "invalid payload")
+	}
+
+	// Move to the central pool (no store).
+	if req.TalentPool || req.StoreNo == nil {
+		if err := h.apps.SetAssignment(c.UserContext(), id, nil, true); err != nil {
+			return err
+		}
+		h.recordAssignment(c.UserContext(), id, fiber.Map{"placement": "central_pool"})
+		return httpx.OK(c, fiber.Map{"id": id, "assigned_store_id": nil, "talent_pool": true})
+	}
+
+	// Assign to a specific store — validate it exists.
+	if h.stores == nil {
+		return fiber.NewError(fiber.StatusServiceUnavailable, "store directory unavailable")
+	}
+	st, serr := h.stores.FindByNo(c.UserContext(), *req.StoreNo)
+	if errors.Is(serr, pgx.ErrNoRows) || (serr == nil && st == nil) {
+		return fiber.NewError(fiber.StatusNotFound, "store not found")
+	}
+	if serr != nil {
+		return serr
+	}
+	if err := h.apps.SetAssignment(c.UserContext(), id, req.StoreNo, false); err != nil {
+		return err
+	}
+	h.recordAssignment(c.UserContext(), id, fiber.Map{"store_no": *req.StoreNo})
+	return httpx.OK(c, fiber.Map{"id": id, "assigned_store_id": *req.StoreNo, "talent_pool": false})
+}
+
+func (h *Handler) recordAssignment(ctx context.Context, id uuid.UUID, detail any) {
+	if h.activity == nil {
+		return
+	}
+	_ = h.activity.Record(ctx, activity.ActionAssignment, "application", id, detail)
 }

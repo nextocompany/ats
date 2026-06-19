@@ -10,6 +10,7 @@ import type { TimelineEntry } from "@/lib/types";
 const ACTION_LABEL: Record<string, string> = {
   status_change: "เปลี่ยนสถานะ",
   bulk_action: "เปลี่ยนสถานะ (กลุ่ม)",
+  assignment: "จัดสาขา",
   view_resume: "เปิดดูเรซูเม่",
   reengage: "ติดต่อกลับ",
   consent: "ให้ความยินยอม PDPA",
