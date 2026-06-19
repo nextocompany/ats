@@ -40,7 +40,7 @@ export function ApprovalPanel({ applicationId, app }: Props) {
   // No request yet → offer the submit CTA only at the interviewed stage to the
   // Staff-level roles. Otherwise render nothing (keeps the aside uncluttered).
   if (!req) {
-    if (app.status !== "interviewed" || !canSubmitApproval(me?.role)) return null;
+    if (app.status !== "interviewed" || !canSubmitApproval(me)) return null;
     return (
       <Section title={t("chainTitle")}>
         <p className="text-xs text-muted-foreground">{t("submitHint")}</p>
@@ -63,7 +63,7 @@ export function ApprovalPanel({ applicationId, app }: Props) {
     );
   }
 
-  const myTurn = req.status === "pending" && canDecideApprovalLevel(me?.role, req.current_level);
+  const myTurn = req.status === "pending" && canDecideApprovalLevel(me, req.current_level);
 
   return (
     <Section title={t("chainTitle")}>

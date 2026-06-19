@@ -14,7 +14,7 @@ import { isLineManager } from "@/lib/roles";
 export default function ShortlistPage() {
   const t = useTranslations("shortlist");
   const { data: me } = useMe();
-  const allowed = isLineManager(me?.role) || me?.role === "super_admin";
+  const allowed = isLineManager(me) || me?.role === "super_admin";
   const { data, isLoading } = useShortlist(5);
 
   if (me && !allowed) {

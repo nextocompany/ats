@@ -22,7 +22,7 @@ const LEVEL_KEYS: Record<number, "level1" | "level2" | "level3" | "level4"> = {
 export default function ApprovalsPage() {
   const t = useTranslations("approvals");
   const { data: me } = useMe();
-  const allowed = canAccessApprovals(me?.role);
+  const allowed = canAccessApprovals(me);
   // Gate the fetch too: a non-approver role would only get an empty list.
   const { data } = useApprovalQueue(me ? allowed : false);
 

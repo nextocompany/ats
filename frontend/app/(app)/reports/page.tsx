@@ -31,7 +31,7 @@ const DEFAULT_WINDOW_DAYS = 90;
 export default function ReportsPage() {
   const t = useTranslations("reports");
   const { data: me } = useMe();
-  const allowed = canViewReports(me?.role);
+  const allowed = canViewReports(me);
 
   // Lazy initializers (run once at setup) keep the impure Date out of render.
   const [today] = useState(() => ymd(new Date()));

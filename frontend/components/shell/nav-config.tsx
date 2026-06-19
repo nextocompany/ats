@@ -14,7 +14,16 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { canAccessApprovals, canBulkUpload, canViewExecutive, canViewReports, isLineManager } from "@/lib/roles";
+import {
+  canAccessApprovals,
+  canBulkUpload,
+  canViewExecutive,
+  canViewReports,
+  isLineManager,
+  isMemberAdmin,
+  isSuperAdmin,
+} from "@/lib/roles";
+import type { Me } from "@/lib/types";
 
 export interface NavItem {
   href: string;
@@ -59,15 +68,15 @@ export const ADMIN_NAV: NavItem = { href: "/admin", label: "Admin", key: "admin"
 
 // navForRole returns the nav items visible to a given role. Bulk upload for HR
 // uploader roles; super_admin + hr_manager see Members; super_admin also sees Admin.
-export function navForRole(role?: string): NavItem[] {
+export function navForRole(me?: Me): NavItem[] {
   const items = [...NAV];
-  if (canViewReports(role)) items.push(REPORTS_NAV);
-  if (canViewExecutive(role)) items.push(EXECUTIVE_NAV);
-  if (isLineManager(role)) items.push(SHORTLIST_NAV);
-  if (canAccessApprovals(role)) items.push(APPROVALS_NAV);
-  if (canBulkUpload(role)) items.push(BULK_NAV);
-  if (role === "super_admin" || role === "hr_manager") items.push(MEMBERS_NAV);
-  if (role === "super_admin") items.push(ADMIN_NAV);
+  if (canViewReports(me)) items.push(REPORTS_NAV);
+  if (canViewExecutive(me)) items.push(EXECUTIVE_NAV);
+  if (isLineManager(me)) items.push(SHORTLIST_NAV);
+  if (canAccessApprovals(me)) items.push(APPROVALS_NAV);
+  if (canBulkUpload(me)) items.push(BULK_NAV);
+  if (isMemberAdmin(me)) items.push(MEMBERS_NAV);
+  if (isSuperAdmin(me)) items.push(ADMIN_NAV);
   return items;
 }
 

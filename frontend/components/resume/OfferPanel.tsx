@@ -45,7 +45,7 @@ export function OfferPanel({ applicationId, app }: Props) {
   const t = useTranslations("offer");
   const { data: me } = useMe();
   const { data: offer, isLoading } = useOffer(applicationId);
-  const canManage = canManageOffer(me?.role);
+  const canManage = canManageOffer(me);
 
   if (isLoading) return null;
   if (!offer && !(app.status === "offer" && canManage)) return null;

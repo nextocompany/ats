@@ -38,6 +38,9 @@ import type {
   OpenRole,
   Position,
   AtsReport,
+  RbacPermission,
+  RbacRole,
+  RbacRoleInput,
   ReportExport,
   ScorecardSummary,
   SearchFilter,
@@ -98,6 +101,58 @@ export function useUpdateHRUser() {
     mutationFn: ({ id, input }: { id: string; input: UpdateHRUserInput }) =>
       api.patch<HRUser>(`/api/v1/admin/users/${id}`, input).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["hr-users"] }),
+  });
+}
+
+// --- Dynamic RBAC (super_admin role/permission management) ---
+
+export function useRbacPermissions(enabled = true) {
+  return useQuery({
+    queryKey: ["rbac", "permissions"],
+    queryFn: () => api.get<RbacPermission[]>("/api/v1/admin/rbac/permissions").then((r) => r.data ?? []),
+    enabled,
+  });
+}
+
+export function useRbacRoles(enabled = true) {
+  return useQuery({
+    queryKey: ["rbac", "roles"],
+    queryFn: () => api.get<RbacRole[]>("/api/v1/admin/rbac/roles").then((r) => r.data ?? []),
+    enabled,
+  });
+}
+
+// invalidateRbac refreshes the role list AND the caller's own permissions (a
+// matrix edit can change what the current user may do/see).
+function invalidateRbac(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: ["rbac"] });
+  qc.invalidateQueries({ queryKey: ["me"] });
+}
+
+export function useCreateRole() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: RbacRoleInput) =>
+      api.post<RbacRole>("/api/v1/admin/rbac/roles", input).then((r) => r.data),
+    onSuccess: () => invalidateRbac(qc),
+  });
+}
+
+export function useUpdateRole() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ key, input }: { key: string; input: RbacRoleInput }) =>
+      api.patch<RbacRole>(`/api/v1/admin/rbac/roles/${key}`, input).then((r) => r.data),
+    onSuccess: () => invalidateRbac(qc),
+  });
+}
+
+export function useDeleteRole() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (key: string) =>
+      api.del<{ deleted: string }>(`/api/v1/admin/rbac/roles/${key}`).then((r) => r.data),
+    onSuccess: () => invalidateRbac(qc),
   });
 }
 

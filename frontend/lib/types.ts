@@ -466,6 +466,37 @@ export interface Me {
   role: string;
   store_id: number | null;
   subregion: string;
+  // Dynamic RBAC: the caller's resolved permission keys + data scope, sent by
+  // GET /users/me. The UI gates on these instead of hardcoded role lists.
+  permissions?: string[];
+  scope?: string;
+}
+
+// --- Dynamic RBAC (admin role/permission management) ---
+export interface RbacPermission {
+  key: string;
+  label_en: string;
+  label_th: string;
+  category: string;
+  sort: number;
+}
+
+export interface RbacRole {
+  key: string;
+  label_en: string;
+  label_th: string;
+  scope_kind: string;
+  is_builtin: boolean;
+  permissions: string[];
+  created_at: string;
+}
+
+export interface RbacRoleInput {
+  key?: string;
+  label_en?: string;
+  label_th?: string;
+  scope_kind?: string;
+  permissions?: string[];
 }
 
 // --- Executive Overview (company-wide leadership dashboard) ---

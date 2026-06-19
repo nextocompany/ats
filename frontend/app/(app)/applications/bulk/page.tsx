@@ -8,7 +8,7 @@ export default function BulkUploadPage() {
   const { data: me, isLoading } = useMe();
 
   if (isLoading) return null;
-  if (!canBulkUpload(me?.role)) {
+  if (!canBulkUpload(me)) {
     return (
       <div className="settle">
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">

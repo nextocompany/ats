@@ -147,7 +147,7 @@ export function TaScorecard({ applicationId, status }: { applicationId: string; 
       eyebrow={t("scTaEyebrow")}
       title={t("scTaTitle")}
       comps={TA_COMPS}
-      canRecord={canRecordTaScorecard(me?.role)}
+      canRecord={canRecordTaScorecard(me)}
     />
   );
 }
@@ -163,7 +163,7 @@ export function LineManagerScorecard({ applicationId, status }: { applicationId:
       eyebrow={t("scLmEyebrow")}
       title={t("scLmTitle")}
       comps={LM_COMPS}
-      canRecord={canRecordLmScorecard(me?.role)}
+      canRecord={canRecordLmScorecard(me)}
     />
   );
 }

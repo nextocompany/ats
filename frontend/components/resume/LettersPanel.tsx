@@ -36,7 +36,7 @@ export function LettersPanel({ applicationId, app }: Props) {
   const { data: me } = useMe();
   const { data: letters } = useLetters(applicationId);
   const generate = useGenerateLetter(applicationId);
-  const canManage = canManageLetters(me?.role);
+  const canManage = canManageLetters(me);
 
   if (!canManage && (!letters || letters.length === 0)) return null;
   if (!SHOW_STATUSES.has(app.status) && (!letters || letters.length === 0)) return null;
