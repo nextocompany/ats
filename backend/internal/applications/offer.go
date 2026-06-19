@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/nexto/hr-ats/internal/rbac"
 )
 
 // Offer management (Module-3 3.6). After the approval chain advances an application
@@ -29,11 +31,9 @@ const (
 	OfferDecisionDecline = "decline"
 )
 
-// offerWriteRoles may compose/send offers. Mirrors the per-role allowlist pattern;
-// super_admin always included. Reads are open to anyone with RBAC visibility.
-var offerWriteRoles = map[string]bool{"super_admin": true, "hr_manager": true}
-
-func canManageOffer(role string) bool { return offerWriteRoles[role] }
+// canManageOffer may compose/send offers — now resolved via dynamic RBAC
+// (rbac.PermOfferWrite). Reads are open to anyone with RBAC visibility.
+func canManageOffer(role string) bool { return rbac.Can(role, rbac.PermOfferWrite) }
 
 func validOfferDecision(d string) bool {
 	return d == OfferDecisionAccept || d == OfferDecisionDecline

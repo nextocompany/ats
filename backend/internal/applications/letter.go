@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/nexto/hr-ats/internal/rbac"
 )
 
 // Letter generation (Module-3 3.3). HR generates a PDF interview-invitation or
@@ -18,15 +20,9 @@ const (
 	LetterOffer     = "offer"
 )
 
-// letterWriteRoles may generate letters — the candidate-managing HR roles.
-var letterWriteRoles = map[string]bool{
-	"super_admin": true,
-	"hr_manager":  true,
-	"hr_staff":    true,
-	"sgm":         true,
-}
-
-func canManageLetter(role string) bool { return letterWriteRoles[role] }
+// canManageLetter may generate letters — now resolved via dynamic RBAC
+// (rbac.PermLetterWrite).
+func canManageLetter(role string) bool { return rbac.Can(role, rbac.PermLetterWrite) }
 
 func validLetterType(tp string) bool { return tp == LetterInterview || tp == LetterOffer }
 

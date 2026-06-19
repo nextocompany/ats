@@ -9,6 +9,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/nexto/hr-ats/internal/middleware"
+	"github.com/nexto/hr-ats/internal/rbac"
 	"github.com/nexto/hr-ats/pkg/httpx"
 )
 
@@ -77,7 +78,7 @@ func (h *Handler) Logout(c *fiber.Ctx) error {
 // restricted to super_admin (mirrors the system-settings gate).
 func requireSuperAdmin(c *fiber.Ctx) bool {
 	u, _ := c.Locals(middleware.UserContextKey).(middleware.DevUser)
-	return u.Role == "super_admin"
+	return rbac.Can(u.Role, rbac.PermUsersAdmin)
 }
 
 // ListUsers handles GET /api/v1/admin/users.

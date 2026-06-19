@@ -12,18 +12,6 @@ import (
 	"github.com/nexto/hr-ats/pkg/httpx"
 )
 
-// reportViewRoles may view ATS reports. Results are RBAC-scoped by the viewer's
-// kind (store roles see only their store). Mirrors the dashboard-access role set.
-var reportViewRoles = map[string]bool{
-	"super_admin":        true,
-	"regional_director":  true,
-	"operation_director": true,
-	"auditor":            true,
-	"sgm":                true,
-	"hr_manager":         true,
-	"hr_staff":           true,
-}
-
 // atsReportStore is the narrow slice the ATS report handler needs (the concrete
 // *Repo satisfies it; a fake backs the handler tests).
 type atsReportStore interface {
@@ -52,7 +40,7 @@ func RegisterATSRoutes(app *fiber.App, h *ATSReportHandler) {
 // endpoints.
 func (h *ATSReportHandler) build(c *fiber.Ctx) (ATSReport, error) {
 	u, _ := c.Locals(middleware.UserContextKey).(middleware.DevUser)
-	if !reportViewRoles[u.Role] {
+	if !rbac.Can(u.Role, rbac.PermReportsView) {
 		return ATSReport{}, fiber.NewError(fiber.StatusForbidden, "insufficient role to view reports")
 	}
 	f, err := parseRange(c.Query("from"), c.Query("to"))

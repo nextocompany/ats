@@ -11,54 +11,38 @@ type stubReader struct{ roles []Role }
 
 func (s stubReader) ListRoles(_ context.Context) ([]Role, error) { return s.roles, nil }
 
-// builtinScope mirrors the seed in 000028_dynamic_rbac.up.sql (and the old switch
-// in scope.go). The parity test cross-checks it against the legacy Kind() logic.
-var builtinScope = map[string]string{
-	"super_admin":        KindAll,
-	"regional_director":  KindAll,
-	"auditor":            KindAll,
-	"operation_director": KindSubregion,
-	"sgm":                KindStore,
-	"hr_manager":         KindStore,
-	"hr_staff":           KindStore,
-}
-
-// seedMatrix mirrors the role→permission seed in 000028_dynamic_rbac.up.sql
-// (super_admin omitted — it's a code bypass and implicitly holds everything).
-var seedMatrix = map[string][]string{
-	"regional_director":  {PermExecutiveView, PermReportsView, PermReportsExport, PermReengageTrigger, PermApprovalDecideL4},
-	"auditor":            {PermExecutiveView, PermReportsView},
-	"operation_director": {PermReportsView, PermReengageTrigger},
-	"sgm":                {PermReportsView, PermBulkUpload, PermAssignmentWrite, PermOnboardingWrite, PermLetterWrite, PermScorecardLM, PermApprovalDecideL3},
-	"hr_manager":         {PermMembersAdmin, PermReportsView, PermBulkUpload, PermAssignmentWrite, PermOfferWrite, PermOnboardingWrite, PermLetterWrite, PermScorecardTA, PermApprovalDecideL2},
-	"hr_staff":           {PermReportsView, PermBulkUpload, PermOnboardingWrite, PermLetterWrite, PermScorecardTA, PermApprovalSubmit, PermApprovalDecideL1},
-}
+// builtinScope / seedMatrix reference the single canonical legacy source in
+// legacy.go (which mirrors migration 000028's seed). The parity test below
+// cross-checks them against the INDEPENDENTLY-transcribed oldAllowlists, so a
+// transcription error in either legacy.go or the migration is caught.
+var builtinScope = legacyRoleScope
+var seedMatrix = legacyRolePerms
 
 // oldAllowlists is the legacy compile-time matrix, transcribed permission-by-
 // permission from the Go allowlists this feature replaces (super_admin excluded;
 // rbac.admin is net-new so it has no legacy entry). If this and the seed diverge,
 // the cutover would silently change access — so this test must stay green.
 var oldAllowlists = map[string][]string{
-	PermSettingsAdmin:    {},                                                       // settings.adminRolesAllowed
-	PermUsersAdmin:       {},                                                       // hrauth requireSuperAdmin
-	PermExecutiveView:    {"regional_director", "auditor"},                         // executiveRolesAllowed
+	PermSettingsAdmin:    {},                                                                                      // settings.adminRolesAllowed
+	PermUsersAdmin:       {},                                                                                      // hrauth requireSuperAdmin
+	PermExecutiveView:    {"regional_director", "auditor"},                                                        // executiveRolesAllowed
 	PermReportsView:      {"regional_director", "auditor", "operation_director", "sgm", "hr_manager", "hr_staff"}, // reportViewRoles (all7)
-	PermReportsExport:    {"regional_director"},                                    // exportRolesAllowed
-	PermReengageTrigger:  {"regional_director", "operation_director"},              // reengage rolesAllowed
-	PermMembersAdmin:     {"hr_manager"},                                           // memberAdminRoles
-	PermMembersErase:     {},                                                       // memberEraseRoles
-	PermBulkUpload:       {"hr_manager", "sgm", "hr_staff"},                        // bulkIntakeRoles
-	PermAssignmentWrite:  {"hr_manager", "sgm"},                                    // assignmentRoles
-	PermOfferWrite:       {"hr_manager"},                                           // offerWriteRoles
-	PermOnboardingWrite:  {"hr_manager", "hr_staff", "sgm"},                        // onboardingWriteRoles
-	PermLetterWrite:      {"hr_manager", "hr_staff", "sgm"},                        // letterWriteRoles
-	PermScorecardTA:      {"hr_manager", "hr_staff"},                               // taRecordRoles
-	PermScorecardLM:      {"sgm"},                                                  // lmRecordRoles
-	PermApprovalSubmit:   {"hr_staff"},                                             // canSubmitApproval
-	PermApprovalDecideL1: {"hr_staff"},                                             // approvalLevelRoles[1]
-	PermApprovalDecideL2: {"hr_manager"},                                           // approvalLevelRoles[2]
-	PermApprovalDecideL3: {"sgm"},                                                  // approvalLevelRoles[3]
-	PermApprovalDecideL4: {"regional_director"},                                    // approvalLevelRoles[4]
+	PermReportsExport:    {"regional_director"},                                                                   // exportRolesAllowed
+	PermReengageTrigger:  {"regional_director", "operation_director"},                                             // reengage rolesAllowed
+	PermMembersAdmin:     {"hr_manager"},                                                                          // memberAdminRoles
+	PermMembersErase:     {},                                                                                      // memberEraseRoles
+	PermBulkUpload:       {"hr_manager", "sgm", "hr_staff"},                                                       // bulkIntakeRoles
+	PermAssignmentWrite:  {"hr_manager", "sgm"},                                                                   // assignmentRoles
+	PermOfferWrite:       {"hr_manager"},                                                                          // offerWriteRoles
+	PermOnboardingWrite:  {"hr_manager", "hr_staff", "sgm"},                                                       // onboardingWriteRoles
+	PermLetterWrite:      {"hr_manager", "hr_staff", "sgm"},                                                       // letterWriteRoles
+	PermScorecardTA:      {"hr_manager", "hr_staff"},                                                              // taRecordRoles
+	PermScorecardLM:      {"sgm"},                                                                                 // lmRecordRoles
+	PermApprovalSubmit:   {"hr_staff"},                                                                            // canSubmitApproval
+	PermApprovalDecideL1: {"hr_staff"},                                                                            // approvalLevelRoles[1]
+	PermApprovalDecideL2: {"hr_manager"},                                                                          // approvalLevelRoles[2]
+	PermApprovalDecideL3: {"sgm"},                                                                                 // approvalLevelRoles[3]
+	PermApprovalDecideL4: {"regional_director"},                                                                   // approvalLevelRoles[4]
 }
 
 var builtinRoleKeys = []string{

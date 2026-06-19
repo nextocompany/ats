@@ -40,6 +40,7 @@ import (
 	"github.com/nexto/hr-ats/internal/positions"
 	"github.com/nexto/hr-ats/internal/profiles"
 	"github.com/nexto/hr-ats/internal/public"
+	"github.com/nexto/hr-ats/internal/rbac"
 	"github.com/nexto/hr-ats/internal/reengage"
 	"github.com/nexto/hr-ats/internal/reports"
 	"github.com/nexto/hr-ats/internal/search"
@@ -60,6 +61,7 @@ import (
 )
 
 const (
+	rbacCacheTTL     = 60 * time.Second // dynamic-RBAC matrix refresh interval per replica
 	shutdownTimeout  = 10 * time.Second
 	maxBodyBytes     = 12 * 1024 * 1024 // headroom over the 10MB resume limit
 	publicRateWindow = time.Minute      // rate-limit window for /api/v1/public/* (Max from config)
@@ -86,6 +88,27 @@ func main() {
 		log.Fatal().Err(err).Msg("postgres connect failed")
 	}
 	defer pool.Close()
+
+	// Dynamic RBAC: install the DB-backed authorizer so handlers/scope resolve
+	// role→permission + scope from the editable matrix. Guarded — if the matrix
+	// hasn't been migrated/seeded yet (or the read fails), we leave the compiled-in
+	// legacy fallback active (identical to pre-RBAC behavior), never fail-open. A
+	// background ticker refreshes every replica within the TTL after an admin edit.
+	rbacRepo := rbac.NewRepository(pool)
+	if roles, err := rbacRepo.ListRoles(ctx); err != nil {
+		log.Warn().Err(err).Msg("rbac: could not load roles; using legacy fallback matrix")
+	} else if len(roles) == 0 {
+		log.Warn().Msg("rbac: no roles seeded (migration 000028 not applied?); using legacy fallback matrix")
+	} else {
+		authz := rbac.NewAuthorizer(rbacRepo, rbacCacheTTL)
+		if err := authz.Reload(ctx); err != nil {
+			log.Warn().Err(err).Msg("rbac: authorizer reload failed; using legacy fallback matrix")
+		} else {
+			rbac.SetDefault(authz)
+			authz.Start(ctx)
+			log.Info().Int("roles", len(roles)).Msg("rbac: dynamic authorizer installed")
+		}
+	}
 
 	var rdb *goredis.Client
 	if err := bootstrap.Retry(ctx, "redis", func(ctx context.Context) error {

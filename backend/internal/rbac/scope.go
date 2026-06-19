@@ -24,17 +24,11 @@ func New(role string, storeID *int, subregion string) Scope {
 	return Scope{Role: role, StoreID: storeID, Subregion: subregion}
 }
 
-// Kind classifies the scope. Unknown roles fall through to the most restrictive
-// (store) kind, so a misconfigured role never widens visibility.
+// Kind classifies the scope via the installed authorizer (or the legacy
+// fallback). Unknown roles fall through to the most restrictive (store) kind, so
+// a misconfigured role never widens visibility.
 func (s Scope) Kind() string {
-	switch s.Role {
-	case "super_admin", "regional_director", "auditor":
-		return KindAll
-	case "operation_director":
-		return KindSubregion
-	default: // sgm, hr_manager, hr_staff, unknown
-		return KindStore
-	}
+	return ScopeKindFor(s.Role)
 }
 
 // ApplicationsClause returns a SQL condition scoping the applications table,

@@ -7,13 +7,13 @@ import (
 
 // Sentinel errors for the role/permission admin surface.
 var (
-	ErrRoleNotFound  = errors.New("rbac: role not found")
-	ErrRoleExists    = errors.New("rbac: role already exists")
-	ErrRoleBuiltin   = errors.New("rbac: built-in role cannot be modified that way")
-	ErrRoleInUse     = errors.New("rbac: role is still assigned to users")
-	ErrInvalidScope  = errors.New("rbac: scope_kind must be all, subregion, or store")
+	ErrRoleNotFound   = errors.New("rbac: role not found")
+	ErrRoleExists     = errors.New("rbac: role already exists")
+	ErrRoleBuiltin    = errors.New("rbac: built-in role cannot be modified that way")
+	ErrRoleInUse      = errors.New("rbac: role is still assigned to users")
+	ErrInvalidScope   = errors.New("rbac: scope_kind must be all, subregion, or store")
 	ErrInvalidRoleKey = errors.New("rbac: role key must match [a-z0-9_]+")
-	ErrUnknownPerm   = errors.New("rbac: unknown permission key")
+	ErrUnknownPerm    = errors.New("rbac: unknown permission key")
 )
 
 // Role is a role and its resolved permission set + data scope.
@@ -39,7 +39,7 @@ type Permission struct {
 // RoleInput is the editable data for create/update. Pointers on update distinguish
 // "not supplied" from "set to zero value"; Permissions nil means "leave as-is".
 type RoleInput struct {
-	Key         string    // create only; ignored on update
+	Key         string // create only; ignored on update
 	LabelEn     *string
 	LabelTh     *string
 	ScopeKind   *string
