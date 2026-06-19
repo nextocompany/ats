@@ -26,7 +26,7 @@ export interface NavItem {
 // Single source of truth for primary navigation across sidebar + drawer.
 export const NAV: NavItem[] = [
   { href: "/dashboard", label: "Overview", key: "overview", icon: LayoutDashboard },
-  { href: "/applications", label: "Inbox", key: "inbox", icon: Inbox },
+  { href: "/applications", label: "Applications", key: "inbox", icon: Inbox },
   { href: "/candidates", label: "Candidates", key: "candidates", icon: Users },
   { href: "/search", label: "Search", key: "search", icon: Search },
   { href: "/analytics", label: "Analytics", key: "analytics", icon: BarChart3 },

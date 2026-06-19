@@ -6,7 +6,7 @@
   },
   "nav": {
     "overview": "Overview",
-    "inbox": "Inbox",
+    "inbox": "Applications",
     "candidates": "Candidates",
     "search": "Search",
     "analytics": "Analytics",
@@ -193,5 +193,16 @@
     "devSignIn": "Sign in as HR (dev)",
     "helpEntra": "Sign in with your Microsoft organization account, or with an email and password provisioned by your administrator. Access and role permissions are managed centrally.",
     "helpDev": "Development sign-in for the screening team. Production access uses Microsoft Entra ID single sign-on or an administrator-provisioned password."
+  },
+  "fit": {
+    "notScored": "Not scored",
+    "fail": "Not passed",
+    "standard": "Standard",
+    "good": "Good",
+    "veryGood": "Excellent"
+  },
+  "inbox": {
+    "title": "Applications",
+    "centralPool": "Central pool · awaiting branch"
   }
 }
