@@ -6,6 +6,7 @@
 // pick a store, or move the candidate (back) to the central pool to be assigned
 // later. Role-gated to mirror the backend (super_admin / hr_manager / sgm).
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import type { Application } from "@/lib/types";
@@ -21,6 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 
 export function ReassignControl({ applicationId, app }: { applicationId: string; app: Application }) {
+  const t = useTranslations("resume");
   const { data: me } = useMe();
   const { data: stores } = useStores();
   const reassign = useReassign(applicationId);
@@ -28,7 +30,7 @@ export function ReassignControl({ applicationId, app }: { applicationId: string;
 
   if (!canReassignPlacement(me?.role)) return null;
 
-  const current = app.store_name ?? (app.talent_pool ? "พูลกลาง · รอจัดสาขา" : "—");
+  const current = app.store_name ?? (app.talent_pool ? t("badgePool") : "—");
 
   function assignStore(storeNo: string | null) {
     if (!storeNo) return;
@@ -36,8 +38,8 @@ export function ReassignControl({ applicationId, app }: { applicationId: string;
     reassign.mutate(
       { store_no: Number(storeNo) },
       {
-        onSuccess: () => toast.success("ย้ายไปสาขาแล้ว"),
-        onError: (e) => toast.error(e instanceof Error ? e.message : "ย้ายสาขาไม่สำเร็จ"),
+        onSuccess: () => toast.success(t("reassignedStore")),
+        onError: (e) => toast.error(e instanceof Error ? e.message : t("reassignStoreFailed")),
       },
     );
   }
@@ -47,22 +49,22 @@ export function ReassignControl({ applicationId, app }: { applicationId: string;
     reassign.mutate(
       { talent_pool: true },
       {
-        onSuccess: () => toast.success("ย้ายไปพูลกลางแล้ว"),
-        onError: (e) => toast.error(e instanceof Error ? e.message : "ย้ายไปพูลกลางไม่สำเร็จ"),
+        onSuccess: () => toast.success(t("reassignedPool")),
+        onError: (e) => toast.error(e instanceof Error ? e.message : t("reassignPoolFailed")),
       },
     );
   }
 
   return (
     <section className="mt-6 border-t border-hairline pt-5">
-      <p className="eyebrow">จัดสาขา (Placement)</p>
+      <p className="eyebrow">{t("reassignTitle")}</p>
       <p className="mt-1 text-sm text-muted-foreground">
-        ปัจจุบัน: <span className="font-medium text-foreground">{current}</span>
+        {t("reassignCurrent")} <span className="font-medium text-foreground">{current}</span>
       </p>
       <div className="mt-3 flex flex-col gap-2">
         <Select value={value} onValueChange={assignStore} disabled={reassign.isPending}>
           <SelectTrigger size="sm">
-            <SelectValue placeholder="เลือกสาขา…" />
+            <SelectValue placeholder={t("reassignPlaceholder")} />
           </SelectTrigger>
           <SelectContent>
             {(stores ?? []).map((s) => (
@@ -74,7 +76,7 @@ export function ReassignControl({ applicationId, app }: { applicationId: string;
         </Select>
         {!app.talent_pool && (
           <Button size="sm" variant="outline" onClick={moveToPool} disabled={reassign.isPending}>
-            ย้ายไปพูลกลาง
+            {t("reassignToPool")}
           </Button>
         )}
       </div>
