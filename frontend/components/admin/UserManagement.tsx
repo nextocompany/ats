@@ -4,10 +4,11 @@
 // path that runs alongside Entra SSO). List, provision, edit role/status, and
 // reset passwords. The backend is the real gate; this UI mirrors it.
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { KeyRound, Loader2, UserPlus } from "lucide-react";
 
 import { useCreateHRUser, useHRUsers, useUpdateHRUser } from "@/lib/queries";
-import { HR_ROLES, roleLabel } from "@/lib/roles";
+import { HR_ROLES } from "@/lib/roles";
 import type { CreateHRUserInput, HRUser, UpdateHRUserInput } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,23 +44,23 @@ function errMessage(e: unknown): string | null {
 }
 
 export function UserManagement() {
+  const t = useTranslations("admin");
   const { data: users, isLoading } = useHRUsers(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<HRUser | null>(null);
+  const shortRole = (role: string) => (t.has(`role_${role}`) ? t(`role_${role}`) : role);
 
   return (
     <section className="rounded-xl bg-card ring-1 ring-hairline">
       <header className="flex items-start justify-between gap-4 border-b border-hairline px-6 py-4">
         <div>
-          <p className="eyebrow">Access</p>
-          <h2 className="mt-1 font-heading text-lg font-semibold tracking-tight">User accounts</h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            Local username &amp; password accounts that sign in alongside Microsoft.
-          </p>
+          <p className="eyebrow">{t("usersEyebrow")}</p>
+          <h2 className="mt-1 font-heading text-lg font-semibold tracking-tight">{t("usersTitle")}</h2>
+          <p className="mt-0.5 text-sm text-muted-foreground">{t("usersDesc")}</p>
         </div>
         <Button className="gap-2" onClick={() => setCreateOpen(true)}>
           <UserPlus className="size-4" />
-          Add user
+          {t("addUser")}
         </Button>
       </header>
 
@@ -72,17 +73,17 @@ export function UserManagement() {
           </div>
         ) : !users || users.length === 0 ? (
           <p className="px-4 py-10 text-center text-sm text-muted-foreground">
-            No local accounts yet. Add one to enable password sign-in.
+            {t("usersEmpty")}
           </p>
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>User</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Last sign-in</TableHead>
-                <TableHead className="text-right">Manage</TableHead>
+                <TableHead>{t("colUser")}</TableHead>
+                <TableHead>{t("colRole")}</TableHead>
+                <TableHead>{t("colStatus")}</TableHead>
+                <TableHead>{t("colLastSignIn")}</TableHead>
+                <TableHead className="text-right">{t("colManage")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -92,22 +93,22 @@ export function UserManagement() {
                     <div className="font-medium text-foreground">{u.full_name || "—"}</div>
                     <div className="text-xs text-muted-foreground">{u.email}</div>
                   </TableCell>
-                  <TableCell className="text-sm">{roleLabel(u.role)}</TableCell>
+                  <TableCell className="text-sm">{shortRole(u.role)}</TableCell>
                   <TableCell>
                     {u.is_active ? (
-                      <Badge variant="secondary">Active</Badge>
+                      <Badge variant="secondary">{t("statusActive")}</Badge>
                     ) : (
                       <Badge variant="outline" className="text-muted-foreground">
-                        Disabled
+                        {t("statusDisabled")}
                       </Badge>
                     )}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {u.last_login_at ? new Date(u.last_login_at).toLocaleDateString() : "Never"}
+                    {u.last_login_at ? new Date(u.last_login_at).toLocaleDateString() : t("never")}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="sm" onClick={() => setEditing(u)}>
-                      Edit
+                      {t("edit")}
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -126,6 +127,7 @@ export function UserManagement() {
 // --- Create ----------------------------------------------------------------
 
 function CreateUserDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const t = useTranslations("admin");
   const create = useCreateHRUser();
   const [form, setForm] = useState<CreateHRUserInput>({
     email: "",
@@ -162,57 +164,55 @@ function CreateUserDialog({ open, onClose }: { open: boolean; onClose: () => voi
     <Dialog open={open} onOpenChange={(o) => (o ? null : close())}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add user account</DialogTitle>
-          <DialogDescription>
-            Provision a local account that signs in with email and password.
-          </DialogDescription>
+          <DialogTitle>{t("createTitle")}</DialogTitle>
+          <DialogDescription>{t("createDesc")}</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-3" noValidate>
-          <Field label="Full name">
+          <Field label={t("fieldFullName")}>
             <Input
               value={form.full_name}
               onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-              placeholder="Somchai Jaidee"
+              placeholder={t("fullNamePlaceholder")}
               required
             />
           </Field>
-          <Field label="Email">
+          <Field label={t("fieldEmail")}>
             <Input
               type="email"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
-              placeholder="somchai@cpaxtra.com"
+              placeholder={t("emailPlaceholder")}
               required
             />
           </Field>
-          <Field label="Role">
+          <Field label={t("fieldRole")}>
             <RoleSelect value={form.role} onChange={(role) => setForm({ ...form, role })} />
           </Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Store no. (optional)">
+            <Field label={t("fieldStore")}>
               <Input
                 type="number"
                 value={form.store_id ?? ""}
                 onChange={(e) =>
                   setForm({ ...form, store_id: e.target.value ? Number(e.target.value) : undefined })
                 }
-                placeholder="e.g. 102"
+                placeholder={t("storePlaceholder")}
               />
             </Field>
-            <Field label="Subregion (optional)">
+            <Field label={t("fieldSubregion")}>
               <Input
                 value={form.subregion ?? ""}
                 onChange={(e) => setForm({ ...form, subregion: e.target.value })}
-                placeholder="e.g. Central"
+                placeholder={t("subregionPlaceholder")}
               />
             </Field>
           </div>
-          <Field label="Temporary password">
+          <Field label={t("fieldTempPassword")}>
             <Input
               type="password"
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
-              placeholder="At least 10 characters, a letter and a number"
+              placeholder={t("tempPasswordPlaceholder")}
               autoComplete="new-password"
               required
             />
@@ -226,11 +226,11 @@ function CreateUserDialog({ open, onClose }: { open: boolean; onClose: () => voi
 
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={close}>
-              Cancel
+              {t("cancel")}
             </Button>
             <Button type="submit" disabled={create.isPending} className="gap-2">
               {create.isPending && <Loader2 className="size-4 animate-spin" />}
-              Create account
+              {t("createAccount")}
             </Button>
           </DialogFooter>
         </form>
@@ -242,6 +242,7 @@ function CreateUserDialog({ open, onClose }: { open: boolean; onClose: () => voi
 // --- Edit ------------------------------------------------------------------
 
 function EditUserDialog({ user, onClose }: { user: HRUser | null; onClose: () => void }) {
+  const t = useTranslations("admin");
   const update = useUpdateHRUser();
   const [fullName, setFullName] = useState("");
   const [role, setRole] = useState("hr_staff");
@@ -281,32 +282,29 @@ function EditUserDialog({ user, onClose }: { user: HRUser | null; onClose: () =>
     <Dialog open={!!user} onOpenChange={(o) => (o ? null : close())}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Edit {user?.email}</DialogTitle>
-          <DialogDescription>
-            Change role or status, or reset the password. Resetting a password or
-            disabling the account signs the user out everywhere immediately.
-          </DialogDescription>
+          <DialogTitle>{t("editTitle", { email: user?.email ?? "" })}</DialogTitle>
+          <DialogDescription>{t("editDesc")}</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-3" noValidate>
-          <Field label="Full name">
+          <Field label={t("fieldFullName")}>
             <Input value={fullName} onChange={(e) => setFullName(e.target.value)} required />
           </Field>
-          <Field label="Role">
+          <Field label={t("fieldRole")}>
             <RoleSelect value={role} onChange={setRole} />
           </Field>
           <div className="flex items-center justify-between rounded-lg border border-hairline px-3 py-2.5">
             <div>
-              <p className="text-sm font-medium text-foreground">Account active</p>
-              <p className="text-xs text-muted-foreground">Disabled accounts cannot sign in.</p>
+              <p className="text-sm font-medium text-foreground">{t("accountActive")}</p>
+              <p className="text-xs text-muted-foreground">{t("accountActiveHelp")}</p>
             </div>
             <Switch checked={active} onCheckedChange={setActive} />
           </div>
-          <Field label="Reset password (optional)">
+          <Field label={t("fieldResetPassword")}>
             <Input
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="Leave blank to keep current password"
+              placeholder={t("resetPasswordPlaceholder")}
               autoComplete="new-password"
             />
           </Field>
@@ -319,11 +317,11 @@ function EditUserDialog({ user, onClose }: { user: HRUser | null; onClose: () =>
 
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={close}>
-              Cancel
+              {t("cancel")}
             </Button>
             <Button type="submit" disabled={update.isPending} className="gap-2">
               {update.isPending ? <Loader2 className="size-4 animate-spin" /> : <KeyRound className="size-4" />}
-              Save changes
+              {t("saveChanges")}
             </Button>
           </DialogFooter>
         </form>
@@ -344,6 +342,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function RoleSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const t = useTranslations("admin");
   return (
     <Select value={value} onValueChange={(v) => onChange(v ?? value)}>
       <SelectTrigger className="w-full">
@@ -352,7 +351,7 @@ function RoleSelect({ value, onChange }: { value: string; onChange: (v: string) 
       <SelectContent>
         {HR_ROLES.map((r) => (
           <SelectItem key={r.value} value={r.value}>
-            {r.label}
+            {t(`roleFull_${r.value}`)}
           </SelectItem>
         ))}
       </SelectContent>
