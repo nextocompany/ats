@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 import { PortalShell } from "@/components/PortalShell";
 import { ShareButtons } from "@/components/ShareButtons";
@@ -10,24 +11,13 @@ import { levelLabel } from "@/lib/levels";
 import { usePublicPosition } from "@/lib/queries";
 import { cn } from "@/lib/utils";
 
-// The public API exposes only title/level, so role content is intentionally
-// generic, reassuring copy (no fabricated job-specific requirements).
-const ABOUT =
-  "ร่วมเป็นส่วนหนึ่งของทีมที่ใส่ใจการบริการและการเติบโตไปด้วยกัน เรามองหาผู้ที่มีความตั้งใจ ใจรักงานบริการ และพร้อมเรียนรู้สิ่งใหม่ เพื่อส่งมอบประสบการณ์ที่ดีให้กับลูกค้าในทุกสาขา";
-const OFFER = [
-  "ค่าตอบแทนและโบนัสตามผลงาน",
-  "ประกันสุขภาพและสวัสดิการพนักงาน",
-  "เส้นทางก้าวหน้าในสายอาชีพที่ชัดเจน",
-  "การอบรมและพัฒนาทักษะอย่างต่อเนื่อง",
-];
-const STEPS = [
-  "เข้าสู่ระบบหรือสมัครสมาชิก แล้วให้ความยินยอม PDPA",
-  "ตรวจสอบข้อมูลและแนบเรซูเม่ของคุณ",
-  "ส่งใบสมัคร แล้วติดตามสถานะได้ทุกเมื่อ",
-];
-
 export function JobDetailClient({ id }: { id: string }) {
+  const t = useTranslations("jobs");
   const { data: position, isLoading, isError } = usePublicPosition(id);
+  // The public API exposes only title/level, so role content is intentionally
+  // generic, reassuring copy (no fabricated job-specific requirements).
+  const offer = t.raw("offer") as string[];
+  const steps = t.raw("steps") as string[];
 
   return (
     <PortalShell backHref="/jobs">
@@ -42,9 +32,9 @@ export function JobDetailClient({ id }: { id: string }) {
 
       {isError || (!isLoading && !position) ? (
         <div className="mx-auto flex max-w-md flex-col items-center gap-4 rounded-xl border border-line bg-card p-10 text-center">
-          <p className="text-sm text-muted-foreground">ไม่พบตำแหน่งงานนี้</p>
+          <p className="text-sm text-muted-foreground">{t("notFound")}</p>
           <Link href="/jobs" className={buttonVariants({ variant: "outline", size: "tap" })}>
-            กลับไปดูตำแหน่งงานทั้งหมด
+            {t("backToAll")}
           </Link>
         </div>
       ) : null}
@@ -67,14 +57,14 @@ export function JobDetailClient({ id }: { id: string }) {
             </header>
 
             <section className="flex flex-col gap-3">
-              <h2 className="[font-size:var(--text-h3)] font-semibold text-foreground">เกี่ยวกับตำแหน่งนี้</h2>
-              <p className="leading-relaxed text-foreground/80">{ABOUT}</p>
+              <h2 className="[font-size:var(--text-h3)] font-semibold text-foreground">{t("aboutHeading")}</h2>
+              <p className="leading-relaxed text-foreground/80">{t("about")}</p>
             </section>
 
             <section className="flex flex-col gap-4">
-              <h2 className="[font-size:var(--text-h3)] font-semibold text-foreground">สิ่งที่เรามอบให้</h2>
+              <h2 className="[font-size:var(--text-h3)] font-semibold text-foreground">{t("offerHeading")}</h2>
               <ul className="divide-y divide-line border-y border-line">
-                {OFFER.map((o) => (
+                {offer.map((o) => (
                   <li key={o} className="flex items-start gap-3 py-4 text-foreground/85">
                     <span
                       aria-hidden="true"
@@ -91,9 +81,9 @@ export function JobDetailClient({ id }: { id: string }) {
             </section>
 
             <section className="flex flex-col gap-4">
-              <h2 className="[font-size:var(--text-h3)] font-semibold text-foreground">ขั้นตอนการสมัคร</h2>
+              <h2 className="[font-size:var(--text-h3)] font-semibold text-foreground">{t("stepsHeading")}</h2>
               <ol className="flex flex-col gap-4">
-                {STEPS.map((s, i) => (
+                {steps.map((s, i) => (
                   <li key={s} className="flex items-start gap-3.5 text-foreground/85">
                     <span className="num grid size-7 shrink-0 place-content-center rounded-full border border-line bg-secondary text-sm font-semibold text-foreground">
                       {i + 1}
@@ -109,13 +99,13 @@ export function JobDetailClient({ id }: { id: string }) {
           <aside className="lg:col-start-2">
             <div className="flex flex-col gap-4 rounded-xl border border-line bg-card p-6 lg:sticky lg:top-24">
               <div className="flex flex-col gap-1">
-                <p className="text-sm text-muted-foreground">สนใจตำแหน่งนี้?</p>
-                <p className="text-lg font-semibold text-foreground">สมัครได้เลยวันนี้</p>
+                <p className="text-sm text-muted-foreground">{t("interested")}</p>
+                <p className="text-lg font-semibold text-foreground">{t("applyToday")}</p>
               </div>
               <Link href={`/jobs/${position.id}/apply`} className={cn(buttonVariants({ size: "tap" }), "w-full")}>
-                สมัครงาน
+                {t("applyCta")}
               </Link>
-              <p className="text-center text-xs text-muted-foreground">ใช้เวลาไม่กี่นาที &middot; ทีม HR จะติดต่อกลับ</p>
+              <p className="text-center text-xs text-muted-foreground">{t("applyNote")}</p>
               <div className="border-t border-line pt-4">
                 <ShareButtons title={position.title_th} />
               </div>

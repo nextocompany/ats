@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 import { levelLabel } from "@/lib/levels";
 import type { PublicPosition } from "@/lib/types";
@@ -8,6 +11,7 @@ import type { PublicPosition } from "@/lib/types";
 // hairline frame, a quiet border-hover, no decorative lift or color flourish —
 // the one blue is reserved for the open-count figure and the focus ring.
 export function JobCard({ position }: { position: PublicPosition }) {
+  const t = useTranslations("jobs");
   return (
     <Link
       href={`/jobs/${position.id}`}
@@ -39,7 +43,7 @@ export function JobCard({ position }: { position: PublicPosition }) {
 
       <div className="mt-auto flex items-baseline gap-1.5 border-t border-line pt-4">
         <span className="num text-base font-semibold text-primary">{position.open_count}</span>
-        <span className="text-sm text-muted-foreground">อัตราที่เปิดรับ</span>
+        <span className="text-sm text-muted-foreground">{t("openings")}</span>
       </div>
     </Link>
   );
