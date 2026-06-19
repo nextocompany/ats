@@ -28,6 +28,7 @@ import (
 	"github.com/nexto/hr-ats/internal/fit"
 	"github.com/nexto/hr-ats/internal/health"
 	"github.com/nexto/hr-ats/internal/hrauth"
+	"github.com/nexto/hr-ats/internal/intake"
 	"github.com/nexto/hr-ats/internal/interview"
 	"github.com/nexto/hr-ats/internal/letters"
 	"github.com/nexto/hr-ats/internal/lineauth"
@@ -224,6 +225,22 @@ func main() {
 	// PeopleSoft integration (Direction A webhooks + Direction B sync). Vacancy
 	// open fires candidate re-engagement (Sprint 5a).
 	peoplesoft.RegisterRoutes(app, peoplesoft.NewHandler(vacancyRepo, positionRepo, psService, cfg.PSProvider, reengageTrigger), cfg.PSWebhookSecret)
+
+	// External intake webhook (MS Forms / SEEK / JobsDB → the same pipeline). HMAC-
+	// authed; not mounted unless INTAKE_WEBHOOK_SECRET is set (disabled by default).
+	// Rate-limited per client IP to bound cost/queue amplification if the HMAC leaks.
+	if cfg.IntakeWebhookSecret != "" {
+		app.Use("/api/v1/intake", limiter.New(limiter.Config{
+			Max:          cfg.RateLimitIntakeMax,
+			Expiration:   publicRateWindow,
+			Storage:      ratelimit.New(rdb),
+			KeyGenerator: clientIPKey,
+			LimitReached: func(c *fiber.Ctx) error {
+				return fiber.NewError(fiber.StatusTooManyRequests, "rate limit exceeded")
+			},
+		}))
+	}
+	intake.RegisterRoutes(app, intake.NewHandler(intakeSvc, positionRepo), cfg.IntakeWebhookSecret)
 
 	// Re-engagement manual trigger (Sprint 5a).
 	reengage.RegisterRoutes(app, reengage.NewHandler(reengageTrigger))
