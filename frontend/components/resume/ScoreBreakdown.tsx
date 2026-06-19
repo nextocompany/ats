@@ -1,13 +1,17 @@
+"use client";
+
+import { useTranslations } from "next-intl";
+
 import type { ScoreBreakdown as Breakdown } from "@/lib/types";
 
 // Dimension order + max points mirror the Go scorer (scoring.Breakdown):
 // experience 30, location 20, skills 20 (LLM), education 10, language 10.
-const DIMENSIONS: { key: keyof Breakdown; label: string; max: number; llm?: boolean }[] = [
-  { key: "experience", label: "ประสบการณ์", max: 30 },
-  { key: "location", label: "ทำเล / ภูมิภาค", max: 20 },
-  { key: "skills", label: "ทักษะ", max: 20, llm: true },
-  { key: "education", label: "การศึกษา", max: 10 },
-  { key: "language", label: "ภาษา", max: 10 },
+const DIMENSIONS: { key: keyof Breakdown; labelKey: string; max: number; llm?: boolean }[] = [
+  { key: "experience", labelKey: "dim_experience", max: 30 },
+  { key: "location", labelKey: "dim_location", max: 20 },
+  { key: "skills", labelKey: "dim_skills", max: 20, llm: true },
+  { key: "education", labelKey: "dim_education", max: 10 },
+  { key: "language", labelKey: "dim_language", max: 10 },
 ];
 
 function splitLines(text: string | undefined, sep: string): string[] {
@@ -25,23 +29,24 @@ interface ScoreBreakdownProps {
 }
 
 export function ScoreBreakdown({ breakdown, summary, redFlags }: ScoreBreakdownProps) {
+  const t = useTranslations("resume");
   const strengths = splitLines(summary, "\n");
   const flags = splitLines(redFlags, ";");
 
   return (
     <div className="border-t border-hairline pt-5">
       <p className="mb-3 text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-        Score breakdown
+        {t("sbTitle")}
       </p>
 
       <ul className="space-y-2.5">
-        {DIMENSIONS.map(({ key, label, max, llm }) => {
+        {DIMENSIONS.map(({ key, labelKey, max, llm }) => {
           const points = breakdown[key] ?? 0;
           const pct = max > 0 ? Math.min(100, (points / max) * 100) : 0;
           return (
             <li key={key} className="grid grid-cols-[7.5rem_1fr_auto] items-center gap-3">
               <span className="flex items-center gap-1.5 text-xs text-foreground">
-                {label}
+                {t(labelKey)}
                 {llm && (
                   <span className="rounded bg-brass-soft px-1 py-px text-[0.5625rem] font-semibold uppercase tracking-wide text-brass">
                     AI
@@ -65,7 +70,7 @@ export function ScoreBreakdown({ breakdown, summary, redFlags }: ScoreBreakdownP
 
       {strengths.length > 0 && (
         <div className="mt-4">
-          <p className="mb-1.5 text-xs font-medium text-foreground">จุดแข็ง</p>
+          <p className="mb-1.5 text-xs font-medium text-foreground">{t("strengths")}</p>
           <ul className="space-y-1">
             {strengths.map((s, i) => (
               <li key={i} className="flex gap-2 text-xs text-muted-foreground">
@@ -79,7 +84,7 @@ export function ScoreBreakdown({ breakdown, summary, redFlags }: ScoreBreakdownP
 
       {flags.length > 0 && (
         <div className="mt-3">
-          <p className="mb-1.5 text-xs font-medium text-foreground">ข้อสังเกต</p>
+          <p className="mb-1.5 text-xs font-medium text-foreground">{t("concerns")}</p>
           <ul className="space-y-1">
             {flags.map((f, i) => (
               <li key={i} className="flex gap-2 text-xs text-muted-foreground">

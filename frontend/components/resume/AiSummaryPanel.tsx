@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import type { Application } from "@/lib/types";
@@ -13,6 +14,7 @@ import { ScheduleInterviewDialog } from "@/components/resume/ScheduleInterviewDi
 import { RejectDialog } from "@/components/resume/RejectDialog";
 
 export function AiSummaryPanel({ app }: { app: Application }) {
+  const t = useTranslations("resume");
   const setStatus = useSetStatus(app.id);
   const inviteInterview = useInviteInterview(app.id);
   const [scheduleOpen, setScheduleOpen] = useState(false);
@@ -26,14 +28,14 @@ export function AiSummaryPanel({ app }: { app: Application }) {
       { status },
       {
         onSuccess: () => toast.success(msg),
-        onError: (e) => toast.error(e instanceof Error ? e.message : "Update failed"),
+        onError: (e) => toast.error(e instanceof Error ? e.message : t("updateFailed")),
       },
     );
 
   const sendInterview = () =>
     inviteInterview.mutate(undefined, {
-      onSuccess: () => toast.success("AI interview invite sent"),
-      onError: (e) => toast.error(e instanceof Error ? e.message : "Could not send interview"),
+      onSuccess: () => toast.success(t("aiInviteSent")),
+      onError: (e) => toast.error(e instanceof Error ? e.message : t("aiInviteFailed")),
     });
 
   // One renderer per action keeps the button set declarative + ordered.
@@ -43,21 +45,21 @@ export function AiSummaryPanel({ app }: { app: Application }) {
       case "send_ai_interview":
         return (
           <Button key={a} size="sm" variant="default" disabled={busy} onClick={sendInterview} className="col-span-2 w-full">
-            {inviteInterview.isPending ? "Sending…" : <><span aria-hidden="true">▶</span> Send AI interview</>}
+            {inviteInterview.isPending ? t("actSending") : <><span aria-hidden="true">▶</span> {t("actSendAiInterview")}</>}
           </Button>
         );
       case "shortlist":
-        return <Button key={a} size="sm" variant="secondary" disabled={busy} onClick={() => move("shortlisted", "Shortlisted")} className="w-full">Shortlist</Button>;
+        return <Button key={a} size="sm" variant="secondary" disabled={busy} onClick={() => move("shortlisted", t("actShortlisted"))} className="w-full">{t("actShortlist")}</Button>;
       case "interview":
-        return <Button key={a} size="sm" variant="secondary" disabled={busy} onClick={() => setScheduleOpen(true)} className="w-full">Interview…</Button>;
+        return <Button key={a} size="sm" variant="secondary" disabled={busy} onClick={() => setScheduleOpen(true)} className="w-full">{t("actInterview")}</Button>;
       case "mark_interviewed":
-        return <Button key={a} size="sm" variant="secondary" disabled={busy} onClick={() => move("interviewed", "Marked as interviewed")} className="w-full">Mark interview done</Button>;
+        return <Button key={a} size="sm" variant="secondary" disabled={busy} onClick={() => move("interviewed", t("actMarkedInterviewed"))} className="w-full">{t("actMarkInterviewed")}</Button>;
       case "submit_approval":
         // The hiring approval submit lives in ApprovalPanel (with the chain view);
         // nothing is rendered here so the action grid only shows generic moves.
         return null;
       case "reject":
-        return <Button key={a} size="sm" variant="destructive" disabled={busy} onClick={() => setRejectOpen(true)} className="w-full">Reject…</Button>;
+        return <Button key={a} size="sm" variant="destructive" disabled={busy} onClick={() => setRejectOpen(true)} className="w-full">{t("actReject")}</Button>;
       default:
         return null;
     }
@@ -80,8 +82,8 @@ export function AiSummaryPanel({ app }: { app: Application }) {
   return (
     <div className="space-y-6">
       <div>
-        <p className="eyebrow">AI summary</p>
-        <h2 className="mt-1 font-heading text-lg font-semibold tracking-tight">Screening verdict</h2>
+        <p className="eyebrow">{t("aiEyebrow")}</p>
+        <h2 className="mt-1 font-heading text-lg font-semibold tracking-tight">{t("aiTitle")}</h2>
       </div>
 
       {/* Score hero */}
@@ -89,34 +91,34 @@ export function AiSummaryPanel({ app }: { app: Application }) {
         <div
           className="grid size-16 shrink-0 place-items-center rounded-lg text-2xl font-semibold tabular-nums text-white"
           style={{ backgroundColor: tone }}
-          aria-label={score === null ? "Not yet scored" : `AI score ${Math.round(score)}`}
+          aria-label={score === null ? t("scoreNotYet") : t("scoreAria", { score: Math.round(score) })}
         >
           {score === null ? "—" : Math.round(score)}
         </div>
         <div className="min-w-0">
           <p className="text-sm font-medium text-foreground">
-            {score === null ? "Awaiting score" : score >= 75 ? "Strong fit" : score >= 50 ? "Worth a review" : "Below threshold"}
+            {score === null ? t("verdictAwaiting") : score >= 75 ? t("verdictStrong") : score >= 50 ? t("verdictReview") : t("verdictBelow")}
           </p>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {app.must_have_passed === null
-              ? "Not yet scored"
+              ? t("scoreNotYet")
               : app.must_have_passed
-                ? "Passed must-have gate"
-                : "Failed must-have gate"}
+                ? t("mustPassed")
+                : t("mustFailed")}
           </p>
         </div>
       </div>
 
       <div className="flex flex-wrap gap-1.5">
-        <Badge variant="secondary" className="capitalize">status: {app.status}</Badge>
-        {app.assigned_store_id !== null && <Badge variant="outline">สาขา {app.assigned_store_id}</Badge>}
-        {app.talent_pool && <Badge variant="outline">พูลกลาง · รอจัดสาขา</Badge>}
+        <Badge variant="secondary" className="capitalize">{t("badgeStatus", { status: app.status })}</Badge>
+        {app.assigned_store_id !== null && <Badge variant="outline">{t("badgeStore", { id: app.assigned_store_id })}</Badge>}
+        {app.talent_pool && <Badge variant="outline">{t("badgePool")}</Badge>}
         {app.needs_manual_review && (
           <span className="inline-flex items-center rounded-full bg-brass-soft px-2 py-0.5 text-xs font-medium text-brass">
-            manual review
+            {t("badgeManualReview")}
           </span>
         )}
-        {app.dedup_state && app.dedup_state !== "none" && <Badge variant="outline">dedup: {app.dedup_state}</Badge>}
+        {app.dedup_state && app.dedup_state !== "none" && <Badge variant="outline">{t("badgeDedup", { state: app.dedup_state })}</Badge>}
       </div>
 
       {app.ai_score_breakdown && (
@@ -129,7 +131,7 @@ export function AiSummaryPanel({ app }: { app: Application }) {
 
       {app.status === "rejected" && app.rejection_reason && (
         <div className="rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          <p className="font-medium">Not selected</p>
+          <p className="font-medium">{t("notSelected")}</p>
           <p className="mt-0.5 text-destructive/90">{app.rejection_reason}</p>
         </div>
       )}
@@ -138,15 +140,13 @@ export function AiSummaryPanel({ app }: { app: Application }) {
 
       <div>
         <p className="mb-2.5 text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-          Next step
+          {t("nextStep")}
         </p>
         {nextStepButtons.length > 0 ? (
           <div className="grid grid-cols-2 gap-2">{nextStepButtons}</div>
         ) : (
           <p className="text-sm text-muted-foreground">
-            {app.status === "ai_interview"
-              ? "AI interview in progress — awaiting the candidate."
-              : "No actions available at this stage."}
+            {app.status === "ai_interview" ? t("aiInProgress") : t("noActions")}
           </p>
         )}
       </div>
@@ -155,16 +155,16 @@ export function AiSummaryPanel({ app }: { app: Application }) {
       <RejectDialog applicationId={app.id} open={rejectOpen} onClose={() => setRejectOpen(false)} />
 
       <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2.5 border-t border-hairline pt-5 text-xs">
-        <dt className="text-muted-foreground">OCR confidence</dt>
+        <dt className="text-muted-foreground">{t("ocrConfidence")}</dt>
         <dd className="text-right font-medium tabular-nums">
           {app.ocr_confidence !== null ? app.ocr_confidence.toFixed(2) : "—"}
         </dd>
-        <dt className="text-muted-foreground">Parsed at</dt>
+        <dt className="text-muted-foreground">{t("parsedAt")}</dt>
         <dd className="text-right tabular-nums">
           {app.parsed_at ? new Date(app.parsed_at).toLocaleString() : "—"}
         </dd>
-        <dt className="text-muted-foreground">Profile JSON</dt>
-        <dd className="truncate text-right">{app.parsed_profile_blob_url ? "stored" : "—"}</dd>
+        <dt className="text-muted-foreground">{t("profileJson")}</dt>
+        <dd className="truncate text-right">{app.parsed_profile_blob_url ? t("stored") : "—"}</dd>
       </dl>
     </div>
   );
