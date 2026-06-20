@@ -37,6 +37,9 @@ import type {
   MemberStats,
   OpenRole,
   Position,
+  Requisition,
+  RequisitionFilter,
+  RequisitionInput,
   AtsReport,
   RbacPermission,
   RbacRole,
@@ -787,5 +790,66 @@ export function useMemberBulk() {
       void qc.invalidateQueries({ queryKey: ["members"] });
       void qc.invalidateQueries({ queryKey: ["member-stats"] });
     },
+  });
+}
+
+// ── Requisitions (manage position openings) ─────────────────────────────────
+
+// useRequisitions keeps the {data, meta} wrapper so the page reads meta.total.
+export function useRequisitions(filter: RequisitionFilter, enabled = true) {
+  return useQuery({
+    queryKey: ["requisitions", filter],
+    queryFn: () =>
+      api.get<Requisition[]>(
+        "/api/v1/requisitions" +
+          buildQuery({
+            status: filter.status,
+            store_id: filter.store_id === undefined ? undefined : String(filter.store_id),
+            position_id: filter.position_id,
+            page: filter.page,
+            limit: filter.limit,
+          }),
+      ),
+    enabled,
+  });
+}
+
+function invalidateRequisitions(qc: ReturnType<typeof useQueryClient>) {
+  void qc.invalidateQueries({ queryKey: ["requisitions"] });
+}
+
+export function useCreateRequisition() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: RequisitionInput) =>
+      api.post<Requisition>("/api/v1/requisitions", input).then((r) => r.data),
+    onSuccess: () => invalidateRequisitions(qc),
+  });
+}
+
+export function useUpdateRequisition() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: RequisitionInput }) =>
+      api.patch<Requisition>(`/api/v1/requisitions/${id}`, input).then((r) => r.data),
+    onSuccess: () => invalidateRequisitions(qc),
+  });
+}
+
+export function useApproveRequisition() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api.post<Requisition>(`/api/v1/requisitions/${id}/approve`).then((r) => r.data),
+    onSuccess: () => invalidateRequisitions(qc),
+  });
+}
+
+export function useCloseRequisition() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api.post<Requisition>(`/api/v1/requisitions/${id}/close`).then((r) => r.data),
+    onSuccess: () => invalidateRequisitions(qc),
   });
 }

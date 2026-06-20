@@ -8,27 +8,29 @@ package rbac
 // rbac_permissions table mirrors them (labels/grouping) for the admin UI and is
 // kept in sync by migration + the AllPermissions parity test.
 const (
-	PermSettingsAdmin    = "settings.admin"     // system settings (allow-all-tenants)
-	PermUsersAdmin       = "users.admin"        // HR user-account CRUD
-	PermRBACAdmin        = "rbac.admin"         // role/permission CRUD (this feature)
-	PermExecutiveView    = "executive.view"     // company-wide executive overview
-	PermReportsView      = "reports.view"       // ATS reports page
-	PermReportsExport    = "reports.export"     // on-demand report export
-	PermReengageTrigger  = "reengage.trigger"   // manual re-engagement sweep
-	PermMembersAdmin     = "members.admin"      // member-management console
-	PermMembersErase     = "members.erase"      // irreversible PDPA anonymize
-	PermBulkUpload       = "bulk.upload"        // bulk CV intake
-	PermAssignmentWrite  = "assignment.write"   // manual branch (re)assignment
-	PermOfferWrite       = "offer.write"        // compose/send offers
-	PermOnboardingWrite  = "onboarding.write"   // review onboarding documents
-	PermLetterWrite      = "letter.write"       // generate PDF letters
-	PermScorecardTA      = "scorecard.ta"       // TA (recruiter) scorecard
-	PermScorecardLM      = "scorecard.lm"       // line-manager scorecard
-	PermApprovalSubmit   = "approval.submit"    // open a hiring-approval request
-	PermApprovalDecideL1 = "approval.decide.l1" // approve at level 1 (staff)
-	PermApprovalDecideL2 = "approval.decide.l2" // approve at level 2 (hr manager)
-	PermApprovalDecideL3 = "approval.decide.l3" // approve at level 3 (sgm)
-	PermApprovalDecideL4 = "approval.decide.l4" // approve at level 4 (regional)
+	PermSettingsAdmin      = "settings.admin"      // system settings (allow-all-tenants)
+	PermUsersAdmin         = "users.admin"         // HR user-account CRUD
+	PermRBACAdmin          = "rbac.admin"          // role/permission CRUD (this feature)
+	PermExecutiveView      = "executive.view"      // company-wide executive overview
+	PermReportsView        = "reports.view"        // ATS reports page
+	PermReportsExport      = "reports.export"      // on-demand report export
+	PermReengageTrigger    = "reengage.trigger"    // manual re-engagement sweep
+	PermMembersAdmin       = "members.admin"       // member-management console
+	PermMembersErase       = "members.erase"       // irreversible PDPA anonymize
+	PermBulkUpload         = "bulk.upload"         // bulk CV intake
+	PermAssignmentWrite    = "assignment.write"    // manual branch (re)assignment
+	PermOfferWrite         = "offer.write"         // compose/send offers
+	PermOnboardingWrite    = "onboarding.write"    // review onboarding documents
+	PermLetterWrite        = "letter.write"        // generate PDF letters
+	PermScorecardTA        = "scorecard.ta"        // TA (recruiter) scorecard
+	PermScorecardLM        = "scorecard.lm"        // line-manager scorecard
+	PermApprovalSubmit     = "approval.submit"     // open a hiring-approval request
+	PermApprovalDecideL1   = "approval.decide.l1"  // approve at level 1 (staff)
+	PermApprovalDecideL2   = "approval.decide.l2"  // approve at level 2 (hr manager)
+	PermApprovalDecideL3   = "approval.decide.l3"  // approve at level 3 (sgm)
+	PermApprovalDecideL4   = "approval.decide.l4"  // approve at level 4 (regional)
+	PermRequisitionManage  = "requisition.manage"  // create/edit/close a requisition
+	PermRequisitionApprove = "requisition.approve" // approve a pending requisition → open
 )
 
 // RoleSuperAdmin is the built-in role that is a hard code bypass: it implicitly
@@ -45,6 +47,7 @@ var AllPermissions = []string{
 	PermMembersAdmin, PermMembersErase, PermBulkUpload, PermAssignmentWrite,
 	PermOfferWrite, PermOnboardingWrite, PermLetterWrite, PermScorecardTA, PermScorecardLM,
 	PermApprovalSubmit, PermApprovalDecideL1, PermApprovalDecideL2, PermApprovalDecideL3, PermApprovalDecideL4,
+	PermRequisitionManage, PermRequisitionApprove,
 }
 
 // ApprovalDecidePermForLevel returns the permission gating a given approval chain

@@ -44,6 +44,7 @@ import (
 	"github.com/nexto/hr-ats/internal/rbacadmin"
 	"github.com/nexto/hr-ats/internal/reengage"
 	"github.com/nexto/hr-ats/internal/reports"
+	"github.com/nexto/hr-ats/internal/requisitions"
 	"github.com/nexto/hr-ats/internal/search"
 	"github.com/nexto/hr-ats/internal/settings"
 	"github.com/nexto/hr-ats/internal/stores"
@@ -414,6 +415,10 @@ func main() {
 	applications.RegisterBulkRoutes(app, applications.NewBulkHandler(intakeSvc))
 	positions.RegisterRoutes(app, positions.NewHandler(positionRepo))
 	stores.RegisterRoutes(app, stores.NewHandler(storeRepo))
+	// Requisition management (HR dashboard): open/approve/close manual position
+	// openings as rows in the shared `vacancies` table (source='manual'), RBAC-scoped.
+	// Approved requisitions flow into branch assignment + executive + portal automatically.
+	requisitions.RegisterRoutes(app, requisitions.NewHandler(requisitions.NewRepository(pool)))
 	interview.RegisterDashboardRoutes(app, interviewHandler)
 	// AI cross-position fit analysis: HR-triggered verdict combining the CV-screening
 	// result + the AI pre-interview, matched against the whole Master JD catalogue.
