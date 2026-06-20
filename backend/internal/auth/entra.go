@@ -67,6 +67,7 @@ func mapIdentity(c entraClaims) Identity {
 type oidcVerifier struct {
 	verifier *oidc.IDTokenVerifier
 	policy   TenantPolicy
+	clientID string // app (client) id; used to resolve directory-extension scope claims
 }
 
 // entraIssuer returns the v2.0 issuer URL for a tenant id.
@@ -101,7 +102,7 @@ func NewEntraVerifier(ctx context.Context, cfg *config.Config, policy TenantPoli
 		return nil, fmt.Errorf("auth: entra discovery: %w", err)
 	}
 	verifier := provider.Verifier(&oidc.Config{ClientID: cfg.AzureADClientID, SkipIssuerCheck: true})
-	return oidcVerifier{verifier: verifier, policy: policy}, nil
+	return oidcVerifier{verifier: verifier, policy: policy, clientID: cfg.AzureADClientID}, nil
 }
 
 func (v oidcVerifier) Verify(ctx context.Context, rawToken string) (Identity, error) {
@@ -117,6 +118,16 @@ func (v oidcVerifier) Verify(ctx context.Context, rawToken string) (Identity, er
 	if err := tok.Claims(&claims); err != nil {
 		return Identity{}, fmt.Errorf("auth: claims: %w", err)
 	}
+	// Scope claims (store_id/subregion) may arrive short-named or as prefixed
+	// directory-extension claims, so resolve them from the raw claim set rather
+	// than the typed struct, which only matches the short name. A second decode
+	// of the same token payload is safe (IDToken stores the raw claims bytes).
+	var raw map[string]any
+	if err := tok.Claims(&raw); err != nil {
+		return Identity{}, fmt.Errorf("auth: raw claims: %w", err)
+	}
+	claims.StoreID = resolveStoreID(raw, v.clientID)
+	claims.Subregion = resolveSubregion(raw, v.clientID)
 	tid := strings.ToLower(strings.TrimSpace(claims.TenantID))
 	if tid == "" {
 		return Identity{}, fmt.Errorf("auth: token missing tenant id")
