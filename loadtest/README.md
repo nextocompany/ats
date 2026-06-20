@@ -1,4 +1,17 @@
-# Load testing — CV intake + pipeline throughput
+# Load testing - CV intake + pipeline throughput
+
+> **Read-only prod baseline** lives in `readonly-load.js` - safe to run against
+> production (GET-only, no writes, no Azure AI). Run:
+> `k6 run -e TARGET=https://<api> loadtest/readonly-load.js`. The write-path tests
+> below MUST use a staging/throwaway stack.
+>
+> **Prod baseline (2026-06-20, api 0.5 vCPU, min 1 / max 3 replicas):** ramped
+> 20 concurrent VUs at `/health` for 2 min = **40,069 reqs @ ~334 req/s, 0%
+> errors, p95 67 ms** (avg 45 ms, max 348 ms). The api **autoscaled 1 -> 3
+> replicas** under the load and stayed healthy. Public read (`/api/v1/public/positions`,
+> sampled under the 30/min limiter) p95 71 ms. Headroom: a single 3-replica
+> revision sustains ~330 read req/s with sub-100 ms p95. The real capacity ceiling
+> remains the async pipeline (OCR+LLM), measured separately below on staging.
 
 Two things to measure, because they have different bottlenecks:
 
