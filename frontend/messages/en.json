@@ -176,10 +176,8 @@
     "pendingHrisShort": "Pending HRIS",
     "printReport": "Print report",
     "asOf": "As of {date}",
-    "sourcingTitle": "Channel performance",
     "dataSourceLive": "Live data",
-    "loadError": "Could not load the overview",
-    "retry": "Try again"
+    "loadError": "Could not load the overview"
   },
   "reports": {
     "eyebrow": "Reporting",

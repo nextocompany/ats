@@ -176,10 +176,8 @@
     "pendingHrisShort": "รอเชื่อม HRIS",
     "printReport": "พิมพ์รายงาน",
     "asOf": "ข้อมูล ณ {date}",
-    "sourcingTitle": "ประสิทธิภาพช่องทาง",
     "dataSourceLive": "ข้อมูลจริง",
-    "loadError": "โหลดภาพรวมไม่สำเร็จ",
-    "retry": "ลองใหม่อีกครั้ง"
+    "loadError": "โหลดภาพรวมไม่สำเร็จ"
   },
   "reports": {
     "eyebrow": "รายงาน",

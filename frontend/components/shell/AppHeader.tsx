@@ -33,7 +33,7 @@ export function AppHeader() {
   });
 
   return (
-    <div className="sticky top-0 z-20 hidden h-16 items-center justify-between border-b border-hairline bg-background/80 px-8 backdrop-blur-md lg:flex">
+    <div className="sticky top-0 z-20 hidden h-16 items-center justify-between border-b border-hairline bg-background/80 px-8 backdrop-blur-md lg:flex print:hidden">
       <nav aria-label="Breadcrumb" className="flex items-baseline gap-2 text-sm">
         <span className="text-muted-foreground">Console</span>
         <span className="text-muted-foreground/40">/</span>

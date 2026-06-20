@@ -45,7 +45,7 @@ export function SideNav() {
   const identity = deriveIdentity(me);
 
   return (
-    <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col overflow-hidden bg-sidebar text-sidebar-foreground lg:flex">
+    <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col overflow-hidden bg-sidebar text-sidebar-foreground lg:flex print:hidden">
       {/* Faint brand dot-dither — atmosphere on the navy spine, never input */}
       <span
         aria-hidden
