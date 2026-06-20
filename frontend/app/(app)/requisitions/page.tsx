@@ -108,7 +108,12 @@ export default function RequisitionsPage() {
         </>
       )}
 
-      <RequisitionDialog mode="create" open={createOpen} onClose={() => setCreateOpen(false)} />
+      <RequisitionDialog
+        key={createOpen ? "create-open" : "create-closed"}
+        mode="create"
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+      />
       <RequisitionDialog
         key={editing?.id ?? "none"}
         mode="edit"

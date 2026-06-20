@@ -10,10 +10,13 @@
 -- A 'pending_approval' row is invisible to every consumer (they match 'open'),
 -- so the approval step is an implicit, free gate.
 
+-- created_by / approved_by are audit pointers, NOT foreign keys: the actor may be
+-- an Entra SSO user (DevUser.ID = the token OID), who has no row in `users` (that
+-- table only holds local password-login accounts). A FK would 23503-fail for them.
 ALTER TABLE vacancies
   ADD COLUMN source      VARCHAR(20) NOT NULL DEFAULT 'peoplesoft', -- 'peoplesoft' | 'manual'
-  ADD COLUMN created_by  UUID REFERENCES users(id),
-  ADD COLUMN approved_by UUID REFERENCES users(id),
+  ADD COLUMN created_by  UUID,
+  ADD COLUMN approved_by UUID,
   ADD COLUMN approved_at TIMESTAMPTZ,
   ADD COLUMN created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   ADD COLUMN updated_at  TIMESTAMPTZ NOT NULL DEFAULT now();

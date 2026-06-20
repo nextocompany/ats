@@ -2,6 +2,7 @@ package requisitions
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -211,7 +212,7 @@ func (r *pgRepository) getByID(ctx context.Context, id uuid.UUID) (Requisition, 
 	row := r.pool.QueryRow(ctx, "SELECT"+reqColumns+reqFrom+" WHERE v.id = $1", id)
 	req, err := scanRequisition(row)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return Requisition{}, ErrNotFound
 		}
 		return Requisition{}, fmt.Errorf("requisitions: get by id: %w", err)
