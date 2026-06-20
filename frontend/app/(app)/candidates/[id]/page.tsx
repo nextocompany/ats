@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { ArrowLeft } from "lucide-react";
 
 import { ScoreBadge } from "@/components/inbox/ScoreBadge";
@@ -11,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useCandidate, useTimeline } from "@/lib/queries";
 
 export default function CandidateProfilePage() {
+  const t = useTranslations("candidates");
   const { id } = useParams<{ id: string }>();
   const { data, isLoading, isError } = useCandidate(id);
   const { data: timeline } = useTimeline(id);
@@ -19,7 +21,7 @@ export default function CandidateProfilePage() {
   if (isError || !data)
     return (
       <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-        Candidate not found.
+        {t("detailNotFound")}
       </div>
     );
 
@@ -32,7 +34,7 @@ export default function CandidateProfilePage() {
         href="/candidates"
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
       >
-        <ArrowLeft className="size-4" /> Back to candidates
+        <ArrowLeft className="size-4" /> {t("backToList")}
       </Link>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
@@ -44,7 +46,7 @@ export default function CandidateProfilePage() {
                 {initials}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="eyebrow brass-underline inline-block">Candidate</p>
+                <p className="eyebrow brass-underline inline-block">{t("colCandidate")}</p>
                 <h1 className="mt-3 font-heading text-2xl font-semibold tracking-tight">
                   {candidate.full_name}
                 </h1>
@@ -59,21 +61,21 @@ export default function CandidateProfilePage() {
             </div>
             <dl className="mt-5 grid grid-cols-1 gap-x-8 gap-y-3 border-t border-hairline pt-5 text-sm sm:grid-cols-2">
               <div className="flex justify-between gap-4 sm:block">
-                <dt className="text-muted-foreground sm:text-xs sm:uppercase sm:tracking-wide">Phone</dt>
+                <dt className="text-muted-foreground sm:text-xs sm:uppercase sm:tracking-wide">{t("phone")}</dt>
                 <dd className="font-medium tabular-nums sm:mt-1">{candidate.phone || "-"}</dd>
               </div>
               <div className="flex justify-between gap-4 sm:block">
-                <dt className="text-muted-foreground sm:text-xs sm:uppercase sm:tracking-wide">Email</dt>
+                <dt className="text-muted-foreground sm:text-xs sm:uppercase sm:tracking-wide">{t("email")}</dt>
                 <dd className="truncate font-medium sm:mt-1">{candidate.email || "-"}</dd>
               </div>
             </dl>
           </section>
 
           <section>
-            <h2 className="eyebrow mb-3">Applications ({applications.length})</h2>
+            <h2 className="eyebrow mb-3">{t("applicationsCount", { count: applications.length })}</h2>
             <div className="overflow-hidden rounded-xl bg-card ring-1 ring-hairline">
               {applications.length === 0 ? (
-                <p className="px-5 py-8 text-center text-sm text-muted-foreground">No applications yet.</p>
+                <p className="px-5 py-8 text-center text-sm text-muted-foreground">{t("noApplications")}</p>
               ) : (
                 applications.map((a, i) => (
                   <Link
@@ -95,8 +97,8 @@ export default function CandidateProfilePage() {
           </section>
         </div>
 
-        <aside aria-label="History">
-          <h2 className="eyebrow mb-3">Timeline</h2>
+        <aside aria-label={t("historyAria")}>
+          <h2 className="eyebrow mb-3">{t("timeline")}</h2>
           <div className="rounded-xl bg-card p-5 ring-1 ring-hairline">
             <ol className="relative space-y-4 border-l border-hairline pl-5 text-sm">
               {(timeline ?? []).map((e, i) => (
@@ -109,7 +111,7 @@ export default function CandidateProfilePage() {
                 </li>
               ))}
               {(timeline ?? []).length === 0 && (
-                <li className="text-muted-foreground">No history yet.</li>
+                <li className="text-muted-foreground">{t("noHistory")}</li>
               )}
             </ol>
           </div>

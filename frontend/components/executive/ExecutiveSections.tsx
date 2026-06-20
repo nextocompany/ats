@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Store, Briefcase } from "lucide-react";
 
 import { Pill } from "@/components/people/PeopleBits";
@@ -28,28 +29,29 @@ const dash = "-";
    mirroring the KPI hero band. Falls back to em-dashes when budget is pending
    (live mode before PeopleSoft is wired). ───────────────────────────────── */
 export function HeadcountBand({ company }: { company: ExecutiveCompany }) {
+  const t = useTranslations("executive");
   const hasBudget = company.budget_available;
   const supporting: { label: string; value: string; hint: string }[] = [
     {
-      label: "Budgeted",
+      label: t("budgeted"),
       value: hasBudget ? fmt.format(company.budget_headcount) : dash,
-      hint: hasBudget ? "approved headcount" : "pending HRIS",
+      hint: hasBudget ? t("approvedHeadcount") : t("pendingHris"),
     },
     {
-      label: "Vacancy",
+      label: t("vacancy"),
       value: fmt.format(company.vacancy),
-      hint: hasBudget ? "open positions" : "open vacancies",
+      hint: hasBudget ? t("openPositions") : t("openVacancies"),
     },
     {
-      label: "Fill rate",
+      label: t("fillRate"),
       value: hasBudget ? `${company.fill_rate_pct}%` : dash,
-      hint: hasBudget ? "of budget filled" : "pending HRIS",
+      hint: hasBudget ? t("ofBudgetFilled") : t("pendingHris"),
     },
   ];
 
   return (
     <section
-      aria-label="Company headcount"
+      aria-label={t("companyHeadcountAria")}
       className="grid gap-px overflow-hidden rounded-xl bg-hairline ring-1 ring-hairline lg:grid-cols-[1.35fr_2fr]"
     >
       <div className="relative flex flex-col justify-between bg-brand px-5 py-6 text-brand-foreground sm:px-7">
@@ -59,7 +61,7 @@ export function HeadcountBand({ company }: { company: ExecutiveCompany }) {
           style={{ background: "var(--brass)" }}
         />
         <p className="pl-3.5 text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-brand-foreground/70">
-          Actual headcount
+          {t("actualHeadcount")}
         </p>
         <div className="mt-3 pl-3.5">
           <span className="num block font-semibold tabular-nums leading-none [font-size:var(--text-stat)] tracking-tight">
@@ -67,8 +69,11 @@ export function HeadcountBand({ company }: { company: ExecutiveCompany }) {
           </span>
           <p className="mt-3 text-sm text-brand-foreground/80">
             {hasBudget
-              ? `of ${fmt.format(company.budget_headcount)} budgeted · ${company.fill_rate_pct}% filled`
-              : "across all stores · budget pending HRIS"}
+              ? t("headcountBudgetLine", {
+                  budget: fmt.format(company.budget_headcount),
+                  pct: company.fill_rate_pct,
+                })
+              : t("headcountNoBudgetLine")}
           </p>
         </div>
       </div>
@@ -95,26 +100,27 @@ export function HeadcountBand({ company }: { company: ExecutiveCompany }) {
 /* ── Most short-staffed branches — ranked ascending by fill-rate (worst first),
    exactly the question "which branch needs people now?". ─────────────────── */
 export function ShortStaffedPanel({ stores }: { stores: ExecutiveStoreFill[] }) {
+  const t = useTranslations("executive");
   return (
     <section className="flex flex-col rounded-xl bg-card p-6 ring-1 ring-hairline">
       <header className="mb-5 flex items-baseline justify-between">
         <div>
-          <p className="eyebrow brass-underline inline-block">Staffing</p>
+          <p className="eyebrow brass-underline inline-block">{t("staffing")}</p>
           <h2 className="mt-3 flex items-center gap-2 font-heading text-lg font-semibold tracking-tight">
             <span aria-hidden className="text-muted-foreground">
               <Store className="size-4" strokeWidth={1.75} />
             </span>
-            Most short-staffed branches
+            {t("mostShortStaffed")}
           </h2>
         </div>
-        <span className="text-xs tabular-nums text-muted-foreground">{stores.length} stores</span>
+        <span className="text-xs tabular-nums text-muted-foreground">{t("storesCount", { count: stores.length })}</span>
       </header>
 
       {stores.length === 0 ? (
         <EmptyState
           icon={<Store className="size-4" strokeWidth={1.75} />}
-          title="No staffing data"
-          hint="Branch fill-rate appears here once headcount targets and hires are available."
+          title={t("noStaffingData")}
+          hint={t("noStaffingHint")}
         />
       ) : (
         <ol className="flex flex-col gap-3">
@@ -130,7 +136,7 @@ export function ShortStaffedPanel({ stores }: { stores: ExecutiveStoreFill[] }) 
                 <span className="flex shrink-0 items-baseline gap-2 tabular-nums">
                   <span className="font-semibold text-foreground">{s.fill_rate_pct}%</span>
                   {s.heads_short > 0 && (
-                    <span className="text-xs text-[var(--score-low)]">-{fmt.format(s.heads_short)} heads</span>
+                    <span className="text-xs text-[var(--score-low)]">{t("headsShort", { n: fmt.format(s.heads_short) })}</span>
                   )}
                 </span>
               </div>
@@ -155,26 +161,27 @@ export function ShortStaffedPanel({ stores }: { stores: ExecutiveStoreFill[] }) 
 /* ── Pipeline by position — compact funnel (applied → screening → interview →
    offer → hired) per role, with open headcount. ─────────────────────────── */
 export function PipelinePanel({ rows }: { rows: ExecutivePipelinePosition[] }) {
+  const t = useTranslations("executive");
   return (
     <section className="flex flex-col rounded-xl bg-card p-6 ring-1 ring-hairline">
       <header className="mb-5 flex items-baseline justify-between">
         <div>
-          <p className="eyebrow brass-underline inline-block">Hiring</p>
+          <p className="eyebrow brass-underline inline-block">{t("hiring")}</p>
           <h2 className="mt-3 flex items-center gap-2 font-heading text-lg font-semibold tracking-tight">
             <span aria-hidden className="text-muted-foreground">
               <Briefcase className="size-4" strokeWidth={1.75} />
             </span>
-            Pipeline by position
+            {t("pipelineByPosition")}
           </h2>
         </div>
-        <span className="text-xs tabular-nums text-muted-foreground">applied ▸ hired</span>
+        <span className="text-xs tabular-nums text-muted-foreground">{t("appliedToHired")}</span>
       </header>
 
       {rows.length === 0 ? (
         <EmptyState
           icon={<Briefcase className="size-4" strokeWidth={1.75} />}
-          title="No pipeline yet"
-          hint="Applications by position appear here as candidates move through screening to hire."
+          title={t("noPipeline")}
+          hint={t("noPipelineHint")}
         />
       ) : (
         <ol className="flex flex-col divide-y divide-hairline">
@@ -182,7 +189,7 @@ export function PipelinePanel({ rows }: { rows: ExecutivePipelinePosition[] }) {
             <li key={p.position_id} className="flex items-center justify-between gap-3 py-3">
               <span className="flex min-w-0 items-baseline gap-2">
                 <span className="truncate text-sm font-medium text-foreground">{p.title}</span>
-                <span className="shrink-0 text-xs text-muted-foreground">{p.openings} open</span>
+                <span className="shrink-0 text-xs text-muted-foreground">{t("openCount", { n: p.openings })}</span>
               </span>
               <span className="flex shrink-0 items-center gap-1 text-xs tabular-nums text-muted-foreground">
                 <Stage value={p.applied} />

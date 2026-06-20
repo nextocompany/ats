@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { ArrowLeft } from "lucide-react";
 
 import { AiSummaryPanel } from "@/components/resume/AiSummaryPanel";
@@ -24,6 +25,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useApplication } from "@/lib/queries";
 
 export default function ApplicationDetailPage() {
+  const t = useTranslations("inbox");
   const { id } = useParams<{ id: string }>();
   const { data: app, isLoading, isError } = useApplication(id);
 
@@ -33,27 +35,27 @@ export default function ApplicationDetailPage() {
         href="/applications"
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
       >
-        <ArrowLeft className="size-4" /> Back to inbox
+        <ArrowLeft className="size-4" /> {t("detailBack")}
       </Link>
 
       {isLoading && <Skeleton className="h-[70vh] w-full rounded-xl" />}
       {isError && (
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-          Application not found, or it has been removed.
+          {t("detailNotFound")}
         </div>
       )}
 
       {app && (
         <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-          <section aria-label="Resume" className="min-w-0">
+          <section aria-label={t("resumeAria")} className="min-w-0">
             <div className="mb-3 flex items-baseline justify-between">
-              <p className="eyebrow">Source document</p>
+              <p className="eyebrow">{t("sourceDocument")}</p>
               <span className="font-mono text-xs text-muted-foreground">{app.id.slice(0, 8)}</span>
             </div>
             <ResumeViewer applicationId={app.id} />
           </section>
           <aside
-            aria-label="AI summary and actions"
+            aria-label={t("actionsAria")}
             className="h-fit rounded-xl bg-card p-6 ring-1 ring-hairline lg:sticky lg:top-6"
           >
             <AiSummaryPanel app={app} />
