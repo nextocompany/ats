@@ -194,6 +194,80 @@ needed.
 3. Confirm the dashboard gates features per that role; `super_admin` sees everything,
    an **unassigned** user fails closed (store scope, near-empty UI).
 
+## Graph API commands (az rest, copy-paste)
+
+Concrete values for this tenant. The signed-in az user needs rights to write the
+app + user objects (Application.ReadWrite.All / Directory.ReadWrite.All or be an
+app owner + user admin). A `403` means the account lacks the directory role.
+
+```bash
+# --- constants (this tenant) ---
+APP_OBJECT_ID=88f1e969-9de1-4d5a-87cc-fea0bd8b3be9          # HR ATS Dashboard (object id, NOT client id)
+EXT=extension_57c7d33847be4726bec5560853620d1f             # client id, dashes stripped
+```
+
+### 1. Register the two directory extension attributes (once)
+
+```bash
+az rest --method POST \
+  --url "https://graph.microsoft.com/v1.0/applications/$APP_OBJECT_ID/extensionProperties" \
+  --headers "Content-Type=application/json" \
+  --body '{"name":"store_id","dataType":"String","targetObjects":["User"]}'
+
+az rest --method POST \
+  --url "https://graph.microsoft.com/v1.0/applications/$APP_OBJECT_ID/extensionProperties" \
+  --headers "Content-Type=application/json" \
+  --body '{"name":"subregion","dataType":"String","targetObjects":["User"]}'
+```
+
+Each response `name` is the full claim name, e.g.
+`extension_57c7d33847be4726bec5560853620d1f_store_id`. Confirm it matches `$EXT_store_id`.
+
+### 2. Set per-user values (per assigned user)
+
+`store_id` for store-scoped roles (`sgm`/`hr_manager`/`hr_staff`); `subregion` for
+`operation_director`. Values are strings; the backend converts `store_id` to int.
+
+```bash
+USER="firstname.lastname@ert.co.th"   # UPN or user object id
+
+az rest --method PATCH \
+  --url "https://graph.microsoft.com/v1.0/users/$USER" \
+  --headers "Content-Type=application/json" \
+  --body "{\"${EXT}_store_id\":\"12\",\"${EXT}_subregion\":\"East\"}"
+```
+
+### 3. Verify the stored values
+
+```bash
+az rest --method GET \
+  --url "https://graph.microsoft.com/v1.0/users/$USER?\$select=displayName,${EXT}_store_id,${EXT}_subregion"
+```
+
+### 4. Surface them as optional claims (so they ride in the token)
+
+Registering + setting an extension does NOT put it in the token; it must also be an
+optional claim. **Portal is the reliable path:** App registration → **Token
+configuration** → **Add optional claim** → ID (and Access) → **directory extension**
+→ pick `store_id` + `subregion`.
+
+Graph alternative (merge into existing `optionalClaims`, do not blind-overwrite):
+
+```bash
+az rest --method PATCH \
+  --url "https://graph.microsoft.com/v1.0/applications/$APP_OBJECT_ID" \
+  --headers "Content-Type=application/json" \
+  --body "{\"optionalClaims\":{\"idToken\":[
+    {\"name\":\"${EXT}_store_id\",\"source\":\"user\",\"essential\":false},
+    {\"name\":\"${EXT}_subregion\",\"source\":\"user\",\"essential\":false}],
+    \"accessToken\":[
+    {\"name\":\"${EXT}_store_id\",\"source\":\"user\",\"essential\":false},
+    {\"name\":\"${EXT}_subregion\",\"source\":\"user\",\"essential\":false}]}}"
+```
+
+Then sign out / in and decode the token at <https://jwt.ms> to confirm the
+`extension_…_store_id` / `_subregion` claims carry the per-user values.
+
 ## UAT #6 gotchas
 
 - Role string mismatch (typo / wrong case) → backend can't find it → fail closed to
