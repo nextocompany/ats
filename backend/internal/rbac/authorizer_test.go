@@ -68,8 +68,8 @@ func newSeededAuthorizer(t *testing.T) *Authorizer {
 func TestSeedMatrixParity(t *testing.T) {
 	a := newSeededAuthorizer(t)
 	for _, perm := range AllPermissions {
-		if perm == PermRBACAdmin {
-			continue // net-new permission, no legacy equivalent
+		if perm == PermRBACAdmin || perm == PermRequisitionManage || perm == PermRequisitionApprove {
+			continue // net-new permissions, no legacy allowlist equivalent
 		}
 		allowed, ok := oldAllowlists[perm]
 		if !ok {

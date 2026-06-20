@@ -280,6 +280,39 @@ export interface Position {
   title_en: string;
 }
 
+// Requisition is a managed position opening (a row in the vacancies table,
+// source='manual'). Mirrors internal/requisitions.Requisition.
+export interface Requisition {
+  id: string;
+  position_id: string | null;
+  position_title: string;
+  store_id: number | null;
+  store_name: string;
+  subregion: string;
+  headcount: number;
+  status: string; // pending_approval | open | closed | cancelled
+  source: string; // manual | peoplesoft
+  created_by: string | null;
+  approved_by: string | null;
+  approved_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RequisitionInput {
+  position_id?: string;
+  store_id?: number;
+  headcount?: number;
+}
+
+export interface RequisitionFilter {
+  status?: string;
+  store_id?: number;
+  position_id?: string;
+  page?: number;
+  limit?: number;
+}
+
 // BulkIntakeResult mirrors applications.bulkResult (per-file outcome of a bulk upload).
 export interface BulkIntakeResult {
   total: number;

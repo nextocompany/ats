@@ -47,6 +47,23 @@ func (s Scope) ApplicationsClause(argStart int) (string, []any) {
 	}
 }
 
+// VacanciesClause returns a SQL condition scoping the vacancies table by its
+// store_id column, with placeholders numbered from argStart. An empty clause
+// means no scoping (KindAll). Used by the requisition-management list/detail.
+func (s Scope) VacanciesClause(argStart int) (string, []any) {
+	switch s.Kind() {
+	case KindSubregion:
+		return fmt.Sprintf("store_id IN (SELECT store_no FROM stores WHERE subregion = $%d)", argStart), []any{s.Subregion}
+	case KindStore:
+		if s.StoreID == nil {
+			return "1=0", nil // store-scoped user without a store sees nothing
+		}
+		return fmt.Sprintf("store_id = $%d", argStart), []any{*s.StoreID}
+	default:
+		return "", nil
+	}
+}
+
 // CandidatesClause returns a SQL condition scoping the candidates table.
 func (s Scope) CandidatesClause(argStart int) (string, []any) {
 	switch s.Kind() {

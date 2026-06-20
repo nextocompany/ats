@@ -9,6 +9,7 @@ import {
   LineChart,
   FileBarChart,
   ClipboardCheck,
+  ClipboardList,
   CheckSquare,
   Settings,
   type LucideIcon,
@@ -17,6 +18,7 @@ import {
 import {
   canAccessApprovals,
   canBulkUpload,
+  canManageRequisitions,
   canViewExecutive,
   canViewReports,
   isLineManager,
@@ -60,6 +62,11 @@ export const SHORTLIST_NAV: NavItem = { href: "/shortlist", label: "Shortlist", 
 // hr_manager/sgm/regional_director) + super_admin, gated via canAccessApprovals.
 export const APPROVALS_NAV: NavItem = { href: "/approvals", label: "Approvals", key: "approvals", icon: CheckSquare };
 
+// Requisitions is the position-opening management queue — manage roles
+// (super_admin/regional_director/operation_director/sgm/hr_manager), gated via
+// canManageRequisitions mirroring the backend allowlist.
+export const REQUISITIONS_NAV: NavItem = { href: "/requisitions", label: "Requisitions", key: "requisitions", icon: ClipboardList };
+
 // Members is super_admin + hr_manager — career-portal member management.
 export const MEMBERS_NAV: NavItem = { href: "/members", label: "Members", key: "members", icon: UserCog };
 
@@ -75,13 +82,14 @@ export function navForRole(me?: Me): NavItem[] {
   if (isLineManager(me)) items.push(SHORTLIST_NAV);
   if (canAccessApprovals(me)) items.push(APPROVALS_NAV);
   if (canBulkUpload(me)) items.push(BULK_NAV);
+  if (canManageRequisitions(me)) items.push(REQUISITIONS_NAV);
   if (isMemberAdmin(me)) items.push(MEMBERS_NAV);
   if (isSuperAdmin(me)) items.push(ADMIN_NAV);
   return items;
 }
 
 // ALL_NAV is every possible item, for pathname→item lookups (e.g. header title).
-export const ALL_NAV: NavItem[] = [...NAV, REPORTS_NAV, EXECUTIVE_NAV, SHORTLIST_NAV, APPROVALS_NAV, BULK_NAV, MEMBERS_NAV, ADMIN_NAV];
+export const ALL_NAV: NavItem[] = [...NAV, REPORTS_NAV, EXECUTIVE_NAV, SHORTLIST_NAV, APPROVALS_NAV, BULK_NAV, REQUISITIONS_NAV, MEMBERS_NAV, ADMIN_NAV];
 
 // Brand lockup — text-only institutional wordmark, no monogram tile or dot mark.
 // "CP AXTRA" tracked uppercase over an "ATS Console" line (HSBC/JPM register),

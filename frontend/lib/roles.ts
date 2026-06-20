@@ -26,6 +26,8 @@ export const PERMS = {
   scorecardTa: "scorecard.ta",
   scorecardLm: "scorecard.lm",
   approvalSubmit: "approval.submit",
+  requisitionManage: "requisition.manage",
+  requisitionApprove: "requisition.approve",
 } as const;
 
 // can reports whether the user holds a permission key.
@@ -92,6 +94,16 @@ export function canRecordLmScorecard(me: PermHolder): boolean {
 
 export function canRecordInterviewFeedback(me: PermHolder): boolean {
   return can(me, PERMS.scorecardTa) || can(me, PERMS.scorecardLm);
+}
+
+// canManageRequisitions gates opening/editing/closing position openings.
+export function canManageRequisitions(me: PermHolder): boolean {
+  return can(me, PERMS.requisitionManage);
+}
+
+// canApproveRequisitions gates approving a pending requisition into 'open'.
+export function canApproveRequisitions(me: PermHolder): boolean {
+  return can(me, PERMS.requisitionApprove);
 }
 
 // canSubmitApproval gates opening a hiring-approval request.
