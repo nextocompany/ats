@@ -51,6 +51,38 @@ func (d statusNotifyDeps) notifyStatusChange(ctx context.Context, apps Repositor
 	}
 }
 
+// notifyInterviewScheduled sends a best-effort candidate notification (LINE +
+// email) after a human interview is booked, carrying the concrete appointment
+// (date/time, mode, place/online link, round). It never returns an error — a
+// notify failure must not lose the booked appointment. No-op when deps are unset
+// or the candidate has no contact handle. Supersedes the generic status message
+// for the interview transition (callers must not also send notifyStatusChange).
+func (d statusNotifyDeps) notifyInterviewScheduled(ctx context.Context, apps Repository, appID uuid.UUID, appt Appointment) {
+	if d.notifier == nil || d.cands == nil {
+		return
+	}
+	app, err := apps.FindByID(ctx, appID)
+	if err != nil {
+		log.Warn().Err(err).Str("application", appID.String()).Msg("interview notify: load application failed")
+		return
+	}
+	cand, err := d.cands.FindByID(ctx, app.CandidateID)
+	if err != nil {
+		log.Warn().Err(err).Str("candidate", app.CandidateID.String()).Msg("interview notify: load candidate failed")
+		return
+	}
+	if msg := notify.InterviewScheduledMessage(cand.LineUserID, cand.FullName, appt.RoundNo, appt.DurationMin, appt.ScheduledAt, appt.Mode, appt.LocationText, appt.OnlineJoinURL, d.portalBaseURL); msg.Recipient != "" {
+		if err := d.notifier.Send(ctx, msg); err != nil {
+			log.Warn().Err(err).Str("application", appID.String()).Msg("interview notify: line send failed (non-fatal)")
+		}
+	}
+	if em := notify.InterviewScheduledEmailMessage(cand.Email, cand.FullName, appt.RoundNo, appt.DurationMin, appt.ScheduledAt, appt.Mode, appt.LocationText, appt.OnlineJoinURL, d.portalBaseURL); em.Recipient != "" {
+		if err := d.notifier.Send(ctx, em); err != nil {
+			log.Warn().Err(err).Str("application", appID.String()).Msg("interview notify: email send failed (non-fatal)")
+		}
+	}
+}
+
 // notifyDocumentReviewed sends a best-effort candidate notification (LINE + email)
 // after an onboarding document is approved/rejected (3.8). It never returns an
 // error — a notify failure must not affect the HR action. No-op when deps are
