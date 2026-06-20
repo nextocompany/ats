@@ -30,7 +30,7 @@ export function ReassignControl({ applicationId, app }: { applicationId: string;
 
   if (!canReassignPlacement(me)) return null;
 
-  const current = app.store_name ?? (app.talent_pool ? t("badgePool") : "—");
+  const current = app.store_name ?? (app.talent_pool ? t("badgePool") : "-");
 
   function assignStore(storeNo: string | null) {
     if (!storeNo) return;

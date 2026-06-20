@@ -164,11 +164,11 @@ export function ApplyStepper({ positionId, positionTitle, account, prefill }: Ap
           <dl className="space-y-3 rounded-xl border border-line bg-surface-muted p-4 text-sm">
             <div className="flex justify-between gap-3">
               <dt className="text-muted-foreground">ชื่อ-นามสกุล</dt>
-              <dd className="font-medium">{fullName || "—"}</dd>
+              <dd className="font-medium">{fullName || "-"}</dd>
             </div>
             <div className="flex justify-between gap-3">
               <dt className="text-muted-foreground">เบอร์โทรศัพท์</dt>
-              <dd className="font-medium">{phone || "—"}</dd>
+              <dd className="font-medium">{phone || "-"}</dd>
             </div>
             <div className="flex justify-between gap-3">
               <dt className="text-muted-foreground">เรซูเม่</dt>

@@ -35,7 +35,7 @@ type T = ReturnType<typeof useTranslations>;
 
 function joinedAgo(iso: string, t: T, locale: string): string {
   const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return "—";
+  if (Number.isNaN(then)) return "-";
   const days = Math.floor((Date.now() - then) / 86400000);
   if (days < 1) return t("agoToday");
   if (days < 7) return t("agoDays", { n: days });
@@ -53,7 +53,7 @@ function ProviderChips({ m }: { m: Member }) {
     m.google_linked && "Google",
     m.email_linked && "Email",
   ].filter(Boolean) as string[];
-  if (ps.length === 0) return <span className="text-xs text-muted-foreground">—</span>;
+  if (ps.length === 0) return <span className="text-xs text-muted-foreground">-</span>;
   return (
     <span className="flex flex-wrap gap-1">
       {ps.map((p) => (
@@ -262,7 +262,7 @@ function MembersInner() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-foreground">{m.full_name || t("noName")}</p>
-                    <p className="truncate text-xs text-muted-foreground">{m.email || m.phone || "—"}</p>
+                    <p className="truncate text-xs text-muted-foreground">{m.email || m.phone || "-"}</p>
                   </div>
                   <MemberStatusBadge status={m.status} />
                 </div>
@@ -323,11 +323,11 @@ function MembersInner() {
                         >
                           {m.full_name || t("noName")}
                         </Link>
-                        <p className="truncate text-xs text-muted-foreground">{m.email || m.phone || "—"}</p>
+                        <p className="truncate text-xs text-muted-foreground">{m.email || m.phone || "-"}</p>
                       </div>
                     </div>
                   </td>
-                  <td className="px-3 py-3.5 text-muted-foreground">{m.province || "—"}</td>
+                  <td className="px-3 py-3.5 text-muted-foreground">{m.province || "-"}</td>
                   <td className="px-3 py-3.5"><ProviderChips m={m} /></td>
                   <td className="px-3 py-3.5 tabular-nums text-muted-foreground">{m.applications_count}</td>
                   <td className="px-3 py-3.5"><MemberStatusBadge status={m.status} /></td>

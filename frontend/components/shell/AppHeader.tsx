@@ -51,7 +51,7 @@ export function AppHeader() {
         </span>
         <span className="h-4 w-px bg-hairline" aria-hidden />
         <time className="text-xs tabular-nums text-foreground/80" suppressHydrationWarning>
-          <span className="text-muted-foreground">{stamp ?? "—"}</span>
+          <span className="text-muted-foreground">{stamp ?? "-"}</span>
           <span className="ml-2 font-semibold">{time ?? "··:··"}</span>
         </time>
       </div>

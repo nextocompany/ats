@@ -93,7 +93,7 @@ export function AiSummaryPanel({ app }: { app: Application }) {
           style={{ backgroundColor: tone }}
           aria-label={score === null ? t("scoreNotYet") : t("scoreAria", { score: Math.round(score) })}
         >
-          {score === null ? "—" : Math.round(score)}
+          {score === null ? "-" : Math.round(score)}
         </div>
         <div className="min-w-0">
           <p className="text-sm font-medium text-foreground">
@@ -157,14 +157,14 @@ export function AiSummaryPanel({ app }: { app: Application }) {
       <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2.5 border-t border-hairline pt-5 text-xs">
         <dt className="text-muted-foreground">{t("ocrConfidence")}</dt>
         <dd className="text-right font-medium tabular-nums">
-          {app.ocr_confidence !== null ? app.ocr_confidence.toFixed(2) : "—"}
+          {app.ocr_confidence !== null ? app.ocr_confidence.toFixed(2) : "-"}
         </dd>
         <dt className="text-muted-foreground">{t("parsedAt")}</dt>
         <dd className="text-right tabular-nums">
-          {app.parsed_at ? new Date(app.parsed_at).toLocaleString() : "—"}
+          {app.parsed_at ? new Date(app.parsed_at).toLocaleString() : "-"}
         </dd>
         <dt className="text-muted-foreground">{t("profileJson")}</dt>
-        <dd className="truncate text-right">{app.parsed_profile_blob_url ? t("stored") : "—"}</dd>
+        <dd className="truncate text-right">{app.parsed_profile_blob_url ? t("stored") : "-"}</dd>
       </dl>
     </div>
   );

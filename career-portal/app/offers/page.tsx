@@ -25,9 +25,9 @@ const STATUS_KEY: Record<OfferStatus, "status_draft" | "status_sent" | "status_a
 // Dates are stored UTC-midnight; render in UTC so a non-UTC viewer never sees an
 // off-by-one calendar day.
 function formatThaiDate(iso: string | null): string {
-  if (!iso) return "—";
+  if (!iso) return "-";
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
+  if (Number.isNaN(d.getTime())) return "-";
   return new Intl.DateTimeFormat("th-TH", { dateStyle: "long", timeZone: "UTC" }).format(d);
 }
 
