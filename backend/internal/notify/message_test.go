@@ -6,7 +6,9 @@ import (
 )
 
 func TestStatusMessage_Notifiable(t *testing.T) {
-	for _, status := range []string{"shortlisted", "interview", "hired"} {
+	// hired/offer carry their own deep links (/account, /offers) — asserted
+	// separately; these two link to /status.
+	for _, status := range []string{"shortlisted", "interview"} {
 		m := StatusMessage("U-line-123", "สมชาย", status, "https://careers.example.com")
 		if m.Channel != ChannelLINE {
 			t.Errorf("%s: channel = %q, want %q", status, m.Channel, ChannelLINE)
@@ -33,6 +35,13 @@ func TestStatusMessage_NotNotifiableStatus(t *testing.T) {
 		if m.Recipient != "" {
 			t.Errorf("status %q should not notify, got recipient %q", status, m.Recipient)
 		}
+	}
+}
+
+func TestStatusMessage_HiredDirectsToOnboardingUpload(t *testing.T) {
+	m := StatusMessage("U-1", "สมชาย", "hired", "https://careers.example.com")
+	if !strings.Contains(m.Body, "https://careers.example.com/account") {
+		t.Errorf("hired copy must direct the candidate to /account to upload docs: %q", m.Body)
 	}
 }
 

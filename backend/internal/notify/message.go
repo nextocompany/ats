@@ -128,7 +128,7 @@ func statusBody(fullName, status, portalBaseURL string) (string, bool) {
 	case "offer":
 		return greeting + fmt.Sprintf(" คุณได้รับข้อเสนอการจ้างงาน! เข้าสู่ระบบเพื่อดูรายละเอียดและตอบรับได้ที่ %s/offers", portalBaseURL), true
 	case "hired":
-		return greeting + " ยินดีด้วย! คุณได้รับการคัดเลือก ทีม HR จะติดต่อเรื่องการเริ่มงาน" + link, true
+		return greeting + fmt.Sprintf(" ยินดีด้วย! คุณได้รับการคัดเลือก กรุณาอัปโหลดเอกสารเริ่มงานของคุณที่ %s/account ทีม HR จะติดต่อกลับเรื่องวันเริ่มงาน", portalBaseURL), true
 	default:
 		return "", false
 	}

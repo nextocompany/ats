@@ -175,8 +175,10 @@ func (h *ScheduleHandler) Schedule(c *fiber.Ctx) error {
 	if err := h.apps.SetStatus(c.UserContext(), id, StatusInterview); err != nil {
 		return err
 	}
-	// Best-effort candidate notification ("interview" status message).
-	h.notifyDeps.notifyStatusChange(c.UserContext(), h.apps, id, StatusInterview)
+	// Best-effort candidate notification carrying the concrete appointment
+	// (date/time, mode, place/online link, round). Supersedes the generic status
+	// message for this transition — do NOT also call notifyStatusChange.
+	h.notifyDeps.notifyInterviewScheduled(c.UserContext(), h.apps, id, saved)
 	return httpx.OK(c, saved)
 }
 
