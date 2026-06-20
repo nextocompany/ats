@@ -89,7 +89,7 @@ export function BulkUpload() {
           </div>
           {files.length > 0 && (
             <span className={`text-xs ${tooMany ? "text-destructive" : "text-muted-foreground"}`}>
-              เลือกแล้ว {files.length} ไฟล์{tooMany ? ` — เกิน ${MAX_FILES} ไฟล์` : ""}
+              เลือกแล้ว {files.length} ไฟล์{tooMany ? ` - เกิน ${MAX_FILES} ไฟล์` : ""}
             </span>
           )}
         </label>

@@ -32,7 +32,7 @@ export async function generateMetadata({
   const position = await fetchPosition(id);
   const title = position ? `${position.title_th} | ร่วมงานกับ CP Axtra` : "ตำแหน่งงาน | ร่วมงานกับ CP Axtra";
   const description = position
-    ? `สมัครตำแหน่ง ${position.title_th} กับ CP Axtra — สมัครออนไลน์ได้ในไม่กี่นาที`
+    ? `สมัครตำแหน่ง ${position.title_th} กับ CP Axtra - สมัครออนไลน์ได้ในไม่กี่นาที`
     : "ดูตำแหน่งงานที่เปิดรับและสมัครงานได้ในไม่กี่ขั้นตอน";
 
   return {
