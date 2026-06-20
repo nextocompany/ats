@@ -79,7 +79,7 @@ export function InterviewPanel({ applicationId }: { applicationId: string }) {
               style={{ backgroundColor: tone }}
               aria-label={score === null ? t("intvNotScored") : t("intvScoreAria", { score: Math.round(score) })}
             >
-              {score === null ? "—" : Math.round(score)}
+              {score === null ? "-" : Math.round(score)}
             </div>
             <div className="min-w-0">
               {s.recommendation && (

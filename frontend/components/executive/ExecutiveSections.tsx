@@ -22,7 +22,7 @@ function fillShade(pct: number): string {
   return "var(--brand)";
 }
 
-const dash = "—";
+const dash = "-";
 
 /* ── Company headcount band — one dominant figure + three supporting metrics,
    mirroring the KPI hero band. Falls back to em-dashes when budget is pending

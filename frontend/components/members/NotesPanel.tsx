@@ -11,7 +11,7 @@ import { useAddNote, useMemberNotes } from "@/lib/queries";
 function when(iso: string, locale: string): string {
   const d = new Date(iso);
   return Number.isNaN(d.getTime())
-    ? "—"
+    ? "-"
     : d.toLocaleString(locale === "th" ? "th-TH" : "en-GB", { dateStyle: "medium", timeStyle: "short" });
 }
 

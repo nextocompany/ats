@@ -38,7 +38,7 @@ function fromDateInput(d: string): string | null {
   return d ? new Date(`${d}T00:00:00Z`).toISOString() : null;
 }
 function fmtDate(iso: string | null): string {
-  return iso ? new Date(iso).toLocaleDateString(undefined, { timeZone: "UTC" }) : "—";
+  return iso ? new Date(iso).toLocaleDateString(undefined, { timeZone: "UTC" }) : "-";
 }
 
 export function OfferPanel({ applicationId, app }: Props) {
@@ -178,7 +178,7 @@ function OfferSummary({ offer, t }: { offer: Offer; t: ReturnType<typeof useTran
       <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-xs">
         <dt className="text-muted-foreground">{t("salary")}</dt>
         <dd className="text-right font-medium tabular-nums">
-          {offer.salary != null ? offer.salary.toLocaleString("th-TH", { maximumFractionDigits: 0 }) : "—"}
+          {offer.salary != null ? offer.salary.toLocaleString("th-TH", { maximumFractionDigits: 0 }) : "-"}
         </dd>
         <dt className="text-muted-foreground">{t("startDate")}</dt>
         <dd className="text-right tabular-nums">{fmtDate(offer.start_date)}</dd>

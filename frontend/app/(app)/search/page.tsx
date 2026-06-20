@@ -161,7 +161,7 @@ function SearchInner() {
                           <span className="font-semibold text-foreground">{h.full_name}</span>
                         </Link>
                       </td>
-                      <td className="px-3 py-3.5 text-foreground/80">{h.province || "—"}</td>
+                      <td className="px-3 py-3.5 text-foreground/80">{h.province || "-"}</td>
                       <td className="py-3.5 pl-3 pr-5 text-right">
                         <StatusPill status={h.status} />
                       </td>

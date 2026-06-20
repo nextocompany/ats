@@ -58,7 +58,7 @@ export function FunnelPanel({ funnel, t }: { funnel: AtsReport["funnel"]; t: T }
               </span>
             </div>
             <span className="w-14 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
-              {i === 0 ? "—" : `${s.conversion_pct}%`}
+              {i === 0 ? "-" : `${s.conversion_pct}%`}
             </span>
           </li>
         ))}

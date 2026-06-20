@@ -101,10 +101,10 @@ export default function MemberDetailPage() {
               </div>
 
               <div className="mt-6">
-                <Row label={t("fieldEmail")} value={m.email ? `${m.email}${m.email_verified ? " ✓" : ""}` : "—"} />
-                <Row label={t("fieldPhone")} value={m.phone || "—"} />
-                <Row label={t("fieldProvince")} value={m.province || "—"} />
-                <Row label={t("fieldLoginProviders")} value={providers.length ? providers.join(" · ") : "—"} />
+                <Row label={t("fieldEmail")} value={m.email ? `${m.email}${m.email_verified ? " ✓" : ""}` : "-"} />
+                <Row label={t("fieldPhone")} value={m.phone || "-"} />
+                <Row label={t("fieldProvince")} value={m.province || "-"} />
+                <Row label={t("fieldLoginProviders")} value={providers.length ? providers.join(" · ") : "-"} />
                 <Row
                   label={t("fieldResume")}
                   value={
@@ -113,7 +113,7 @@ export default function MemberDetailPage() {
                         {t("viewResume", { type: m.resume_file_type || "file" })}
                       </Button>
                     ) : (
-                      "—"
+                      "-"
                     )
                   }
                 />
@@ -142,7 +142,7 @@ export default function MemberDetailPage() {
               <Row label={t("activeSessions")} value={<span className="tabular-nums">{m.active_sessions}</span>} />
               <Row
                 label={t("lastLogin")}
-                value={m.last_login_at ? new Date(m.last_login_at).toLocaleString(dateLocale) : "—"}
+                value={m.last_login_at ? new Date(m.last_login_at).toLocaleString(dateLocale) : "-"}
               />
             </div>
             <TagEditor memberId={m.id} />

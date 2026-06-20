@@ -60,11 +60,11 @@ export default function CandidateProfilePage() {
             <dl className="mt-5 grid grid-cols-1 gap-x-8 gap-y-3 border-t border-hairline pt-5 text-sm sm:grid-cols-2">
               <div className="flex justify-between gap-4 sm:block">
                 <dt className="text-muted-foreground sm:text-xs sm:uppercase sm:tracking-wide">Phone</dt>
-                <dd className="font-medium tabular-nums sm:mt-1">{candidate.phone || "—"}</dd>
+                <dd className="font-medium tabular-nums sm:mt-1">{candidate.phone || "-"}</dd>
               </div>
               <div className="flex justify-between gap-4 sm:block">
                 <dt className="text-muted-foreground sm:text-xs sm:uppercase sm:tracking-wide">Email</dt>
-                <dd className="truncate font-medium sm:mt-1">{candidate.email || "—"}</dd>
+                <dd className="truncate font-medium sm:mt-1">{candidate.email || "-"}</dd>
               </div>
             </dl>
           </section>

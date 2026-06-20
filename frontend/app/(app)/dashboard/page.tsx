@@ -68,7 +68,7 @@ export default function DashboardPage() {
                 href="/applications?status=scored"
                 icon={<Inbox className="size-4" />}
                 title={t("qaReviewTitle")}
-                hint={kpi ? t("qaReviewHint", { count: kpi.waiting }) : "—"}
+                hint={kpi ? t("qaReviewHint", { count: kpi.waiting }) : "-"}
               />
               <QuickAction
                 href="/applications?min_score=75"

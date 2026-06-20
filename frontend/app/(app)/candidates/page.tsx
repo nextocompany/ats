@@ -186,7 +186,7 @@ function CandidatesInner() {
                         {c.province}
                       </span>
                     ) : (
-                      <span className="text-sm text-muted-foreground">—</span>
+                      <span className="text-sm text-muted-foreground">-</span>
                     )}
                   </td>
                   <td className="px-3 py-3">

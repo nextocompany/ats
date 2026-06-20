@@ -21,7 +21,7 @@ const CHIP_TINTS = [
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "—";
+  if (parts.length === 0) return "-";
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
@@ -72,7 +72,7 @@ function prettyChannel(raw: string): string {
 export function SourceChip({ channel }: { channel: string }) {
   const t = useTranslations("source");
   if (!channel) {
-    return <span className="text-sm text-muted-foreground">—</span>;
+    return <span className="text-sm text-muted-foreground">-</span>;
   }
   const key = channel.toLowerCase().replace(/\s+/g, "_");
   const Icon = SOURCE_ICONS[key] ?? Building2;
@@ -156,6 +156,6 @@ export function StatusPill({ status }: { status: string }) {
   const t = useTranslations("status");
   const tone = toneForStatus(status);
   const key = (status ?? "").toLowerCase();
-  const label = !key ? "—" : t.has(key) ? t(key) : status[0].toUpperCase() + status.slice(1);
+  const label = !key ? "-" : t.has(key) ? t(key) : status[0].toUpperCase() + status.slice(1);
   return <Pill tone={tone}>{label}</Pill>;
 }

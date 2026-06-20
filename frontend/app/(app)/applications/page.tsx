@@ -34,7 +34,7 @@ type T = ReturnType<typeof useTranslations>;
 // Friendly relative time so "Applied" reads as recency, not an ISO timestamp.
 function appliedAgo(iso: string, t: T): string {
   const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return "—";
+  if (Number.isNaN(then)) return "-";
   const mins = Math.floor((Date.now() - then) / 60000);
   if (mins < 1) return t("agoJustNow");
   if (mins < 60) return t("agoMin", { n: mins });
@@ -54,7 +54,7 @@ function placement(a: Application, centralPoolLabel: string): string {
   if (a.store_name) return a.store_name;
   if (a.talent_pool) return centralPoolLabel;
   if (a.candidate_province) return a.candidate_province;
-  return "—";
+  return "-";
 }
 
 // The must-have screening gate, spoken plainly. "Gate / Pass / Fail" was
@@ -192,7 +192,7 @@ function InboxInner() {
             { label: t("sumReview"), value: <span className="tabular-nums">{queue.flagged}</span>, hint: t("sumReviewHint") },
             {
               label: t("sumBestFit"),
-              value: queue.top !== null ? <span className="tabular-nums">{queue.top}</span> : <span className="text-muted-foreground">—</span>,
+              value: queue.top !== null ? <span className="tabular-nums">{queue.top}</span> : <span className="text-muted-foreground">-</span>,
               hint: t("sumBestFitHint"),
             },
           ]}

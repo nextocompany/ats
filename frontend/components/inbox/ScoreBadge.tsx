@@ -42,7 +42,7 @@ export function FitLabel({ score }: ScoreBadgeProps) {
 export function ScoreBadge({ score }: ScoreBadgeProps) {
   const t = useTranslations("fit");
   if (score === null || score === undefined) {
-    return <span className="inline-block w-9 text-center text-xs text-muted-foreground tabular-nums">—</span>;
+    return <span className="inline-block w-9 text-center text-xs text-muted-foreground tabular-nums">-</span>;
   }
 
   const rounded = Math.round(score);
