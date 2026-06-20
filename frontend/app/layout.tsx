@@ -23,7 +23,7 @@ const body = IBM_Plex_Sans_Thai_Looped({
 });
 
 export const metadata: Metadata = {
-  title: "HR ATS — Recruitment Console",
+  title: "HR ATS - Recruitment Console",
   description: "AI-powered recruitment screening dashboard",
 };
 

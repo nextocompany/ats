@@ -15,7 +15,7 @@ export function Wordmark({ invert, className }: WordmarkProps) {
   return (
     <Link
       href="/"
-      aria-label="CP Axtra Careers — หน้าแรก"
+      aria-label="CP Axtra Careers - หน้าแรก"
       className={cn(
         "group/wordmark inline-flex items-center gap-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-4 focus-visible:ring-offset-background rounded-sm",
         className,
