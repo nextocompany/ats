@@ -1,7 +1,13 @@
-# UAT Guide — Talent Pool (12 requirements)
+# UAT Guide - Talent Pool (12 requirements)
 
-Verified against code + **live prod runtime env** 2026-06-19. All 12 are implemented and
-deployed. AI features are **real** on prod (Azure), not mock.
+Verified against code + **live prod runtime env** (re-checked 2026-06-20). All 12 are
+implemented and deployed. AI features are **real** on prod (Azure), not mock.
+
+> Changes since the 2026-06-19 pass: item 5 now has a **manual branch reassign** control
+> (was auto-only); item 6 was upgraded to **dynamic RBAC** (DB role/permission matrix +
+> admin editor) and Entra SSO can carry **store/subregion scope claims**; item 7's load
+> test has been **run on prod** (read-only + a bounded intake/pipeline drain with full
+> cleanup), not just documented for staging.
 
 ## Prod runtime (ground truth — verified on `hrats-prod-api`)
 | Flag | Value | Meaning |
@@ -89,8 +95,10 @@ query (status/min-score filters exist in the API but aren't wired into this page
 3. Cross-check: a candidate in a province with an open vacancy (matching the position's store format) gets the
    **nearest store**; an unknown province or no open vacancy → **Talent pool**.
 **Expected:** every screened candidate is assigned a store or talent pool automatically.
-**Note:** assignment is system-driven; there is **no HR reassign button** (would need a backend change) —
-flag if reassignment is a required capability.
+**Manual reassign (added 2026-06-19):** on `/applications/{id}` the **ReassignControl** lets an authorised
+role override the auto-assignment - pick a different store or move to/from Talent pool. Backend
+`PATCH /api/v1/applications/{id}/assignment` (role-gated; `SetAssignment` with `store_no` or `pool=true`).
+Verify: change a candidate's store, refresh the inbox **Placement** column, confirm it reflects the override.
 
 ## 6. User Access — role / permission
 **Screen:** `/login`, `/admin` (super_admin only). RBAC scope on every list/report.
@@ -105,12 +113,33 @@ flag if reassignment is a required capability.
 **Roles:** super_admin, regional_director, auditor, operation_director, sgm, hr_manager, hr_staff. Scope:
 all / subregion / store (store-scoped with no store = sees nothing, fail-closed).
 
-## 7. Concurrent Load — concurrent usage
-**Type:** ops runbook (`loadtest/README.md` + `loadtest/intake-load.js`), **staging only — never prod**.
-**Steps (operator, on staging)**
-1. `k6 run -e TARGET=https://<staging-api> -e POSITION_ID=<uuid> -e COOKIE="hr_auth=<session>"
-   -e SAMPLE=./loadtest/sample.pdf loadtest/intake-load.js`.
-2. k6 ramps 0→30 VUs/2min; thresholds `http_req_failed<1%`, `p95<2s`.
+**Dynamic RBAC (added 2026-06-20):** roles + the role→permission matrix + per-role scope are now **DB-driven
+and editable** at `/admin` → **Roles & Permissions** (super_admin only): create custom roles, toggle the
+permission matrix, set scope. super_admin is a hard code bypass (never lockable). Permissions are a fixed
+code catalog (21 keys); `/users/me` returns the effective `permissions[]` + `scope`.
+
+**Entra SSO role + scope (important):** for **Microsoft SSO** logins the role and scope come **only from the
+token claims**, not the DB - the dashboard matrix editor binds role→permission but does **not** set an Entra
+user's role. Set the role via the Azure **app role** assignment, and store/subregion via **directory-extension
+claims**. Full setup (7 app roles + `store_id`/`subregion` extensions + `az rest` commands) is in
+`docs/entra-app-roles-setup.md`. UAT order: test scope=all roles (super_admin/regional_director/auditor) first
+- they need no extra claims - then store-scoped roles after the extensions are set. The **password-login** path
+(create user at `/admin`) reads role/scope from the DB and needs no Azure setup, so it is the simpler path for
+the scope test above.
+
+## 7. Concurrent Load - concurrent usage
+**Type:** ops runbook (`loadtest/README.md`). **Already run on prod 2026-06-20** (recorded baselines in the
+README): a safe **read-only** test (`loadtest/readonly-load.js`: 20 VUs x 2 min = ~40k reqs @ ~334 req/s,
+0% errors, /health p95 67ms, api autoscaled 1→3) and a bounded **write-path + pipeline drain**
+(`loadtest/intake-batch.js`: 100 CVs @ 10 VUs intake p95 583ms 0% err; pipeline ~85 CV/min @
+WORKER_CONCURRENCY=10 / 1 worker, **zero Azure 429**) run on the empty prod stack with a full 3-layer cleanup
+(DB + blobs + AI Search index, incl. an orphan sweep for async indexing). No staging stack exists.
+**Re-running the write-path test** requires the same cleanup; do it on empty prod or a throwaway stack only.
+**Steps (operator)**
+1. `k6 run -e TARGET=https://<api> -e POSITION_ID=<uuid> -e COOKIE="hr_auth=<session>"
+   -e SAMPLE=<ABSOLUTE path to sample> -e CVS=100 -e VUS=10 loadtest/intake-batch.js`.
+   (k6 `open()` resolves SAMPLE relative to the script dir - **must be an absolute path**.)
+2. Thresholds `http_req_failed<1%`, `p95<2s`.
 3. Measure pipeline drain: bulk-submit a known batch, poll `GET /api/v1/applications?status=scored|rejected`
    until counts plateau → CVs/min.
 **Expected:** API stays <1% errors / p95<2s; pipeline drain rate is bounded by the **Azure OpenAI TPM +
@@ -191,9 +220,9 @@ internal HR dashboard).
 | 2 | AI Scoring | ✅ real | inbox + /applications/{id} |
 | 3 | AI Summary | ✅ real | /applications/{id} |
 | 4 | Semantic Search | ✅ real (Azure, index seeded on intake) | /search |
-| 5 | Branch Assignment | ✅ real, auto (no manual reassign) | inbox Placement |
-| 6 | User Access | ✅ real | /login, /admin |
-| 7 | Concurrent Load | ✅ runbook (staging only) | loadtest/ (ops) |
+| 5 | Branch Assignment | ✅ real, auto + **manual reassign** | inbox Placement · /applications/{id} |
+| 6 | User Access | ✅ real, **dynamic RBAC** + Entra scope claims | /login, /admin |
+| 7 | Concurrent Load | ✅ **run on prod** (read-only + bounded intake, cleaned) | loadtest/ (ops) |
 | 8 | Candidate Tracking | ✅ real | inbox, /applications/{id}, portal /status |
 | 9 | Deduplication | ✅ real (deterministic) | /applications/{id} badge |
 | 10 | Dashboard | ✅ real | /dashboard |
