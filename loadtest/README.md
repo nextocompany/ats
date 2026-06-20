@@ -5,13 +5,23 @@
 > `k6 run -e TARGET=https://<api> loadtest/readonly-load.js`. The write-path tests
 > below MUST use a staging/throwaway stack.
 >
-> **Prod baseline (2026-06-20, api 0.5 vCPU, min 1 / max 3 replicas):** ramped
-> 20 concurrent VUs at `/health` for 2 min = **40,069 reqs @ ~334 req/s, 0%
-> errors, p95 67 ms** (avg 45 ms, max 348 ms). The api **autoscaled 1 -> 3
-> replicas** under the load and stayed healthy. Public read (`/api/v1/public/positions`,
-> sampled under the 30/min limiter) p95 71 ms. Headroom: a single 3-replica
-> revision sustains ~330 read req/s with sub-100 ms p95. The real capacity ceiling
-> remains the async pipeline (OCR+LLM), measured separately below on staging.
+> **Read-only prod baseline (2026-06-20, api 0.5 vCPU, min 1 / max 3 replicas):**
+> ramped 20 concurrent VUs at `/health` for 2 min = **40,069 reqs @ ~334 req/s, 0%
+> errors, p95 67 ms** (avg 45 ms, max 348 ms). The api **autoscaled 1 -> 3 replicas**
+> under the load and stayed healthy. Public read (`/api/v1/public/positions`, sampled
+> under the 30/min limiter) p95 71 ms. Headroom: a single 3-replica revision sustains
+> ~330 read req/s with sub-100 ms p95.
+>
+> **Write-path + pipeline baseline (2026-06-20, ran on prod while it was empty,
+> fully cleaned up after):** `intake-batch.js` submitted **100 CVs at 10 VUs** =
+> intake API **p95 583 ms, 0% errors, ~71 uploads/s** (100 enqueued in 1.4 s). The
+> async pipeline then drained all 101 (OCR + LLM score each) in **~70 s = ~85 CV/min**
+> at `WORKER_CONCURRENCY=10` on **1 worker replica (0.5 vCPU)**, with **zero Azure
+> 429/throttling** (gpt-4o-mini TPM budget was sufficient at this rate; no worker
+> autoscale needed). All 101 fully parsed + scored (then auto-rejected on low fit —
+> expected for one generic CV vs an arbitrary JD). To push past ~85 CV/min, raise
+> `WORKER_CONCURRENCY` + worker replicas, at which point **Azure OpenAI TPM becomes
+> the wall** (429 → retry → slower, capped drain; see Tuning knobs).
 
 Two things to measure, because they have different bottlenecks:
 
