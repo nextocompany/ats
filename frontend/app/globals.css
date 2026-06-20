@@ -324,3 +324,42 @@ nextjs-portal {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ── Print: executive board-report pack ───────────────────────────────────────
+   Board packs print on white, with every tab section stacked under its heading.
+   The executive tabs mount all panels but `hidden` the inactive ones on screen;
+   here we reveal them all. Interactive chrome (tablist, header actions, nav) is
+   marked `print:hidden` at the component level. */
+@media print {
+  /* Force the light board palette even if the viewer is in dark mode. */
+  .dark {
+    --background: oklch(98.6% 0.004 250);
+    --foreground: oklch(23% 0.03 264);
+    --card: oklch(100% 0 0);
+    --card-foreground: oklch(23% 0.03 264);
+    --secondary: oklch(96% 0.006 250);
+    --secondary-foreground: oklch(30% 0.02 264);
+    --muted: oklch(96% 0.006 250);
+    --muted-foreground: oklch(47% 0.02 260);
+    --border: oklch(91% 0.006 255);
+    --hairline: oklch(91% 0.006 255);
+    --brand: oklch(46% 0.18 264);
+    --brand-foreground: oklch(99% 0.01 250);
+  }
+  /* Keep brand fills and fill-rate bars in the printout. */
+  body {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  /* Reveal every tab panel so the printed pack contains all sections. */
+  [role="tabpanel"][hidden] {
+    display: block !important;
+  }
+  [role="tabpanel"] {
+    margin-top: 1.5rem;
+  }
+  /* Do not split a table row across pages. */
+  table, tr, .ledger-row {
+    break-inside: avoid;
+  }
+}
