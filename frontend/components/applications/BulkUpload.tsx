@@ -5,6 +5,7 @@
 // placeholder once processing completes. Server re-validates everything.
 import { useState } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { Loader2, UploadCloud, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 
@@ -23,6 +24,7 @@ const MAX_FILES = 50;
 const ACCEPT = ".pdf,.docx,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg";
 
 export function BulkUpload() {
+  const t = useTranslations("bulk");
   const { data: positions, isLoading: posLoading } = usePositions();
   const bulk = useBulkIntake();
   const [positionId, setPositionId] = useState("");
@@ -41,9 +43,9 @@ export function BulkUpload() {
         onSuccess: (r) => {
           setResult(r);
           setFiles([]);
-          toast.success(`อัปโหลดสำเร็จ ${r.succeeded}/${r.total} ไฟล์`);
+          toast.success(t("uploadOk", { succeeded: r.succeeded, total: r.total }));
         },
-        onError: (err) => toast.error(err instanceof Error ? err.message : "อัปโหลดไม่สำเร็จ"),
+        onError: (err) => toast.error(err instanceof Error ? err.message : t("uploadFailed")),
       },
     );
   }
@@ -51,19 +53,17 @@ export function BulkUpload() {
   return (
     <div className="settle space-y-6">
       <div>
-        <p className="eyebrow">Bulk intake</p>
-        <h1 className="mt-1 font-heading text-2xl font-semibold tracking-tight">อัปโหลด CV จำนวนมาก</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          เลือกตำแหน่ง แล้วเลือกไฟล์ CV ได้สูงสุด {MAX_FILES} ไฟล์ (PDF, DOCX, JPG, PNG ≤10MB/ไฟล์) ระบบจะคัดกรองอัตโนมัติ
-        </p>
+        <p className="eyebrow">{t("intake")}</p>
+        <h1 className="mt-1 font-heading text-2xl font-semibold tracking-tight">{t("title")}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{t("help", { max: MAX_FILES })}</p>
       </div>
 
       <form onSubmit={submit} className="max-w-xl space-y-4 rounded-xl bg-card p-6 ring-1 ring-hairline">
         <label className="block space-y-1.5">
-          <span className="text-xs font-medium text-foreground">ตำแหน่ง</span>
+          <span className="text-xs font-medium text-foreground">{t("position")}</span>
           <Select value={positionId} onValueChange={(v) => setPositionId(v ?? "")}>
-            <SelectTrigger className="w-full" aria-label="ตำแหน่ง">
-              <SelectValue placeholder={posLoading ? "กำลังโหลด…" : "เลือกตำแหน่ง…"} />
+            <SelectTrigger className="w-full" aria-label={t("position")}>
+              <SelectValue placeholder={posLoading ? t("loading") : t("positionPlaceholder")} />
             </SelectTrigger>
             <SelectContent>
               {(positions ?? []).map((p) => (
@@ -76,7 +76,7 @@ export function BulkUpload() {
         </label>
 
         <label className="block space-y-1.5">
-          <span className="text-xs font-medium text-foreground">ไฟล์ CV</span>
+          <span className="text-xs font-medium text-foreground">{t("filesLabel")}</span>
           <div className="flex items-center gap-3 rounded-lg border border-dashed border-input bg-transparent px-4 py-6">
             <UploadCloud className="size-5 shrink-0 text-muted-foreground" />
             <input
@@ -89,14 +89,15 @@ export function BulkUpload() {
           </div>
           {files.length > 0 && (
             <span className={`text-xs ${tooMany ? "text-destructive" : "text-muted-foreground"}`}>
-              เลือกแล้ว {files.length} ไฟล์{tooMany ? ` - เกิน ${MAX_FILES} ไฟล์` : ""}
+              {t("selectedFiles", { n: files.length })}
+              {tooMany ? t("overLimit", { max: MAX_FILES }) : ""}
             </span>
           )}
         </label>
 
         <Button type="submit" disabled={!canSubmit} className="gap-2">
           {bulk.isPending && <Loader2 className="size-4 animate-spin" />}
-          อัปโหลด {files.length > 0 ? `(${files.length})` : ""}
+          {t("submit")} {files.length > 0 ? `(${files.length})` : ""}
         </Button>
       </form>
 
@@ -106,15 +107,16 @@ export function BulkUpload() {
 }
 
 function ResultPanel({ result }: { result: BulkIntakeResult }) {
+  const t = useTranslations("bulk");
   return (
     <div className="max-w-xl space-y-4">
       <div className="flex gap-4 text-sm">
         <span className="inline-flex items-center gap-1.5 text-[var(--score-high)]">
-          <CheckCircle2 className="size-4" /> สำเร็จ {result.succeeded}
+          <CheckCircle2 className="size-4" /> {t("succeeded", { n: result.succeeded })}
         </span>
         {result.failed_count > 0 && (
           <span className="inline-flex items-center gap-1.5 text-destructive">
-            <XCircle className="size-4" /> ล้มเหลว {result.failed_count}
+            <XCircle className="size-4" /> {t("failed", { n: result.failed_count })}
           </span>
         )}
       </div>
@@ -128,7 +130,7 @@ function ResultPanel({ result }: { result: BulkIntakeResult }) {
                 href={`/applications/${c.application_id}`}
                 className="shrink-0 text-xs font-medium text-primary underline-offset-4 hover:underline"
               >
-                เปิด
+                {t("open")}
               </Link>
             </li>
           ))}
