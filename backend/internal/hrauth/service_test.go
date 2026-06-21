@@ -23,6 +23,7 @@ type fakeRepo struct {
 type userRow struct {
 	u    User
 	hash string
+	oid  string // Entra object id, set for SSO-provisioned rows
 }
 
 type session struct {
@@ -44,6 +45,15 @@ func (f *fakeRepo) seed(email, password, role string, active bool) uuid.UUID {
 	hash, _ := hashPassword(password)
 	u := User{ID: id, Email: email, Role: role, IsActive: active, HasPassword: true}
 	f.users[email] = userRow{u: u, hash: hash}
+	f.byID[id] = email
+	return id
+}
+
+// seedSSO adds an SSO-provisioned row (no password) bound to an Entra oid.
+func (f *fakeRepo) seedSSO(oid, email, role string, active bool) uuid.UUID {
+	id := uuid.New()
+	u := User{ID: id, Email: email, Role: role, IsActive: active, Source: "sso"}
+	f.users[email] = userRow{u: u, oid: oid}
 	f.byID[id] = email
 	return id
 }
@@ -95,6 +105,15 @@ func (f *fakeRepo) RevokeAllUserSessions(_ context.Context, userID uuid.UUID) er
 }
 
 func (f *fakeRepo) UpsertSSOUser(_ context.Context, _, _, _ string) error { f.ssoUpserts++; return nil }
+
+func (f *fakeRepo) FindByAzureOID(_ context.Context, oid string) (User, error) {
+	for _, r := range f.users {
+		if r.u.IsActive && r.oid == oid {
+			return r.u, nil
+		}
+	}
+	return User{}, ErrNotFound
+}
 
 func (f *fakeRepo) ListUsers(context.Context) ([]User, error) {
 	out := []User{}
@@ -154,6 +173,34 @@ func TestProvisionSSOUser_SkipsEmptyOID(t *testing.T) {
 	}
 	if repo.ssoUpserts != 0 {
 		t.Fatalf("expected no upsert for empty oid, got %d", repo.ssoUpserts)
+	}
+}
+
+func TestResolveSSOUser(t *testing.T) {
+	repo := newFakeRepo()
+	repo.seedSSO("oid-mgr", "mgr@cpaxtra.com", "hr_manager", true)
+	repo.seedSSO("oid-none", "newhire@cpaxtra.com", "", true) // provisioned, no role yet
+	svc := newSvc(repo)
+
+	// Known oid with a role: identity carries the DB role + the oid as ID.
+	if id, ok := svc.ResolveSSOUser(context.Background(), "oid-mgr"); !ok {
+		t.Fatal("expected resolve ok for known oid")
+	} else if id.Role != "hr_manager" || id.ID != "oid-mgr" {
+		t.Fatalf("unexpected identity: role=%q id=%q", id.Role, id.ID)
+	}
+
+	// Provisioned but role-less account: ok=true, empty role (authenticated, denied).
+	if id, ok := svc.ResolveSSOUser(context.Background(), "oid-none"); !ok || id.Role != "" {
+		t.Fatalf("expected role-less resolve ok with empty role, got ok=%v role=%q", ok, id.Role)
+	}
+
+	// Unknown oid: not provisioned → default-deny.
+	if _, ok := svc.ResolveSSOUser(context.Background(), "oid-ghost"); ok {
+		t.Fatal("expected resolve miss for unknown oid")
+	}
+	// Empty oid: never resolves.
+	if _, ok := svc.ResolveSSOUser(context.Background(), ""); ok {
+		t.Fatal("expected resolve miss for empty oid")
 	}
 }
 
