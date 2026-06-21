@@ -72,11 +72,16 @@ jobs:
           # but we pass it explicitly so the baked config is unambiguous).
           DASH_FQDN=$(az containerapp show -n hrats-prod-dashboard -g "$RESOURCE_GROUP" \
             --query properties.configuration.ingress.fqdn -o tsv)
+          # Portal FQDN → baked as metadataBase so Open Graph/canonical URLs resolve
+          # to absolute links. Required: an empty arg makes `new URL("")` throw at build.
+          PORTAL_FQDN=$(az containerapp show -n hrats-prod-portal -g "$RESOURCE_GROUP" \
+            --query properties.configuration.ingress.fqdn -o tsv)
           echo "acr_name=$ACR_NAME"     >> "$GITHUB_OUTPUT"
           echo "acr_login=$ACR_LOGIN"   >> "$GITHUB_OUTPUT"
           echo "api_url=https://$API_FQDN" >> "$GITHUB_OUTPUT"
           echo "dashboard_url=https://$DASH_FQDN" >> "$GITHUB_OUTPUT"
-          echo "ACR=$ACR_LOGIN  API=https://$API_FQDN  DASH=https://$DASH_FQDN"
+          echo "portal_url=https://$PORTAL_FQDN" >> "$GITHUB_OUTPUT"
+          echo "ACR=$ACR_LOGIN  API=https://$API_FQDN  DASH=https://$DASH_FQDN  PORTAL=https://$PORTAL_FQDN"
 
       # --- Build all five images server-side in ACR (parallel-ish, each is a task) ---
       - name: Build backend images (api/worker/scheduler)
@@ -97,14 +102,19 @@ jobs:
           TAG: ${{ steps.tag.outputs.tag }}
           API_URL: ${{ steps.env.outputs.api_url }}
           DASH_URL: ${{ steps.env.outputs.dashboard_url }}
+          PORTAL_URL: ${{ steps.env.outputs.portal_url }}
           AD_CLIENT_ID: ${{ vars.AZURE_AD_CLIENT_ID }}
           AD_TENANT_ID: ${{ vars.AZURE_AD_TENANT_ID }}
           AD_AUTHORITY: ${{ vars.AZURE_AD_AUTHORITY }}
         run: |
           set -euo pipefail
-          # Career portal — only the public API origin is baked in.
+          # Career portal: bake the public API origin and the portal base URL.
+          # NEXT_PUBLIC_PORTAL_BASE_URL feeds metadataBase; omitting it makes the
+          # Dockerfile ENV an empty string and `next build` fails on new URL("").
           az acr build -r "$ACR" -t "hr-ats/career-portal:$TAG" -t "hr-ats/career-portal:latest" \
-            --build-arg NEXT_PUBLIC_API_URL="$API_URL" -f career-portal/Dockerfile career-portal &
+            --build-arg NEXT_PUBLIC_API_URL="$API_URL" \
+            --build-arg NEXT_PUBLIC_PORTAL_BASE_URL="$PORTAL_URL" \
+            -f career-portal/Dockerfile career-portal &
 
           # Dashboard — bake the Entra SSO config too. NEXT_PUBLIC_* are inlined at
           # build time, and lib/auth.ts gates real SSO on NEXT_PUBLIC_AZURE_AD_CLIENT_ID;
