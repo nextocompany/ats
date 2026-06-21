@@ -79,3 +79,29 @@ func TestBearerToken(t *testing.T) {
 		t.Fatalf("expected empty token without header, got %q", got)
 	}
 }
+
+func TestIsUnauthedPath(t *testing.T) {
+	unauthed := []string{
+		"/health",
+		"/api/v1/auth/login",
+		"/api/v1/pdpa/policy/current", // public privacy notice
+		"/api/v1/pdpa/dpo",            // published DPO contact (s.41)
+		"/api/v1/public/jobs",
+	}
+	for _, p := range unauthed {
+		if !isUnauthedPath(p) {
+			t.Errorf("expected %q to be unauthed", p)
+		}
+	}
+	gated := []string{
+		"/api/v1/pdpa/consent",             // consent write stays gated
+		"/api/v1/pdpa/admin/dsar-requests", // DPO console stays gated
+		"/api/v1/pdpa/dpox",                // not an exact match
+		"/api/v1/applications",
+	}
+	for _, p := range gated {
+		if isUnauthedPath(p) {
+			t.Errorf("expected %q to require auth", p)
+		}
+	}
+}

@@ -108,6 +108,12 @@ func isUnauthedPath(path string) bool {
 	return path == "/health" ||
 		path == "/api/v1/auth/login" ||
 		path == "/api/v1/auth/logout" ||
+		// Public-read PDPA endpoints: the privacy notice + the published DPO contact
+		// (PDPA s.41) are shown to unauthenticated career-portal visitors. The other
+		// /api/v1/pdpa routes (consent write, /admin/*) stay gated, so these are
+		// matched exactly, not by prefix.
+		path == "/api/v1/pdpa/policy/current" ||
+		path == "/api/v1/pdpa/dpo" ||
 		strings.HasPrefix(path, "/api/v1/public") ||
 		strings.HasPrefix(path, "/api/v1/ps") ||
 		strings.HasPrefix(path, "/api/v1/intake/") // HMAC-authed external intake webhook (trailing slash: no prefix bleed)
