@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -25,11 +26,12 @@ var ErrNoCurrentDoc = errors.New("pdpa: no current consent document")
 
 // ConsentDocument is one localized privacy/consent notice from the registry.
 type ConsentDocument struct {
-	Version   string `json:"version"`
-	Locale    string `json:"locale"`
-	Title     string `json:"title"`
-	Body      string `json:"body"`
-	IsCurrent bool   `json:"is_current"`
+	Version     string    `json:"version"`
+	Locale      string    `json:"locale"`
+	Title       string    `json:"title"`
+	Body        string    `json:"body"`
+	IsCurrent   bool      `json:"is_current"`
+	EffectiveAt time.Time `json:"effective_at"`
 }
 
 // CurrentVersion returns the version string of the current consent notice, read
@@ -62,22 +64,22 @@ func (r *Repo) CurrentVersion(ctx context.Context) (string, error) {
 // ErrNoCurrentDoc when the registry has no current document at all.
 func (r *Repo) CurrentDocuments(ctx context.Context, locale string) (ConsentDocument, error) {
 	const q = `
-		SELECT version, locale, title, body, is_current
+		SELECT version, locale, title, body, is_current, effective_at
 		FROM consent_documents
 		WHERE is_current AND locale = $1
 		LIMIT 1`
 	var d ConsentDocument
-	err := r.pool.QueryRow(ctx, q, locale).Scan(&d.Version, &d.Locale, &d.Title, &d.Body, &d.IsCurrent)
+	err := r.pool.QueryRow(ctx, q, locale).Scan(&d.Version, &d.Locale, &d.Title, &d.Body, &d.IsCurrent, &d.EffectiveAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		// Fall back to any current document (e.g. the requested locale has not been
 		// translated for this version yet) rather than 404-ing the consent step.
 		const anyQ = `
-			SELECT version, locale, title, body, is_current
+			SELECT version, locale, title, body, is_current, effective_at
 			FROM consent_documents
 			WHERE is_current
 			ORDER BY (locale = $1) DESC, locale
 			LIMIT 1`
-		err = r.pool.QueryRow(ctx, anyQ, canonicalLocale).Scan(&d.Version, &d.Locale, &d.Title, &d.Body, &d.IsCurrent)
+		err = r.pool.QueryRow(ctx, anyQ, canonicalLocale).Scan(&d.Version, &d.Locale, &d.Title, &d.Body, &d.IsCurrent, &d.EffectiveAt)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ConsentDocument{}, ErrNoCurrentDoc
 		}

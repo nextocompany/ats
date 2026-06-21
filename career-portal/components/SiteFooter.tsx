@@ -79,7 +79,12 @@ export function SiteFooter() {
 
       <div className="border-t border-line">
         <Container className="flex flex-col items-start justify-between gap-2 py-6 text-xs text-muted-foreground sm:flex-row sm:items-center">
-          <p>ข้อมูลของคุณได้รับการคุ้มครองตาม พ.ร.บ. คุ้มครองข้อมูลส่วนบุคคล (PDPA)</p>
+          <Link
+            href="/privacy"
+            className="transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:outline-none"
+          >
+            ข้อมูลของคุณได้รับการคุ้มครองตาม พ.ร.บ. คุ้มครองข้อมูลส่วนบุคคล (PDPA)
+          </Link>
           <p>&copy; 2569 บริษัท ซีพี แอ็กซ์ตร้า จำกัด (มหาชน)</p>
         </Container>
       </div>
