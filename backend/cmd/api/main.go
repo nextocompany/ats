@@ -428,8 +428,10 @@ func main() {
 	// HR member management (career-portal accounts): role-gated directory + lifecycle
 	// (super_admin + hr_manager; PDPA erase super_admin-only). Reads candidate_accounts
 	// directly; resume URLs are signed on demand and erased on anonymize via the blob
-	// client (passed as both signer and deleter).
-	members.RegisterDashboardRoutes(app, members.NewHandler(members.NewRepository(pool), activityLog, blobClient, blobClient))
+	// client (passed as both signer and deleter). The eraser cascades account erasure
+	// into full PDPA erasure of the applicant data behind it.
+	memberEraser := pdpa.NewRetentionService(pool, blobClient, search.NewIndexer(cfg), activityLog, cfg.RetentionDays)
+	members.RegisterDashboardRoutes(app, members.NewHandler(members.NewRepository(pool), activityLog, blobClient, blobClient).WithEraser(memberEraser))
 	// Candidate search (Sprint 5c) — registered BEFORE profiles so the static
 	// /candidates/search path takes precedence over /candidates/:id. Mock Postgres
 	// trigram by default; Azure AI Search behind config.

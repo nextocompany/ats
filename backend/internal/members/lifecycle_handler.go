@@ -169,8 +169,19 @@ func (h *Handler) Anonymize(c *fiber.Ctx) error {
 		return err
 	}
 	h.deleteResumeBlob(c, id, resumeURL)
-	h.auditWith(c, actionMemberAnonymize, id, nil)
-	return httpx.OK(c, fiber.Map{"id": id, "status": StatusAnonymized})
+	// Cascade: fully erase the applicant data (applications, interviews, onboarding
+	// scans, offers, letters, search index) behind this account. The account PII is
+	// already redacted; a cascade failure is surfaced (cascade_complete:false) and
+	// audited so an operator can retry - re-running anonymize is idempotent.
+	cascadeComplete := true
+	if h.eraser != nil {
+		if err := h.eraser.EraseLinkedCandidates(c.UserContext(), id); err != nil {
+			cascadeComplete = false
+			log.Warn().Err(err).Str("member", id.String()).Msg("members: candidate erasure cascade failed")
+		}
+	}
+	h.auditWith(c, actionMemberAnonymize, id, fiber.Map{"cascade_complete": cascadeComplete})
+	return httpx.OK(c, fiber.Map{"id": id, "status": StatusAnonymized, "cascade_complete": cascadeComplete})
 }
 
 // deleteResumeBlob removes the member's stored resume after a successful

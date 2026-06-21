@@ -143,8 +143,10 @@ func main() {
 		reports.New(pool), blobClient, notifier, cfg.ReportRecipientList(),
 	)
 
-	// Retention sweep (Sprint 7): anonymize expired candidate PII.
-	retentionSvc := pdpa.NewRetentionService(pool, blobClient, activity.New(pool), cfg.RetentionDays)
+	// Retention sweep (Sprint 7): anonymize expired candidate PII. The search
+	// indexer (no-op unless AI_SEARCH_PROVIDER=azure) lets erasure also remove the
+	// subject from the search index.
+	retentionSvc := pdpa.NewRetentionService(pool, blobClient, search.NewIndexer(cfg), activity.New(pool), cfg.RetentionDays)
 
 	// Auth cleanup (candidate membership): purge expired OTP/session rows.
 	authCleanupSvc := candidateauth.NewCleanupService(pool)

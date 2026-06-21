@@ -30,11 +30,13 @@ type Doc struct {
 	AIScore         *float64 `json:"ai_score"`
 }
 
-// Indexer manages the candidate search index: schema creation and document
-// upserts. The mock implementation is a no-op so local/CI need no Azure creds.
+// Indexer manages the candidate search index: schema creation, document upserts,
+// and document deletes (PDPA erasure). The mock implementation is a no-op so
+// local/CI need no Azure creds.
 type Indexer interface {
 	EnsureIndex(ctx context.Context) error
 	UpsertBatch(ctx context.Context, docs []Doc) error
+	Delete(ctx context.Context, candidateIDs []string) error
 }
 
 // NewIndexer selects the implementation by config — Azure push when
@@ -52,6 +54,7 @@ type noopIndexer struct{}
 
 func (noopIndexer) EnsureIndex(context.Context) error        { return nil }
 func (noopIndexer) UpsertBatch(context.Context, []Doc) error { return nil }
+func (noopIndexer) Delete(context.Context, []string) error   { return nil }
 
 // azureIndexer pushes documents into an Azure AI Search index via the REST push
 // API. Constructed only when AI_SEARCH_PROVIDER=azure.
@@ -76,6 +79,13 @@ func newAzureIndexer(cfg *config.Config) *azureIndexer {
 type indexAction struct {
 	Action string `json:"@search.action"`
 	Doc
+}
+
+// deleteAction removes a document by key only. Azure's "delete" action needs just
+// the key field (candidate_id); sending the rest would be ignored, so it is omitted.
+type deleteAction struct {
+	Action      string `json:"@search.action"`
+	CandidateID string `json:"candidate_id"`
 }
 
 type indexResponse struct {
@@ -103,11 +113,38 @@ func (s *azureIndexer) UpsertBatch(ctx context.Context, docs []Doc) error {
 	return nil
 }
 
+// Delete removes candidate documents from the index by key, in chunks of
+// maxBatch. Used by PDPA erasure so a forgotten subject leaves no searchable
+// trace. A no-op for an empty list.
+func (s *azureIndexer) Delete(ctx context.Context, candidateIDs []string) error {
+	for start := 0; start < len(candidateIDs); start += maxBatch {
+		end := start + maxBatch
+		if end > len(candidateIDs) {
+			end = len(candidateIDs)
+		}
+		actions := make([]deleteAction, 0, end-start)
+		for _, id := range candidateIDs[start:end] {
+			actions = append(actions, deleteAction{Action: "delete", CandidateID: id})
+		}
+		if err := s.postActions(ctx, actions); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (s *azureIndexer) pushChunk(ctx context.Context, docs []Doc) error {
 	actions := make([]indexAction, 0, len(docs))
 	for _, d := range docs {
 		actions = append(actions, indexAction{Action: "mergeOrUpload", Doc: d})
 	}
+	return s.postActions(ctx, actions)
+}
+
+// postActions marshals an action batch and POSTs it to /docs/index, surfacing the
+// first per-document failure. Shared by upsert and delete (both are batched
+// document actions on the same endpoint).
+func (s *azureIndexer) postActions(ctx context.Context, actions any) error {
 	body, err := json.Marshal(map[string]any{"value": actions})
 	if err != nil {
 		return fmt.Errorf("search: index marshal: %w", err)

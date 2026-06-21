@@ -47,18 +47,33 @@ type activityWriter interface {
 	Record(ctx context.Context, action, entityType string, entityID uuid.UUID, newValue any) error
 }
 
+// CandidateEraser cascades a member (account) erasure into full PDPA erasure of
+// the applicant/candidate data behind it. Satisfied by *pdpa.RetentionService;
+// optional (nil = no cascade, account-only erasure still runs).
+type CandidateEraser interface {
+	EraseLinkedCandidates(ctx context.Context, accountID uuid.UUID) error
+}
+
 // Handler serves the HR member-management endpoints.
 type Handler struct {
 	repo     Repository
 	activity activityWriter
 	signer   ResumeSigner
 	blob     blobDeleter
+	eraser   CandidateEraser
 }
 
 // NewHandler builds the member-admin handler. blob may be nil (blob cleanup on
 // anonymize is then skipped — the DB redaction, the critical part, still runs).
 func NewHandler(repo Repository, act activityWriter, signer ResumeSigner, blob blobDeleter) *Handler {
 	return &Handler{repo: repo, activity: act, signer: signer, blob: blob}
+}
+
+// WithEraser wires the candidate-erasure cascade used on anonymize and returns the
+// handler for chaining. Without it, anonymize redacts the account only.
+func (h *Handler) WithEraser(e CandidateEraser) *Handler {
+	h.eraser = e
+	return h
 }
 
 func (h *Handler) authorized(c *fiber.Ctx) bool {
