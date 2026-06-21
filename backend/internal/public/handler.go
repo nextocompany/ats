@@ -20,9 +20,21 @@ import (
 	"github.com/nexto/hr-ats/pkg/httpx"
 )
 
-// ConsentRecorder records a candidate's PDPA consent. pdpa.Repo satisfies it.
+// ConsentRecorder records a candidate's PDPA consent and reports the current
+// notice version. pdpa.Repo satisfies it.
 type ConsentRecorder interface {
 	Record(ctx context.Context, c pdpa.Consent, ip string) error
+	CurrentVersion(ctx context.Context) (string, error)
+}
+
+// currentConsentVersion resolves the registry's current notice version, falling
+// back to "1.0" so an apply never fails on a registry read error.
+func (h *Handler) currentConsentVersion(c *fiber.Ctx) string {
+	v, err := h.consent.CurrentVersion(c.UserContext())
+	if err != nil || v == "" {
+		return "1.0"
+	}
+	return v
 }
 
 // AccountResolver resolves a member account from a session token, reads its saved
@@ -31,7 +43,9 @@ type ConsentRecorder interface {
 type AccountResolver interface {
 	AccountFromSession(ctx context.Context, token string) (*candidateauth.Account, error)
 	SavedResumeBytes(ctx context.Context, acct *candidateauth.Account) ([]byte, error)
-	SaveConsent(ctx context.Context, accountID uuid.UUID, version string) error
+	// MarkConsented flips the account consent snapshot (no ledger row); the
+	// apply's candidate-keyed consent row is the authoritative ledger entry.
+	MarkConsented(ctx context.Context, accountID uuid.UUID, version string) error
 }
 
 const maxResumeBytes = 10 * 1024 * 1024
@@ -159,7 +173,7 @@ func (h *Handler) Apply(c *fiber.Ctx) error {
 	// the box; a member must have actually consented at signup (don't assume).
 	consentVersion := c.FormValue("consent_version")
 	if consentVersion == "" {
-		consentVersion = "1.0"
+		consentVersion = h.currentConsentVersion(c)
 	}
 	if acct != nil {
 		switch {
@@ -173,7 +187,7 @@ func (h *Handler) Apply(c *fiber.Ctx) error {
 			// consent step). Persist it so later applies don't re-prompt. A failure
 			// to persist must not lose the application — the legal record is still
 			// written by finalizeApplication below.
-			if err := h.accounts.SaveConsent(c.UserContext(), acct.ID, consentVersion); err != nil {
+			if err := h.accounts.MarkConsented(c.UserContext(), acct.ID, consentVersion); err != nil {
 				log.Warn().Err(err).Str("account_id", acct.ID.String()).Msg("failed to persist member PDPA consent")
 			}
 		default:
@@ -211,7 +225,7 @@ func (h *Handler) Apply(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	return h.finalizeApplication(c, result, consentVersion)
+	return h.finalizeApplication(c, result, consentVersion, accountID)
 }
 
 // QuickApply handles POST /api/v1/public/apply/quick (RequireCandidate). A member
@@ -240,7 +254,7 @@ func (h *Handler) QuickApply(c *fiber.Ctx) error {
 	}
 	consentVersion := acct.PDPAVersion
 	if consentVersion == "" {
-		consentVersion = "1.0"
+		consentVersion = h.currentConsentVersion(c)
 	}
 	if !acct.PDPAConsent {
 		// Not consented at signup — require an explicit consent on this apply, then
@@ -248,7 +262,7 @@ func (h *Handler) QuickApply(c *fiber.Ctx) error {
 		if !body.ConsentGiven {
 			return fiber.NewError(fiber.StatusBadRequest, "PDPA consent is required")
 		}
-		if err := h.accounts.SaveConsent(c.UserContext(), acct.ID, consentVersion); err != nil {
+		if err := h.accounts.MarkConsented(c.UserContext(), acct.ID, consentVersion); err != nil {
 			log.Warn().Err(err).Str("account_id", acct.ID.String()).Msg("failed to persist member PDPA consent")
 		}
 	}
@@ -278,11 +292,14 @@ func (h *Handler) QuickApply(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	return h.finalizeApplication(c, result, consentVersion)
+	return h.finalizeApplication(c, result, consentVersion, &id)
 }
 
 // finalizeApplication issues the opaque status token and records PDPA consent.
-func (h *Handler) finalizeApplication(c *fiber.Ctx, result applications.IntakeResult, consentVersion string) error {
+// accountID is the applying member's portal account (nil for guest/LINE-only
+// applies); it is stamped on the ledger row so the apply consent correlates to
+// the account without a join through candidates.
+func (h *Handler) finalizeApplication(c *fiber.Ctx, result applications.IntakeResult, consentVersion string, accountID *uuid.UUID) error {
 	token, err := newPublicToken()
 	if err != nil {
 		return err
@@ -290,10 +307,11 @@ func (h *Handler) finalizeApplication(c *fiber.Ctx, result applications.IntakeRe
 	if err := h.apps.SetPublicToken(c.UserContext(), result.ApplicationID, token); err != nil {
 		return err
 	}
-	// Record PDPA consent against the candidate. A failure here must not lose the
-	// application — log and continue (consent is retryable).
+	// Record PDPA consent against the candidate (+ account when known). A failure
+	// here must not lose the application — log and continue (consent is retryable).
 	if err := h.consent.Record(c.UserContext(), pdpa.Consent{
 		CandidateID:   result.CandidateID,
+		AccountID:     accountID,
 		ConsentGiven:  true,
 		Version:       consentVersion,
 		SourceChannel: "career_portal",

@@ -153,6 +153,26 @@ func (f *fakeRepo) SetConsent(_ context.Context, id uuid.UUID, version string) e
 	return nil
 }
 
+func (f *fakeRepo) MarkConsented(_ context.Context, id uuid.UUID, version string) error {
+	a, ok := f.accounts[id]
+	if !ok {
+		return ErrNotFound
+	}
+	a.PDPAConsent = true
+	a.PDPAVersion = version
+	return nil
+}
+
+func (f *fakeRepo) WithdrawConsent(_ context.Context, id uuid.UUID, _ string) error {
+	a, ok := f.accounts[id]
+	if !ok {
+		return ErrNotFound
+	}
+	// Mirror writeConsent: only the boolean flips; the accepted version is kept.
+	a.PDPAConsent = false
+	return nil
+}
+
 func (f *fakeRepo) CreateSession(_ context.Context, accountID uuid.UUID, tokenHash string, _ time.Time) error {
 	f.sessions[tokenHash] = accountID
 	return nil

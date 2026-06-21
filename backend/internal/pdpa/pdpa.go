@@ -13,6 +13,7 @@ import (
 // Consent is a recorded consent decision.
 type Consent struct {
 	CandidateID   uuid.UUID  `json:"candidate_id"`
+	AccountID     *uuid.UUID `json:"account_id,omitempty"` // portal account, when known
 	ConsentGiven  bool       `json:"consent_given"`
 	Version       string     `json:"consent_version"`
 	SourceChannel string     `json:"source_channel"`
@@ -33,16 +34,25 @@ func (r *Repo) Record(ctx context.Context, c Consent, ip string) error {
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	if _, err := tx.Exec(ctx,
-		`INSERT INTO pdpa_consents (candidate_id, consent_given, consent_version, source_channel, ip_address)
-		 VALUES ($1,$2,$3,$4,NULLIF($5,'')::inet)`,
-		c.CandidateID, c.ConsentGiven, c.Version, c.SourceChannel, ip); err != nil {
-		return fmt.Errorf("pdpa: insert consent: %w", err)
+	// candidate_id is nullable: an account-only consent event (no application yet)
+	// records into the ledger without a candidate. Pass NULL rather than the zero
+	// UUID, which would violate the candidates FK.
+	var candID *uuid.UUID
+	if c.CandidateID != uuid.Nil {
+		candID = &c.CandidateID
 	}
 	if _, err := tx.Exec(ctx,
-		`UPDATE candidates SET pdpa_consent=$2, pdpa_consent_at=NOW(), pdpa_version=$3, updated_at=NOW() WHERE id=$1`,
-		c.CandidateID, c.ConsentGiven, c.Version); err != nil {
-		return fmt.Errorf("pdpa: update candidate: %w", err)
+		`INSERT INTO pdpa_consents (candidate_id, account_id, consent_given, consent_version, source_channel, ip_address)
+		 VALUES ($1,$2,$3,$4,$5,NULLIF($6,'')::inet)`,
+		candID, c.AccountID, c.ConsentGiven, c.Version, c.SourceChannel, ip); err != nil {
+		return fmt.Errorf("pdpa: insert consent: %w", err)
+	}
+	if candID != nil {
+		if _, err := tx.Exec(ctx,
+			`UPDATE candidates SET pdpa_consent=$2, pdpa_consent_at=NOW(), pdpa_version=$3, updated_at=NOW() WHERE id=$1`,
+			c.CandidateID, c.ConsentGiven, c.Version); err != nil {
+			return fmt.Errorf("pdpa: update candidate: %w", err)
+		}
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("pdpa: commit: %w", err)

@@ -18,4 +18,5 @@ func RegisterRoutes(app *fiber.App, h *Handler) {
 	g.Get("/me", gate, h.Me)
 	g.Patch("/profile", gate, h.UpdateProfile)
 	g.Post("/resume", gate, h.UploadResume)
+	g.Post("/consent/withdraw", gate, h.WithdrawConsent)
 }

@@ -95,13 +95,51 @@ func (h *Handler) VerifyEmail(c *fiber.Ctx) error {
 	return httpx.OK(c, toMeView(acct))
 }
 
+// meWithConsent enriches the base view with the consent-version state the portal
+// needs to decide whether to show a re-consent prompt (PDPA s.19).
+type meWithConsent struct {
+	meView
+	PDPAVersion        string `json:"pdpa_version"`
+	PDPACurrentVersion string `json:"pdpa_current_version"`
+	PDPANeedsReconsent bool   `json:"pdpa_needs_reconsent"`
+}
+
 // Me handles GET /me (RequireCandidate).
 func (h *Handler) Me(c *fiber.Ctx) error {
 	acct := CandidateFromCtx(c)
 	if acct == nil {
 		return fiber.NewError(fiber.StatusUnauthorized, "login required")
 	}
-	return httpx.OK(c, toMeView(acct))
+	current := h.svc.CurrentConsentVersion(c.UserContext())
+	// A consenting member is prompted to re-consent when a newer notice version is
+	// current than the one they accepted. Withdrawn (not-consented) members are not
+	// nagged here; they re-consent through the normal consent step on next apply.
+	needs := acct.PDPAConsent && acct.PDPAVersion != "" && acct.PDPAVersion != current
+	return httpx.OK(c, meWithConsent{
+		meView:             toMeView(acct),
+		PDPAVersion:        acct.PDPAVersion,
+		PDPACurrentVersion: current,
+		PDPANeedsReconsent: needs,
+	})
+}
+
+// WithdrawConsent handles POST /consent/withdraw (RequireCandidate): the member
+// revokes PDPA consent. The withdrawal is recorded in the consent ledger + the
+// account snapshot. Erasure of data with no other lawful basis is a separate
+// self-service action (Phase 3 DSAR); this endpoint only revokes consent.
+func (h *Handler) WithdrawConsent(c *fiber.Ctx) error {
+	acct := CandidateFromCtx(c)
+	if acct == nil {
+		return fiber.NewError(fiber.StatusUnauthorized, "login required")
+	}
+	version := acct.PDPAVersion
+	if version == "" {
+		version = h.svc.CurrentConsentVersion(c.UserContext())
+	}
+	if err := h.svc.WithdrawConsent(c.UserContext(), acct.ID, version); err != nil {
+		return err
+	}
+	return httpx.OK(c, fiber.Map{"pdpa_consent": false})
 }
 
 // Logout handles POST /logout: revoke the session + clear the cookie.
@@ -141,7 +179,7 @@ func (h *Handler) UpdateProfile(c *fiber.Ctx) error {
 	if body.ConsentGiven {
 		version := body.ConsentVersion
 		if version == "" {
-			version = "1.0"
+			version = h.svc.CurrentConsentVersion(c.UserContext())
 		}
 		if err := h.svc.SaveConsent(c.UserContext(), acct.ID, version); err != nil {
 			return err

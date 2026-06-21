@@ -25,6 +25,12 @@ type Session struct {
 	Expires time.Time
 }
 
+// ConsentPolicy reports the current PDPA notice version (satisfied by *pdpa.Repo).
+// Optional: nil falls back to the historical "1.0".
+type ConsentPolicy interface {
+	CurrentVersion(ctx context.Context) (string, error)
+}
+
 // Service orchestrates candidate signup/login: email-OTP, OAuth login (LINE/
 // Google), session issuance, profile + resume, and identity linking.
 type Service struct {
@@ -33,11 +39,37 @@ type Service struct {
 	blob       BlobStore
 	otpTTL     time.Duration
 	sessionTTL time.Duration
+	policy     ConsentPolicy
 }
 
 // NewService wires the candidateauth service.
 func NewService(repo Repository, sender email.Sender, blob BlobStore, otpTTL, sessionTTL time.Duration) *Service {
 	return &Service{repo: repo, email: sender, blob: blob, otpTTL: otpTTL, sessionTTL: sessionTTL}
+}
+
+// WithConsentPolicy wires the current-version source for consent stamping and the
+// re-consent prompt, returning the service for chaining.
+func (s *Service) WithConsentPolicy(p ConsentPolicy) *Service {
+	s.policy = p
+	return s
+}
+
+// CurrentConsentVersion returns the registry's current notice version, falling
+// back to "1.0" when no policy is wired or the lookup fails.
+func (s *Service) CurrentConsentVersion(ctx context.Context) string {
+	if s.policy == nil {
+		return "1.0"
+	}
+	v, err := s.policy.CurrentVersion(ctx)
+	if err != nil || v == "" {
+		return "1.0"
+	}
+	return v
+}
+
+// WithdrawConsent records a consent withdrawal for the account (ledger + snapshot).
+func (s *Service) WithdrawConsent(ctx context.Context, accountID uuid.UUID, version string) error {
+	return s.repo.WithdrawConsent(ctx, accountID, version)
 }
 
 // normalizeEmail lowercases + trims; returns ("", false) when not a valid address.
@@ -171,9 +203,16 @@ func (s *Service) SaveResume(ctx context.Context, accountID uuid.UUID, fileName,
 	return s.repo.SetResume(ctx, accountID, key, fileType)
 }
 
-// SaveConsent records PDPA consent on the account (captured once at signup).
+// SaveConsent records PDPA consent on the account + a ledger row (portal
+// profile/signup path, where no candidate row exists yet).
 func (s *Service) SaveConsent(ctx context.Context, accountID uuid.UUID, version string) error {
 	return s.repo.SetConsent(ctx, accountID, version)
+}
+
+// MarkConsented updates only the account consent snapshot (no ledger row). The
+// apply flow uses this; the candidate-keyed apply consent row is the ledger record.
+func (s *Service) MarkConsented(ctx context.Context, accountID uuid.UUID, version string) error {
+	return s.repo.MarkConsented(ctx, accountID, version)
 }
 
 // SavedResumeBytes downloads the account's saved resume for quick-apply.

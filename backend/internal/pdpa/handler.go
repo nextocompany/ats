@@ -1,6 +1,8 @@
 package pdpa
 
 import (
+	"errors"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 
@@ -18,6 +20,26 @@ func RegisterRoutes(app *fiber.App, h *Handler) {
 	v1 := app.Group("/api/v1/pdpa")
 	v1.Post("/consent", h.RecordConsent)
 	v1.Get("/consent/:candidate_id", h.GetConsent)
+	// Public: the current privacy/consent notice (the apps stamp this version and
+	// render the body on the consent step / privacy page).
+	v1.Get("/policy/current", h.CurrentPolicy)
+}
+
+// CurrentPolicy handles GET /api/v1/pdpa/policy/current?locale=th|en — the current
+// consent document for the requested locale (defaults to th).
+func (h *Handler) CurrentPolicy(c *fiber.Ctx) error {
+	locale := c.Query("locale", "th")
+	if locale != "th" && locale != "en" {
+		locale = "th"
+	}
+	doc, err := h.repo.CurrentDocuments(c.UserContext(), locale)
+	if errors.Is(err, ErrNoCurrentDoc) {
+		return fiber.NewError(fiber.StatusNotFound, "no current consent document")
+	}
+	if err != nil {
+		return err // transient DB error → 5xx so the client retries, not a false 404
+	}
+	return httpx.OK(c, doc)
 }
 
 type consentReq struct {

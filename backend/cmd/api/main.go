@@ -310,7 +310,8 @@ func main() {
 	// handler so apply can be account-first.
 	emailSender := email.NewSender(cfg)
 	caRepo := candidateauth.NewRepository(pool)
-	caSvc := candidateauth.NewService(caRepo, emailSender, blobClient, cfg.EmailOTPTTL, cfg.CandidateSessionTTL)
+	caSvc := candidateauth.NewService(caRepo, emailSender, blobClient, cfg.EmailOTPTTL, cfg.CandidateSessionTTL).
+		WithConsentPolicy(pdpaRepo)
 	caHandler := candidateauth.NewHandler(caSvc, cfg.SessionCookieName, !cfg.IsDevelopment())
 	// CSRF guard for cookie-authed endpoints: reject cross-origin state-changing
 	// requests (the session cookie is SameSite=None in prod, and multipart uploads
