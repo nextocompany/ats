@@ -57,7 +57,7 @@ import type {
   DsarRequest,
   DsarFilter,
   ConsentRecord,
-  DpoContact,
+  DpoDirectory,
   PolicyDoc,
 } from "./types";
 
@@ -934,6 +934,6 @@ export function usePrivacyPolicy(locale: string) {
 export function usePublicDpo() {
   return useQuery({
     queryKey: ["pdpa", "dpo"],
-    queryFn: () => api.get<DpoContact>("/api/v1/pdpa/dpo").then((r) => r.data),
+    queryFn: () => api.get<DpoDirectory>("/api/v1/pdpa/dpo").then((r) => r.data),
   });
 }

@@ -149,15 +149,11 @@ type Config struct {
 	// candidate-facing.
 	DashboardBaseURL string
 
-	// CompanyName is the letterhead name printed on generated PDF letters (3.3).
+	// CompanyName is the letterhead name printed on generated PDF letters (3.3) and
+	// the controller name in the published DPO block / breach notification. The DPO
+	// officers themselves are now derived dynamically from DPO-flagged accounts, not
+	// config (see internal/pdpa.ListDPOOfficers).
 	CompanyName string
-
-	// Data Protection Officer contact (PDPA s.41), published on the privacy notice
-	// and embedded in the generated PDPC breach-notification draft. Empty by default
-	// (the surfaces then show a visible placeholder rather than a silent blank).
-	PDPADPOName  string
-	PDPADPOEmail string
-	PDPADPOPhone string
 
 	// OnboardingRequiredDocsRaw is the comma-separated subset of known onboarding
 	// document types (3.8) that a hired candidate must submit. Defaults to seven;
@@ -320,9 +316,6 @@ func Load() (*Config, error) {
 		PortalBaseURL:    getenv("PORTAL_BASE_URL", "http://localhost:3001"),
 		DashboardBaseURL: getenv("DASHBOARD_BASE_URL", "http://localhost:3000"),
 		CompanyName:      getenv("COMPANY_NAME", "CP AXTRA"),
-		PDPADPOName:      os.Getenv("PDPA_DPO_NAME"),
-		PDPADPOEmail:     os.Getenv("PDPA_DPO_EMAIL"),
-		PDPADPOPhone:     os.Getenv("PDPA_DPO_PHONE"),
 
 		OnboardingRequiredDocsRaw: getenv("ONBOARDING_REQUIRED_DOCS", "id_card,house_registration,education_certificate,bank_book,tax_document,photo,health_check"),
 

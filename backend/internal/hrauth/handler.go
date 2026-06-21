@@ -128,6 +128,8 @@ type updateUserReq struct {
 	StoreID   *int    `json:"store_id"`
 	Subregion *string `json:"subregion"`
 	IsActive  *bool   `json:"is_active"`
+	Phone     *string `json:"phone"`
+	IsDPO     *bool   `json:"is_dpo"`
 	Password  *string `json:"password"`
 }
 
@@ -147,7 +149,8 @@ func (h *Handler) UpdateUser(c *fiber.Ctx) error {
 	caller, _ := c.Locals(middleware.UserContextKey).(middleware.DevUser)
 	user, err := h.svc.UpdateUser(c.UserContext(), id, caller.ID, UpdateUserInput{
 		FullName: req.FullName, Role: req.Role, StoreID: req.StoreID,
-		Subregion: req.Subregion, IsActive: req.IsActive, Password: req.Password,
+		Subregion: req.Subregion, IsActive: req.IsActive,
+		Phone: req.Phone, IsDPO: req.IsDPO, Password: req.Password,
 	})
 	if err != nil {
 		return h.writeUserError(c, err)

@@ -12,6 +12,7 @@ import (
 
 	"github.com/nexto/hr-ats/internal/activity"
 	"github.com/nexto/hr-ats/internal/middleware"
+	"github.com/nexto/hr-ats/internal/pdpa"
 	"github.com/nexto/hr-ats/internal/rbac"
 	"github.com/nexto/hr-ats/pkg/httpx"
 )
@@ -28,21 +29,44 @@ const maxAffectedSubjects = 100_000_000 // sanity bound on the affected-count fi
 // a future discovered_at.
 const clockSkew = time.Minute
 
+// dpoLister resolves the published DPO directory dynamically (officers flagged
+// is_dpo). Satisfied by *pdpa.Repo.
+type dpoLister interface {
+	ListDPOOfficers(ctx context.Context) ([]pdpa.DPOOfficer, error)
+}
+
 // Handler serves /api/v1/breaches, gated entirely to breach.manage. The register
-// is company-wide (no RBAC data-scope clause). The DPO contact block is injected
-// for the generated PDPC notification (wired from config; Phase 5.4 fills the DPO
-// fields, until then the generator shows placeholders).
+// is company-wide (no RBAC data-scope clause). The PDPC notification's DPO contact
+// is resolved dynamically from the DPO-flagged accounts (company from config).
 type Handler struct {
-	repo  Repository
-	dpo   DPOContact
-	audit auditWriter
-	now   func() time.Time
+	repo    Repository
+	dpo     dpoLister
+	company string
+	audit   auditWriter
+	now     func() time.Time
 }
 
 // NewHandler builds the breach handler. audit may be nil (mutations are then not
 // written to the audit trail, but the operation still succeeds).
-func NewHandler(repo Repository, dpo DPOContact, audit auditWriter) *Handler {
-	return &Handler{repo: repo, dpo: dpo, audit: audit, now: time.Now}
+func NewHandler(repo Repository, dpo dpoLister, company string, audit auditWriter) *Handler {
+	return &Handler{repo: repo, dpo: dpo, company: company, audit: audit, now: time.Now}
+}
+
+// dpoContact resolves the DPO contact block for the generated notification: the
+// first active DPO-flagged account (placeholders kick in when none is set).
+func (h *Handler) dpoContact(ctx context.Context) DPOContact {
+	contact := DPOContact{Company: h.company}
+	officers, err := h.dpo.ListDPOOfficers(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("breach: dpo officers lookup failed")
+		return contact
+	}
+	if len(officers) > 0 {
+		contact.DPOName = officers[0].Name
+		contact.DPOEmail = officers[0].Email
+		contact.DPOPhone = officers[0].Phone
+	}
+	return contact
 }
 
 // record writes an audit entry for a breach mutation, attributed to the caller.
@@ -313,7 +337,7 @@ func (h *Handler) Notification(c *fiber.Ctx) error {
 	if err != nil {
 		return h.writeErr(c, err)
 	}
-	return httpx.OK(c, GenerateNotification(b, h.dpo, h.now()))
+	return httpx.OK(c, GenerateNotification(b, h.dpoContact(c.UserContext()), h.now()))
 }
 
 func (h *Handler) NotifyPDPC(c *fiber.Ctx) error {

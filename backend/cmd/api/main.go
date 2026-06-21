@@ -440,10 +440,11 @@ func main() {
 	// PDPA breach register (DPO/legal): record personal-data breaches, drive the
 	// s.37(4) 72h PDPC-notification countdown, and generate the notification
 	// content. Gated to breach.manage; company-wide (no RBAC data-scope). The DPO
-	// contact block is wired from config (Phase 5.4 fills the DPO fields).
+	// contact in the notification is resolved dynamically from DPO-flagged accounts.
 	breach.RegisterRoutes(app, breach.NewHandler(
 		breach.NewRepository(pool),
-		breach.DPOContact{Company: cfg.CompanyName, DPOName: cfg.PDPADPOName, DPOEmail: cfg.PDPADPOEmail, DPOPhone: cfg.PDPADPOPhone},
+		pdpaRepo,
+		cfg.CompanyName,
 		activityLog,
 	))
 	interview.RegisterDashboardRoutes(app, interviewHandler)
@@ -474,13 +475,13 @@ func main() {
 	executive.RegisterRoutes(app, executive.NewHandler(executive.NewService(pool, cfg.ExecutiveProvider)))
 	// PDPA: published DPO contact (s.41) on the public policy endpoints + the
 	// pdpa.admin-gated DPO console (DSAR held-queue, consent lookup, overview).
-	dpoContact := pdpa.DPOContact{Name: cfg.PDPADPOName, Email: cfg.PDPADPOEmail, Phone: cfg.PDPADPOPhone, Company: cfg.CompanyName}
 	pdpaHandler := pdpa.NewHandler(pdpaRepo)
-	pdpaHandler.SetDPO(dpoContact)
+	pdpaHandler.SetCompany(cfg.CompanyName)
 	pdpa.RegisterRoutes(app, pdpaHandler)
 	pdpaadmin.RegisterRoutes(app, pdpaadmin.NewHandler(
 		pdpaadmin.NewRepository(pool),
-		dpoContact,
+		pdpaRepo,
+		cfg.CompanyName,
 		pdpaadmin.RetentionInfo{Days: cfg.RetentionDays, Enabled: cfg.RetentionSweepEnabled},
 		activityLog,
 	))

@@ -63,13 +63,18 @@ func (s *stubRepo) Counts(context.Context) (int, int, int, string, error) {
 	return 3, 1, 1, "1.0", nil
 }
 
+// fakeDPO is a no-officer DPO directory for the overview test.
+type fakeDPO struct{}
+
+func (fakeDPO) ListDPOOfficers(context.Context) ([]pdpa.DPOOfficer, error) { return nil, nil }
+
 func appWithRole(role string, repo Repository) *fiber.App {
 	fa := fiber.New()
 	fa.Use(func(c *fiber.Ctx) error {
 		c.Locals(middleware.UserContextKey, middleware.DevUser{ID: uuid.NewString(), Role: role})
 		return c.Next()
 	})
-	RegisterRoutes(fa, NewHandler(repo, pdpa.DPOContact{Company: "CP Axtra"}, RetentionInfo{Days: 365, Enabled: true}, nil))
+	RegisterRoutes(fa, NewHandler(repo, fakeDPO{}, "CP Axtra", RetentionInfo{Days: 365, Enabled: true}, nil))
 	return fa
 }
 

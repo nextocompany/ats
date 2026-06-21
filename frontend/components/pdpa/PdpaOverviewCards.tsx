@@ -60,24 +60,32 @@ export function PdpaOverviewCards({ overview }: { overview: PdpaOverview }) {
         </div>
         <div className="rounded-xl bg-card p-5 ring-1 ring-hairline">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">{t("dpoTitle")}</p>
-          <dl className="mt-2 space-y-1 text-sm">
+          <div className="mt-2 space-y-2 text-sm">
             <div className="flex gap-2">
-              <dt className="w-20 shrink-0 text-muted-foreground">{t("dpoCompany")}</dt>
-              <dd className="text-foreground">{placeholder(dpo.company)}</dd>
+              <span className="w-20 shrink-0 text-muted-foreground">{t("dpoCompany")}</span>
+              <span className="text-foreground">{placeholder(dpo.company)}</span>
             </div>
-            <div className="flex gap-2">
-              <dt className="w-20 shrink-0 text-muted-foreground">{t("dpoName")}</dt>
-              <dd className="text-foreground">{placeholder(dpo.name)}</dd>
-            </div>
-            <div className="flex gap-2">
-              <dt className="w-20 shrink-0 text-muted-foreground">{t("dpoEmail")}</dt>
-              <dd className="text-foreground">{placeholder(dpo.email)}</dd>
-            </div>
-            <div className="flex gap-2">
-              <dt className="w-20 shrink-0 text-muted-foreground">{t("dpoPhone")}</dt>
-              <dd className="text-foreground">{placeholder(dpo.phone)}</dd>
-            </div>
-          </dl>
+            {dpo.officers.length > 0 ? (
+              dpo.officers.map((o, i) => (
+                <dl key={i} className="space-y-1 border-t border-hairline pt-2">
+                  <div className="flex gap-2">
+                    <dt className="w-20 shrink-0 text-muted-foreground">{t("dpoName")}</dt>
+                    <dd className="text-foreground">{placeholder(o.name)}</dd>
+                  </div>
+                  <div className="flex gap-2">
+                    <dt className="w-20 shrink-0 text-muted-foreground">{t("dpoEmail")}</dt>
+                    <dd className="text-foreground">{placeholder(o.email)}</dd>
+                  </div>
+                  <div className="flex gap-2">
+                    <dt className="w-20 shrink-0 text-muted-foreground">{t("dpoPhone")}</dt>
+                    <dd className="text-foreground">{placeholder(o.phone)}</dd>
+                  </div>
+                </dl>
+              ))
+            ) : (
+              <p className="text-muted-foreground">{t("dpoUnset")}</p>
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -11,8 +11,15 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/nexto/hr-ats/internal/middleware"
+	"github.com/nexto/hr-ats/internal/pdpa"
 	"github.com/nexto/hr-ats/internal/rbac"
 )
+
+// fakeDPO is a no-officer DPO directory for the handler tests (the notification
+// generator then renders s.41 placeholders).
+type fakeDPO struct{}
+
+func (fakeDPO) ListDPOOfficers(context.Context) ([]pdpa.DPOOfficer, error) { return nil, nil }
 
 // fakeReader seeds an authorizer that grants breach.manage to super_admin (via
 // the hard bypass) and to a non-builtin role, so rbac.Can works in-process
@@ -102,7 +109,7 @@ func appWithRole(role string, repo Repository) *fiber.App {
 		c.Locals(middleware.UserContextKey, middleware.DevUser{ID: uuid.NewString(), Role: role})
 		return c.Next()
 	})
-	RegisterRoutes(fa, NewHandler(repo, DPOContact{Company: "CP Axtra"}, nil))
+	RegisterRoutes(fa, NewHandler(repo, fakeDPO{}, "CP Axtra", nil))
 	return fa
 }
 
