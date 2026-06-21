@@ -18,6 +18,23 @@ func RegisterRoutes(app *fiber.App, h *Handler) {
 	v1 := app.Group("/api/v1/pdpa")
 	v1.Post("/consent", h.RecordConsent)
 	v1.Get("/consent/:candidate_id", h.GetConsent)
+	// Public: the current privacy/consent notice (the apps stamp this version and
+	// render the body on the consent step / privacy page).
+	v1.Get("/policy/current", h.CurrentPolicy)
+}
+
+// CurrentPolicy handles GET /api/v1/pdpa/policy/current?locale=th|en — the current
+// consent document for the requested locale (defaults to th).
+func (h *Handler) CurrentPolicy(c *fiber.Ctx) error {
+	locale := c.Query("locale", "th")
+	if locale != "th" && locale != "en" {
+		locale = "th"
+	}
+	doc, err := h.repo.CurrentDocuments(c.UserContext(), locale)
+	if err != nil {
+		return fiber.NewError(fiber.StatusNotFound, "no current consent document")
+	}
+	return httpx.OK(c, doc)
 }
 
 type consentReq struct {

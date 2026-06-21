@@ -20,9 +20,21 @@ import (
 	"github.com/nexto/hr-ats/pkg/httpx"
 )
 
-// ConsentRecorder records a candidate's PDPA consent. pdpa.Repo satisfies it.
+// ConsentRecorder records a candidate's PDPA consent and reports the current
+// notice version. pdpa.Repo satisfies it.
 type ConsentRecorder interface {
 	Record(ctx context.Context, c pdpa.Consent, ip string) error
+	CurrentVersion(ctx context.Context) (string, error)
+}
+
+// currentConsentVersion resolves the registry's current notice version, falling
+// back to "1.0" so an apply never fails on a registry read error.
+func (h *Handler) currentConsentVersion(c *fiber.Ctx) string {
+	v, err := h.consent.CurrentVersion(c.UserContext())
+	if err != nil || v == "" {
+		return "1.0"
+	}
+	return v
 }
 
 // AccountResolver resolves a member account from a session token, reads its saved
@@ -159,7 +171,7 @@ func (h *Handler) Apply(c *fiber.Ctx) error {
 	// the box; a member must have actually consented at signup (don't assume).
 	consentVersion := c.FormValue("consent_version")
 	if consentVersion == "" {
-		consentVersion = "1.0"
+		consentVersion = h.currentConsentVersion(c)
 	}
 	if acct != nil {
 		switch {
@@ -240,7 +252,7 @@ func (h *Handler) QuickApply(c *fiber.Ctx) error {
 	}
 	consentVersion := acct.PDPAVersion
 	if consentVersion == "" {
-		consentVersion = "1.0"
+		consentVersion = h.currentConsentVersion(c)
 	}
 	if !acct.PDPAConsent {
 		// Not consented at signup — require an explicit consent on this apply, then
