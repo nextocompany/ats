@@ -10,11 +10,26 @@ import (
 	"github.com/nexto/hr-ats/pkg/httpx"
 )
 
+// DPOContact is the published Data Protection Officer contact (PDPA s.41). Wired
+// from config; empty fields render as visible placeholders on the privacy pages.
+type DPOContact struct {
+	Name    string `json:"name"`
+	Email   string `json:"email"`
+	Phone   string `json:"phone"`
+	Company string `json:"company"`
+}
+
 // Handler serves the PDPA endpoints.
-type Handler struct{ repo *Repo }
+type Handler struct {
+	repo *Repo
+	dpo  DPOContact
+}
 
 // NewHandler builds the PDPA handler.
 func NewHandler(repo *Repo) *Handler { return &Handler{repo: repo} }
+
+// SetDPO wires the published DPO contact returned by GET /api/v1/pdpa/dpo.
+func (h *Handler) SetDPO(d DPOContact) { h.dpo = d }
 
 // RegisterRoutes mounts the PDPA endpoints.
 func RegisterRoutes(app *fiber.App, h *Handler) {
@@ -24,6 +39,14 @@ func RegisterRoutes(app *fiber.App, h *Handler) {
 	// Public: the current privacy/consent notice (the apps stamp this version and
 	// render the body on the consent step / privacy page).
 	v1.Get("/policy/current", h.CurrentPolicy)
+	// Public: the published DPO contact (PDPA s.41), shown on the privacy pages.
+	v1.Get("/dpo", h.DPO)
+}
+
+// DPO handles GET /api/v1/pdpa/dpo - the published Data Protection Officer
+// contact. Public (it is published on the privacy notice by law).
+func (h *Handler) DPO(c *fiber.Ctx) error {
+	return httpx.OK(c, h.dpo)
 }
 
 // CurrentPolicy handles GET /api/v1/pdpa/policy/current?locale=th|en — the current

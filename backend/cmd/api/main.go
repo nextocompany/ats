@@ -38,6 +38,7 @@ import (
 	"github.com/nexto/hr-ats/internal/middleware"
 	"github.com/nexto/hr-ats/internal/notify"
 	"github.com/nexto/hr-ats/internal/pdpa"
+	"github.com/nexto/hr-ats/internal/pdpaadmin"
 	"github.com/nexto/hr-ats/internal/peoplesoft"
 	"github.com/nexto/hr-ats/internal/positions"
 	"github.com/nexto/hr-ats/internal/profiles"
@@ -442,7 +443,7 @@ func main() {
 	// contact block is wired from config (Phase 5.4 fills the DPO fields).
 	breach.RegisterRoutes(app, breach.NewHandler(
 		breach.NewRepository(pool),
-		breach.DPOContact{Company: cfg.CompanyName},
+		breach.DPOContact{Company: cfg.CompanyName, DPOName: cfg.PDPADPOName, DPOEmail: cfg.PDPADPOEmail, DPOPhone: cfg.PDPADPOPhone},
 		activityLog,
 	))
 	interview.RegisterDashboardRoutes(app, interviewHandler)
@@ -471,7 +472,18 @@ func main() {
 	// ATS Reports (Module-3 3.9): RBAC-scoped, date-ranged hiring-funnel metrics + CSV.
 	reports.RegisterATSRoutes(app, reports.NewATSReportHandler(reportRepo, cfg.OnboardingRequiredDocs()))
 	executive.RegisterRoutes(app, executive.NewHandler(executive.NewService(pool, cfg.ExecutiveProvider)))
-	pdpa.RegisterRoutes(app, pdpa.NewHandler(pdpaRepo))
+	// PDPA: published DPO contact (s.41) on the public policy endpoints + the
+	// pdpa.admin-gated DPO console (DSAR held-queue, consent lookup, overview).
+	dpoContact := pdpa.DPOContact{Name: cfg.PDPADPOName, Email: cfg.PDPADPOEmail, Phone: cfg.PDPADPOPhone, Company: cfg.CompanyName}
+	pdpaHandler := pdpa.NewHandler(pdpaRepo)
+	pdpaHandler.SetDPO(dpoContact)
+	pdpa.RegisterRoutes(app, pdpaHandler)
+	pdpaadmin.RegisterRoutes(app, pdpaadmin.NewHandler(
+		pdpaadmin.NewRepository(pool),
+		dpoContact,
+		pdpaadmin.RetentionInfo{Days: cfg.RetentionDays, Enabled: cfg.RetentionSweepEnabled},
+		activityLog,
+	))
 	users.RegisterRoutes(app, users.NewHandler())
 	// HR password sign-in + super_admin account management (alongside Entra SSO).
 	// login/logout are unauthenticated (see middleware.isUnauthedPath); the
