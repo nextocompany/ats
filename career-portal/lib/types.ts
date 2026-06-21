@@ -146,6 +146,10 @@ export interface Account {
   has_resume: boolean;
   resume_file_type: string;
   pdpa_consent: boolean;
+  // Consent versioning (Phase 2): the version the member accepted, and whether a
+  // newer notice version is current (so the UI can prompt for re-consent).
+  pdpa_version?: string;
+  pdpa_needs_reconsent?: boolean;
 }
 
 // PATCH /api/v1/public/auth/profile body.

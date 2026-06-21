@@ -161,7 +161,33 @@ func (h *Handler) WithdrawConsent(c *fiber.Ctx) error {
 			log.Warn().Err(err).Str("account_id", acct.ID.String()).Msg("candidateauth: consent-withdraw audit failed")
 		}
 	}
-	return httpx.OK(c, fiber.Map{"pdpa_consent": false})
+	return httpx.OK(c, fiber.Map{"pdpa_consent": false, "pdpa_version": version})
+}
+
+// AcceptConsent handles POST /consent/accept (RequireCandidate): the member
+// re-consents to the CURRENT notice version (Phase 2 reconsent). Each call records
+// a fresh consent event (a new ledger row) + updates the account snapshot to the
+// current version, so /me stops signalling pdpa_needs_reconsent. Re-posting writes
+// another ledger row (every accept is a real, audited event), which is the
+// intended audit-trail behaviour, not a no-op.
+func (h *Handler) AcceptConsent(c *fiber.Ctx) error {
+	acct := CandidateFromCtx(c)
+	if acct == nil {
+		return fiber.NewError(fiber.StatusUnauthorized, "login required")
+	}
+	version := h.svc.CurrentConsentVersion(c.UserContext())
+	if err := h.svc.SaveConsent(c.UserContext(), acct.ID, version); err != nil {
+		return err
+	}
+	// PDPA audit: the subject re-consented (actor = self, spoof-resistant IP).
+	if h.audit != nil {
+		acctID := acct.ID
+		a := activity.Actor{UserID: &acctID, IP: middleware.ClientIP(c), UserAgent: c.Get(fiber.HeaderUserAgent)}
+		if err := h.audit.RecordWith(c.UserContext(), a, activity.ActionConsentReaccept, "candidate_account", acct.ID, fiber.Map{"version": version}); err != nil {
+			log.Warn().Err(err).Str("account_id", acct.ID.String()).Msg("candidateauth: consent-reaccept audit failed")
+		}
+	}
+	return httpx.OK(c, fiber.Map{"pdpa_consent": true, "pdpa_version": version})
 }
 
 // Logout handles POST /logout: revoke the session + clear the cookie.
