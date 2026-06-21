@@ -10,26 +10,17 @@ import (
 	"github.com/nexto/hr-ats/pkg/httpx"
 )
 
-// DPOContact is the published Data Protection Officer contact (PDPA s.41). Wired
-// from config; empty fields render as visible placeholders on the privacy pages.
-type DPOContact struct {
-	Name    string `json:"name"`
-	Email   string `json:"email"`
-	Phone   string `json:"phone"`
-	Company string `json:"company"`
-}
-
 // Handler serves the PDPA endpoints.
 type Handler struct {
-	repo *Repo
-	dpo  DPOContact
+	repo    *Repo
+	company string // controller name for the published DPO block (officers are dynamic)
 }
 
 // NewHandler builds the PDPA handler.
 func NewHandler(repo *Repo) *Handler { return &Handler{repo: repo} }
 
-// SetDPO wires the published DPO contact returned by GET /api/v1/pdpa/dpo.
-func (h *Handler) SetDPO(d DPOContact) { h.dpo = d }
+// SetCompany sets the controller name returned in the published DPO block.
+func (h *Handler) SetCompany(company string) { h.company = company }
 
 // RegisterRoutes mounts the PDPA endpoints.
 func RegisterRoutes(app *fiber.App, h *Handler) {
@@ -44,9 +35,14 @@ func RegisterRoutes(app *fiber.App, h *Handler) {
 }
 
 // DPO handles GET /api/v1/pdpa/dpo - the published Data Protection Officer
-// contact. Public (it is published on the privacy notice by law).
+// directory (controller + every active DPO-flagged account). Public (it is
+// published on the privacy notice by law).
 func (h *Handler) DPO(c *fiber.Ctx) error {
-	return httpx.OK(c, h.dpo)
+	officers, err := h.repo.ListDPOOfficers(c.UserContext())
+	if err != nil {
+		return err // transient DB error -> 5xx so the client retries
+	}
+	return httpx.OK(c, DPODirectory{Company: h.company, Officers: officers})
 }
 
 // CurrentPolicy handles GET /api/v1/pdpa/policy/current?locale=th|en — the current

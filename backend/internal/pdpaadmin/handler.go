@@ -29,18 +29,26 @@ type auditWriter interface {
 	RecordWith(ctx context.Context, a activity.Actor, action, entityType string, entityID uuid.UUID, newValue any) error
 }
 
+// dpoLister resolves the published DPO directory dynamically (officers flagged
+// is_dpo). Satisfied by *pdpa.Repo.
+type dpoLister interface {
+	ListDPOOfficers(ctx context.Context) ([]pdpa.DPOOfficer, error)
+}
+
 // Handler serves /api/v1/pdpa/admin, gated entirely to pdpa.admin. The console is
-// company-wide (no RBAC data scope). DPO + retention are injected from config.
+// company-wide (no RBAC data scope). The DPO directory is resolved dynamically;
+// retention + company come from config.
 type Handler struct {
 	repo      Repository
-	dpo       pdpa.DPOContact
+	dpo       dpoLister
+	company   string
 	retention RetentionInfo
 	audit     auditWriter
 }
 
 // NewHandler builds the PDPA-console handler. audit may be nil.
-func NewHandler(repo Repository, dpo pdpa.DPOContact, retention RetentionInfo, audit auditWriter) *Handler {
-	return &Handler{repo: repo, dpo: dpo, retention: retention, audit: audit}
+func NewHandler(repo Repository, dpo dpoLister, company string, retention RetentionInfo, audit auditWriter) *Handler {
+	return &Handler{repo: repo, dpo: dpo, company: company, retention: retention, audit: audit}
 }
 
 // RegisterRoutes mounts the console endpoints. Static segments precede the
@@ -75,6 +83,11 @@ func (h *Handler) Overview(c *fiber.Ctx) error {
 		log.Error().Err(err).Msg("pdpaadmin: overview counts failed")
 		return httpx.Fail(c, fiber.StatusInternalServerError, "could not load overview")
 	}
+	officers, err := h.dpo.ListDPOOfficers(c.UserContext())
+	if err != nil {
+		log.Error().Err(err).Msg("pdpaadmin: dpo officers failed")
+		return httpx.Fail(c, fiber.StatusInternalServerError, "could not load overview")
+	}
 	return httpx.OK(c, Overview{
 		DSARPending:     pending,
 		BreachesOpen:    open,
@@ -82,7 +95,7 @@ func (h *Handler) Overview(c *fiber.Ctx) error {
 		ConsentVersion:  version,
 		RetentionDays:   h.retention.Days,
 		RetentionOn:     h.retention.Enabled,
-		DPO:             h.dpo,
+		DPO:             pdpa.DPODirectory{Company: h.company, Officers: officers},
 	})
 }
 

@@ -587,7 +587,12 @@
     "cat_hiring": "การจ้างงาน",
     "cat_approvals": "การอนุมัติ",
     "sourceSso": "SSO",
-    "sourceLocal": "ภายใน"
+    "sourceLocal": "ภายใน",
+    "dpoDesignate": "เจ้าหน้าที่คุ้มครองข้อมูล (DPO)",
+    "dpoDesignateHelp": "เผยแพร่บัญชีนี้เป็น DPO บนประกาศความเป็นส่วนตัว (PDPA ม.41)",
+    "fieldPhone": "เบอร์โทร DPO",
+    "phonePlaceholder": "เช่น 02-000-0000",
+    "dpoBadge": "DPO"
   },
   "members": {
     "eyebrow": "จัดการสมาชิก",
@@ -962,7 +967,8 @@
     "consentEmpty": "ไม่พบบันทึกความยินยอม",
     "consentVersionLabel": "เวอร์ชัน {version}",
     "consentGiven": "ให้ความยินยอม",
-    "consentWithdrawn": "ถอนความยินยอม"
+    "consentWithdrawn": "ถอนความยินยอม",
+    "dpoUnset": "ยังไม่ได้กำหนด DPO กำหนดได้ที่ Admin → บัญชีผู้ใช้"
   },
   "privacy": {
     "eyebrow": "การคุ้มครองข้อมูล",

@@ -587,7 +587,12 @@
     "cat_hiring": "Hiring",
     "cat_approvals": "Approvals",
     "sourceSso": "SSO",
-    "sourceLocal": "Local"
+    "sourceLocal": "Local",
+    "dpoDesignate": "Data Protection Officer",
+    "dpoDesignateHelp": "Publish this account as a DPO on the privacy notice (PDPA s.41).",
+    "fieldPhone": "DPO phone",
+    "phonePlaceholder": "e.g. 02-000-0000",
+    "dpoBadge": "DPO"
   },
   "members": {
     "eyebrow": "Member management",
@@ -962,7 +967,8 @@
     "consentEmpty": "No consent records found",
     "consentVersionLabel": "Version {version}",
     "consentGiven": "Given",
-    "consentWithdrawn": "Withdrawn"
+    "consentWithdrawn": "Withdrawn",
+    "dpoUnset": "No DPO has been designated yet. Set one in Admin → user accounts."
   },
   "privacy": {
     "eyebrow": "Data protection",

@@ -245,6 +245,17 @@ func (r *pgRepository) UpdateUser(ctx context.Context, id uuid.UUID, in UpdateUs
 	if in.IsActive != nil {
 		add("is_active", *in.IsActive)
 	}
+	if in.Phone != nil {
+		// Empty string clears the phone (stored as NULL to match COALESCE reads).
+		var v *string
+		if *in.Phone != "" {
+			v = in.Phone
+		}
+		add("phone", v)
+	}
+	if in.IsDPO != nil {
+		add("is_dpo", *in.IsDPO)
+	}
 	if passwordHash != nil {
 		add("password_hash", *passwordHash)
 		set = append(set, "password_updated_at = now()")

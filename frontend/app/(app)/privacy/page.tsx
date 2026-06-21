@@ -30,7 +30,7 @@ export default function PrivacyPage() {
 
   const paragraphs = (doc?.body ?? "").split(/\n\s*\n/).filter(Boolean);
   const placeholder = (v: string | null | undefined) => (!v || v.trim() === "" ? t("notSet") : v);
-  const hasDpo = !!dpo && (dpo.name.trim() !== "" || dpo.email.trim() !== "" || dpo.phone.trim() !== "");
+  const officers = dpo?.officers ?? [];
 
   return (
     <div className="settle space-y-8">
@@ -71,25 +71,33 @@ export default function PrivacyPage() {
         <h2 id="dpo-heading" className="text-lg font-semibold text-foreground">
           {t("dpoTitle")}
         </h2>
-        {hasDpo && dpo ? (
-          <dl className="flex flex-col gap-1 text-sm">
-            <div className="flex gap-2">
-              <dt className="w-24 shrink-0 text-muted-foreground">{t("dpoCompany")}</dt>
-              <dd className="text-foreground">{placeholder(dpo.company)}</dd>
-            </div>
-            <div className="flex gap-2">
-              <dt className="w-24 shrink-0 text-muted-foreground">{t("dpoName")}</dt>
-              <dd className="text-foreground">{placeholder(dpo.name)}</dd>
-            </div>
-            <div className="flex gap-2">
-              <dt className="w-24 shrink-0 text-muted-foreground">{t("dpoEmail")}</dt>
-              <dd className="text-foreground">{placeholder(dpo.email)}</dd>
-            </div>
-            <div className="flex gap-2">
-              <dt className="w-24 shrink-0 text-muted-foreground">{t("dpoPhone")}</dt>
-              <dd className="text-foreground">{placeholder(dpo.phone)}</dd>
-            </div>
-          </dl>
+        {officers.length > 0 ? (
+          <div className="space-y-3">
+            <p className="text-sm">
+              <span className="text-muted-foreground">{t("dpoCompany")}: </span>
+              <span className="text-foreground">{placeholder(dpo?.company)}</span>
+            </p>
+            <ul className="space-y-3">
+              {officers.map((o, i) => (
+                <li key={i} className="rounded-lg border border-hairline p-3">
+                  <dl className="flex flex-col gap-1 text-sm">
+                    <div className="flex gap-2">
+                      <dt className="w-24 shrink-0 text-muted-foreground">{t("dpoName")}</dt>
+                      <dd className="text-foreground">{placeholder(o.name)}</dd>
+                    </div>
+                    <div className="flex gap-2">
+                      <dt className="w-24 shrink-0 text-muted-foreground">{t("dpoEmail")}</dt>
+                      <dd className="text-foreground">{placeholder(o.email)}</dd>
+                    </div>
+                    <div className="flex gap-2">
+                      <dt className="w-24 shrink-0 text-muted-foreground">{t("dpoPhone")}</dt>
+                      <dd className="text-foreground">{placeholder(o.phone)}</dd>
+                    </div>
+                  </dl>
+                </li>
+              ))}
+            </ul>
+          </div>
         ) : (
           <p className="text-sm text-muted-foreground">{t("dpoUnset")}</p>
         )}

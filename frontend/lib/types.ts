@@ -616,6 +616,8 @@ export interface UpdateHRUserInput {
   store_id?: number | null;
   subregion?: string;
   is_active?: boolean;
+  phone?: string;
+  is_dpo?: boolean;
   password?: string;
 }
 
@@ -713,13 +715,18 @@ export interface SearchFilter {
 
 // --- PDPA / DPO console (Phase 5.4) ---
 
-// DpoContact mirrors pdpa.DPOContact: the published Data Protection Officer
-// contact (s.41). Fields may be empty (config not set) → render a placeholder.
-export interface DpoContact {
+// DpoOfficer is one published Data Protection Officer (s.41).
+export interface DpoOfficer {
   name: string;
   email: string;
   phone: string;
+}
+
+// DpoDirectory mirrors pdpa.DPODirectory: the controller (company) plus every
+// active DPO-flagged account. officers is never null (empty ⇒ none designated yet).
+export interface DpoDirectory {
   company: string;
+  officers: DpoOfficer[];
 }
 
 // PdpaOverview mirrors pdpaadmin.Overview: the console summary card data.
@@ -730,7 +737,7 @@ export interface PdpaOverview {
   current_consent_version: string;
   retention_days: number;
   retention_sweep_enabled: boolean;
-  dpo: DpoContact;
+  dpo: DpoDirectory;
 }
 
 // DsarRequest mirrors pdpaadmin.DSARRequest: one queued data-subject request

@@ -72,5 +72,7 @@ type UpdateUserInput struct {
 	StoreID   *int
 	Subregion *string
 	IsActive  *bool
+	Phone     *string // DPO contact phone (PDPA s.41)
+	IsDPO     *bool   // designate/clear the account as a published Data Protection Officer
 	Password  *string // when set, resets the password (must pass the policy)
 }

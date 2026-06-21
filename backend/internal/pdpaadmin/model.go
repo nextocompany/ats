@@ -60,13 +60,13 @@ type ConsentRecord struct {
 
 // Overview is the console summary card data.
 type Overview struct {
-	DSARPending     int             `json:"dsar_pending"`
-	BreachesOpen    int             `json:"breaches_open"`
-	BreachesOverdue int             `json:"breaches_overdue"` // open, past the 72h PDPC deadline, not yet notified
-	ConsentVersion  string          `json:"current_consent_version"`
-	RetentionDays   int             `json:"retention_days"`
-	RetentionOn     bool            `json:"retention_sweep_enabled"`
-	DPO             pdpa.DPOContact `json:"dpo"`
+	DSARPending     int               `json:"dsar_pending"`
+	BreachesOpen    int               `json:"breaches_open"`
+	BreachesOverdue int               `json:"breaches_overdue"` // open, past the 72h PDPC deadline, not yet notified
+	ConsentVersion  string            `json:"current_consent_version"`
+	RetentionDays   int               `json:"retention_days"`
+	RetentionOn     bool              `json:"retention_sweep_enabled"`
+	DPO             pdpa.DPODirectory `json:"dpo"`
 }
 
 // DSARListFilter narrows + paginates the held-queue list.
