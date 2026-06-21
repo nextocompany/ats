@@ -31,6 +31,7 @@ const (
 	PermApprovalDecideL4   = "approval.decide.l4"  // approve at level 4 (regional)
 	PermRequisitionManage  = "requisition.manage"  // create/edit/close a requisition
 	PermRequisitionApprove = "requisition.approve" // approve a pending requisition → open
+	PermBreachManage       = "breach.manage"       // PDPA breach register CRUD (s.37 72h)
 )
 
 // RoleSuperAdmin is the built-in role that is a hard code bypass: it implicitly
@@ -48,6 +49,7 @@ var AllPermissions = []string{
 	PermOfferWrite, PermOnboardingWrite, PermLetterWrite, PermScorecardTA, PermScorecardLM,
 	PermApprovalSubmit, PermApprovalDecideL1, PermApprovalDecideL2, PermApprovalDecideL3, PermApprovalDecideL4,
 	PermRequisitionManage, PermRequisitionApprove,
+	PermBreachManage,
 }
 
 // ApprovalDecidePermForLevel returns the permission gating a given approval chain
