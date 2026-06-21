@@ -367,8 +367,10 @@ func main() {
 	// candidate detail/timeline, analytics, PDPA, users/me.
 	activityLog := activity.New(pool)
 	// Portal DSAR self-service (PDPA Phase 3): an authenticated candidate exports
-	// their own data (s.30 access + s.31 portability). Gated by the candidate session.
-	dsar.RegisterRoutes(app, dsar.NewHandler(dsar.New(pool), activityLog),
+	// their own data (s.30 access + s.31 portability) and erases it (s.33; held for
+	// HR when a legal hold applies). Gated by the candidate session.
+	dsarEraser := pdpa.NewRetentionService(pool, blobClient, search.NewIndexer(cfg), activityLog, cfg.RetentionDays)
+	dsar.RegisterRoutes(app, dsar.NewHandler(dsar.New(pool).WithEraser(dsarEraser), activityLog),
 		candidateauth.RequireCandidate(caSvc, cfg.SessionCookieName))
 	// Search indexer: no-op unless AI_SEARCH_PROVIDER=azure. Ensure the index
 	// exists at startup (best-effort — a transient Search outage must not block
