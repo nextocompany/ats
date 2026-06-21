@@ -122,10 +122,10 @@ func (r *pgRepository) Anonymize(ctx context.Context, id uuid.UUID) (string, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	var status, resumeURL string
+	var status, resumeURL, accountEmail string
 	err = tx.QueryRow(ctx,
-		`SELECT status, COALESCE(resume_blob_url,'') FROM candidate_accounts WHERE id = $1 FOR UPDATE`, id,
-	).Scan(&status, &resumeURL)
+		`SELECT status, COALESCE(resume_blob_url,''), COALESCE(email,'') FROM candidate_accounts WHERE id = $1 FOR UPDATE`, id,
+	).Scan(&status, &resumeURL, &accountEmail)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", ErrNotFound
 	}
@@ -157,6 +157,21 @@ func (r *pgRepository) Anonymize(ctx context.Context, id uuid.UUID) (string, err
 	}
 	if _, err := tx.Exec(ctx, `DELETE FROM candidate_sessions WHERE account_id = $1`, id); err != nil {
 		return "", fmt.Errorf("members: anonymize revoke sessions: %w", err)
+	}
+	// CRM notes + tags are account-scoped personal data (HR free-text + labels) and
+	// must be erased with the account.
+	if _, err := tx.Exec(ctx, `DELETE FROM member_notes WHERE account_id = $1`, id); err != nil {
+		return "", fmt.Errorf("members: anonymize delete notes: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM member_tags WHERE account_id = $1`, id); err != nil {
+		return "", fmt.Errorf("members: anonymize delete tags: %w", err)
+	}
+	// email_otps is keyed by email (no account_id); purge by the account's email
+	// before it is gone so the address does not linger until the OTP-expiry sweep.
+	if accountEmail != "" {
+		if _, err := tx.Exec(ctx, `DELETE FROM email_otps WHERE email = $1`, accountEmail); err != nil {
+			return "", fmt.Errorf("members: anonymize delete otps: %w", err)
+		}
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return "", fmt.Errorf("members: anonymize commit: %w", err)

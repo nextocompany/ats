@@ -116,6 +116,107 @@ func TestNoopIndexer_NoCalls(t *testing.T) {
 	if err := n.UpsertBatch(context.Background(), []Doc{{CandidateID: "x"}}); err != nil {
 		t.Errorf("UpsertBatch: %v", err)
 	}
+	if err := n.Delete(context.Background(), []string{"x"}); err != nil {
+		t.Errorf("Delete: %v", err)
+	}
+}
+
+// TestDelete_BuildsKeyOnlyActions asserts the PDPA erasure delete posts one
+// "delete" action per candidate carrying ONLY the candidate_id key - Azure
+// ignores non-key fields on delete, and leaking the rest would be needless PII.
+func TestDelete_BuildsKeyOnlyActions(t *testing.T) {
+	var got struct {
+		Value []map[string]any `json:"value"`
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		if err := json.Unmarshal(body, &got); err != nil {
+			t.Errorf("decode body: %v", err)
+		}
+		_, _ = io.WriteString(w, `{"value":[{"key":"c1","status":true,"statusCode":200},{"key":"c2","status":true,"statusCode":200}]}`)
+	}))
+	defer srv.Close()
+
+	idx := newTestIndexer(srv.URL)
+	if err := idx.Delete(context.Background(), []string{"c1", "c2"}); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+	if len(got.Value) != 2 {
+		t.Fatalf("expected 2 delete actions, got %d", len(got.Value))
+	}
+	for i, want := range []string{"c1", "c2"} {
+		a := got.Value[i]
+		if a["@search.action"] != "delete" {
+			t.Errorf("action %d: want @search.action=delete, got %v", i, a["@search.action"])
+		}
+		if a["candidate_id"] != want {
+			t.Errorf("action %d: want candidate_id=%s, got %v", i, want, a["candidate_id"])
+		}
+		if len(a) != 2 { // action + key only
+			t.Errorf("action %d: want key-only payload (2 fields), got %d: %v", i, len(a), a)
+		}
+	}
+}
+
+// TestDelete_ChunksOverMax confirms deletes batch at maxBatch like upserts.
+func TestDelete_ChunksOverMax(t *testing.T) {
+	var mu sync.Mutex
+	var requests, keysSeen int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		var payload struct {
+			Value []map[string]any `json:"value"`
+		}
+		_ = json.Unmarshal(body, &payload)
+		mu.Lock()
+		requests++
+		keysSeen += len(payload.Value)
+		mu.Unlock()
+		var b strings.Builder
+		b.WriteString(`{"value":[`)
+		for i := range payload.Value {
+			if i > 0 {
+				b.WriteString(",")
+			}
+			b.WriteString(`{"key":"k","status":true,"statusCode":200}`)
+		}
+		b.WriteString(`]}`)
+		_, _ = io.WriteString(w, b.String())
+	}))
+	defer srv.Close()
+
+	idx := newTestIndexer(srv.URL)
+	ids := make([]string, 1200)
+	for i := range ids {
+		ids[i] = idFromInt(i + 1)
+	}
+	if err := idx.Delete(context.Background(), ids); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+	if requests != 3 { // 500 + 500 + 200
+		t.Errorf("requests = %d, want 3", requests)
+	}
+	if keysSeen != 1200 {
+		t.Errorf("keysSeen = %d, want 1200", keysSeen)
+	}
+}
+
+// TestDelete_EmptyIsNoop ensures deleting nothing makes no request.
+func TestDelete_EmptyIsNoop(t *testing.T) {
+	called := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		called = true
+		_, _ = io.WriteString(w, `{"value":[]}`)
+	}))
+	defer srv.Close()
+
+	idx := newTestIndexer(srv.URL)
+	if err := idx.Delete(context.Background(), nil); err != nil {
+		t.Fatalf("Delete empty: %v", err)
+	}
+	if called {
+		t.Error("expected no HTTP request for empty delete list")
+	}
 }
 
 // idFromInt makes a stable distinct id string per index without Math/rand.
