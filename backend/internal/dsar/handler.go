@@ -7,20 +7,23 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 
+	"github.com/nexto/hr-ats/internal/activity"
 	"github.com/nexto/hr-ats/internal/candidateauth"
+	"github.com/nexto/hr-ats/internal/middleware"
 	"github.com/nexto/hr-ats/pkg/httpx"
 )
 
 // Audit action names for subject-initiated DSAR events.
 const (
-	actionDSARExport    = "dsar_export"
-	actionDSARErase     = "dsar_erase"      // erased immediately
-	actionDSAREraseHeld = "dsar_erase_held" // queued for HR (legal hold)
+	actionDSARExport    = activity.ActionDSARExport
+	actionDSARErase     = activity.ActionDSARErase     // erased immediately
+	actionDSAREraseHeld = activity.ActionDSAREraseHeld // queued for HR (legal hold)
 )
 
-// auditWriter records the access event (satisfied by *activity.Log). Optional.
+// auditWriter records the access event with actor attribution (satisfied by
+// *activity.Log). Optional.
 type auditWriter interface {
-	Record(ctx context.Context, action, entityType string, entityID uuid.UUID, newValue any) error
+	RecordWith(ctx context.Context, a activity.Actor, action, entityType string, entityID uuid.UUID, newValue any) error
 }
 
 // Handler serves the portal DSAR endpoints (RequireCandidate-gated).
@@ -71,12 +74,21 @@ func (h *Handler) RequestErasure(c *fiber.Ctx) error {
 
 // recordErase audits a self-service erasure outcome against the subject's account.
 func (h *Handler) recordErase(c *fiber.Ctx, accountID uuid.UUID, action string) {
+	h.recordEvent(c, action, accountID)
+}
+
+// recordEvent records a subject-initiated DSAR event. The subject is both actor
+// and entity (they act on their own account); the IP is spoof-resistant
+// (middleware.ClientIP). Best-effort: a failure must not block the subject's
+// right, so it is only logged.
+func (h *Handler) recordEvent(c *fiber.Ctx, action string, accountID uuid.UUID) {
 	if h.audit == nil {
 		return
 	}
-	val := fiber.Map{"by": "self", "ip": c.IP()}
-	if err := h.audit.Record(c.UserContext(), action, "candidate_account", accountID, val); err != nil {
-		log.Warn().Err(err).Str("account_id", accountID.String()).Msg("dsar: erase audit record failed")
+	acct := accountID
+	a := activity.Actor{UserID: &acct, IP: middleware.ClientIP(c), UserAgent: c.Get(fiber.HeaderUserAgent)}
+	if err := h.audit.RecordWith(c.UserContext(), a, action, "candidate_account", accountID, fiber.Map{"by": "self"}); err != nil {
+		log.Warn().Err(err).Str("account_id", accountID.String()).Str("action", action).Msg("dsar: audit record failed")
 	}
 }
 
@@ -97,14 +109,7 @@ func (h *Handler) Export(c *fiber.Ctx) error {
 	return httpx.OK(c, data)
 }
 
-// recordAccess audits the export against the subject's own account, capturing the
-// request IP (best-effort: a failure must not block the subject's access right).
+// recordAccess audits the export against the subject's own account.
 func (h *Handler) recordAccess(c *fiber.Ctx, accountID uuid.UUID) {
-	if h.audit == nil {
-		return
-	}
-	val := fiber.Map{"by": "self", "ip": c.IP()}
-	if err := h.audit.Record(c.UserContext(), actionDSARExport, "candidate_account", accountID, val); err != nil {
-		log.Warn().Err(err).Str("account_id", accountID.String()).Msg("dsar: export audit record failed")
-	}
+	h.recordEvent(c, actionDSARExport, accountID)
 }

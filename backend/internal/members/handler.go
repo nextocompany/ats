@@ -9,8 +9,8 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
-	"github.com/rs/zerolog/log"
 
+	"github.com/nexto/hr-ats/internal/activity"
 	"github.com/nexto/hr-ats/internal/middleware"
 	"github.com/nexto/hr-ats/internal/rbac"
 	"github.com/nexto/hr-ats/pkg/httpx"
@@ -42,9 +42,10 @@ type blobDeleter interface {
 	DeleteStored(ctx context.Context, storedURL string) error
 }
 
-// activityWriter records an audit entry (satisfied by *activity.Log).
+// activityWriter records an audit entry with actor attribution (satisfied by
+// *activity.Log).
 type activityWriter interface {
-	Record(ctx context.Context, action, entityType string, entityID uuid.UUID, newValue any) error
+	RecordWith(ctx context.Context, a activity.Actor, action, entityType string, entityID uuid.UUID, newValue any) error
 }
 
 // CandidateEraser cascades a member (account) erasure into full PDPA erasure of
@@ -172,12 +173,13 @@ func (h *Handler) Detail(c *fiber.Ctx) error {
 // audit records an HR action against a member, logging (not failing) on error so a
 // broken audit path is visible but never blocks the response.
 func (h *Handler) audit(c *fiber.Ctx, action string, id uuid.UUID) {
-	if h.activity == nil {
-		return
-	}
-	if err := h.activity.Record(c.UserContext(), action, "member", id, fiber.Map{"by": actor(c)}); err != nil {
-		log.Warn().Err(err).Str("member", id.String()).Str("action", action).Msg("members: audit record failed")
-	}
+	h.auditWith(c, action, id, nil)
+}
+
+// auditActor builds the actor attribution (id + spoof-resistant IP + UA) for the
+// current HR caller.
+func auditActor(c *fiber.Ctx) activity.Actor {
+	return activity.Actor{UserID: actorID(c), IP: middleware.ClientIP(c), UserAgent: c.Get(fiber.HeaderUserAgent)}
 }
 
 // Resume handles GET /api/v1/admin/members/:id/resume — signed URL for the

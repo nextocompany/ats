@@ -47,7 +47,7 @@ func (h *Handler) auditWith(c *fiber.Ctx, action string, id uuid.UUID, extra fib
 	for k, v := range extra {
 		val[k] = v
 	}
-	if err := h.activity.Record(c.UserContext(), action, "member", id, val); err != nil {
+	if err := h.activity.RecordWith(c.UserContext(), auditActor(c), action, "member", id, val); err != nil {
 		log.Warn().Err(err).Str("member", id.String()).Str("action", action).Msg("members: audit record failed")
 	}
 }

@@ -25,9 +25,10 @@ type ResumeSigner interface {
 	SignedURLForStored(storedURL string, ttl time.Duration) (string, error)
 }
 
-// ActivityWriter records audit entries.
+// ActivityWriter records audit entries, with and without actor attribution.
 type ActivityWriter interface {
 	Record(ctx context.Context, action, entityType string, entityID uuid.UUID, newValue any) error
+	RecordWith(ctx context.Context, a activity.Actor, action, entityType string, entityID uuid.UUID, newValue any) error
 }
 
 // CandidateIndexer re-syncs a candidate's search document after a status change.
@@ -222,7 +223,8 @@ func (h *DashboardHandler) Bulk(c *fiber.Ctx) error {
 			failed++
 			continue
 		}
-		_ = h.activity.Record(c.UserContext(), activity.ActionBulkAction, "application", id, fiber.Map{"status": target})
+		buid, bip, bua := middleware.AuditActor(c)
+		_ = h.activity.RecordWith(c.UserContext(), activity.Actor{UserID: buid, IP: bip, UserAgent: bua}, activity.ActionBulkAction, "application", id, fiber.Map{"status": target})
 		// Keep the search index fresh — best-effort, never fails the bulk action.
 		_ = h.indexer.Index(c.UserContext(), app.CandidateID)
 		// Notify the candidate — best-effort (rejections are never notified).
@@ -258,7 +260,9 @@ func (h *DashboardHandler) Resume(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	_ = h.activity.Record(c.UserContext(), activity.ActionViewResume, "application", id, nil)
+	// PDPA: record who accessed this candidate's resume (PII), from where.
+	uid, ip, ua := middleware.AuditActor(c)
+	_ = h.activity.RecordWith(c.UserContext(), activity.Actor{UserID: uid, IP: ip, UserAgent: ua}, activity.ActionViewResume, "application", id, nil)
 	return httpx.OK(c, fiber.Map{"url": url, "expires_in_seconds": int(resumeURLTTL.Seconds())})
 }
 

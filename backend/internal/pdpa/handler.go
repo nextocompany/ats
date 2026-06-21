@@ -6,6 +6,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 
+	"github.com/nexto/hr-ats/internal/middleware"
 	"github.com/nexto/hr-ats/pkg/httpx"
 )
 
@@ -64,7 +65,7 @@ func (h *Handler) RecordConsent(c *fiber.Ctx) error {
 		ConsentGiven:  req.ConsentGiven,
 		Version:       req.Version,
 		SourceChannel: req.SourceChannel,
-	}, c.IP()); err != nil {
+	}, middleware.ClientIP(c)); err != nil {
 		return err
 	}
 	return httpx.Created(c, fiber.Map{"candidate_id": id, "consent_given": req.ConsentGiven})

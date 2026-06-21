@@ -5,8 +5,48 @@ import (
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 )
+
+// clientIPLocalKey is the Locals key under which ResolveClientIP stashes the
+// spoof-resistant client IP for the request.
+const clientIPLocalKey = "audit_client_ip"
+
+// ResolveClientIP stashes the spoof-resistant client IP (RealClientIP) into the
+// request Locals so any downstream handler can read it via ClientIP without
+// re-threading the trusted-proxy list. Install once, after the trust config is
+// parsed and before the route groups.
+func ResolveClientIP(trusted []*net.IPNet) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		c.Locals(clientIPLocalKey, RealClientIP(c, trusted))
+		return c.Next()
+	}
+}
+
+// ClientIP returns the resolved client IP stashed by ResolveClientIP, or "" when
+// the middleware is not installed.
+func ClientIP(c *fiber.Ctx) string {
+	if v, ok := c.Locals(clientIPLocalKey).(string); ok {
+		return v
+	}
+	return ""
+}
+
+// AuditActor extracts the audit attribution for the current request: the
+// authenticated HR user's id (parsed from the DevUser/JWT claim, nil if absent or
+// not a UUID), the spoof-resistant client IP, and the user agent. Candidate
+// self-service handlers (no DevUser) pass their own account id instead.
+func AuditActor(c *fiber.Ctx) (userID *uuid.UUID, ip, userAgent string) {
+	ip = ClientIP(c)
+	userAgent = c.Get(fiber.HeaderUserAgent)
+	if u, ok := c.Locals(UserContextKey).(DevUser); ok && u.ID != "" {
+		if id, err := uuid.Parse(u.ID); err == nil {
+			userID = &id
+		}
+	}
+	return userID, ip, userAgent
+}
 
 // ParseTrustedCIDRs turns the TRUSTED_PROXIES allowlist (IPs or CIDRs) into parsed
 // networks. A bare IP becomes a host route (/32 or /128). Malformed entries are

@@ -43,8 +43,8 @@ type Handler struct {
 	inspector  JobInspector
 	hired      HiredSyncer
 	notifyDeps statusNotifyDeps
-	activity   activity.Writer // optional; records status changes onto the candidate journey
-	stores     storeReader     // optional; validates a store on manual reassignment
+	activity   activity.ActorWriter // optional; records status changes onto the candidate journey
+	stores     storeReader          // optional; validates a store on manual reassignment
 }
 
 // storeReader is the narrow read the assignment handler needs to validate a store.
@@ -60,7 +60,7 @@ func (h *Handler) SetNotifier(n notify.Notifier, cands candidates.Repository, po
 
 // SetActivity wires the audit/journey writer so single status changes are recorded
 // onto the candidate timeline (mirrors the bulk handler). Unset → not recorded.
-func (h *Handler) SetActivity(w activity.Writer) { h.activity = w }
+func (h *Handler) SetActivity(w activity.ActorWriter) { h.activity = w }
 
 // SetStores wires the store directory so manual reassignment can validate a target
 // store. Unset → reassign-to-store returns 503 (move-to-pool still works).
@@ -209,14 +209,14 @@ func (h *Handler) UpdateStatus(c *fiber.Ctx) error {
 		if err := h.apps.SetRejection(c.UserContext(), id, strings.TrimSpace(req.Reason)); err != nil {
 			return err
 		}
-		h.recordStatusChange(c.UserContext(), id, app.Status, StatusRejected)
+		h.recordStatusChange(c, id, app.Status, StatusRejected)
 		return httpx.OK(c, fiber.Map{"id": id, "status": StatusRejected})
 	}
 
 	if err := h.apps.SetStatus(c.UserContext(), id, req.Status); err != nil {
 		return err
 	}
-	h.recordStatusChange(c.UserContext(), id, app.Status, req.Status)
+	h.recordStatusChange(c, id, app.Status, req.Status)
 	// Best-effort candidate notification (only shortlisted produces a message today;
 	// offer/interviewed have none defined — the seam is a no-op for those).
 	h.notifyDeps.notifyStatusChange(c.UserContext(), h.apps, id, req.Status)
@@ -226,11 +226,12 @@ func (h *Handler) UpdateStatus(c *fiber.Ctx) error {
 // recordStatusChange best-effort logs a status transition onto the candidate
 // journey. No-op when the activity writer is unset; a failure is swallowed (the
 // status change already succeeded — the audit entry is non-critical).
-func (h *Handler) recordStatusChange(ctx context.Context, id uuid.UUID, from, to string) {
+func (h *Handler) recordStatusChange(c *fiber.Ctx, id uuid.UUID, from, to string) {
 	if h.activity == nil {
 		return
 	}
-	_ = h.activity.Record(ctx, activity.ActionStatusChange, "application", id, fiber.Map{"from": from, "to": to})
+	uid, ip, ua := middleware.AuditActor(c)
+	_ = h.activity.RecordWith(c.UserContext(), activity.Actor{UserID: uid, IP: ip, UserAgent: ua}, activity.ActionStatusChange, "application", id, fiber.Map{"from": from, "to": to})
 }
 
 type assignmentReq struct {
@@ -266,7 +267,7 @@ func (h *Handler) UpdateAssignment(c *fiber.Ctx) error {
 		if err := h.apps.SetAssignment(c.UserContext(), id, nil, true); err != nil {
 			return err
 		}
-		h.recordAssignment(c.UserContext(), id, fiber.Map{"placement": "central_pool"})
+		h.recordAssignment(c, id, fiber.Map{"placement": "central_pool"})
 		return httpx.OK(c, fiber.Map{"id": id, "assigned_store_id": nil, "talent_pool": true})
 	}
 
@@ -284,13 +285,14 @@ func (h *Handler) UpdateAssignment(c *fiber.Ctx) error {
 	if err := h.apps.SetAssignment(c.UserContext(), id, req.StoreNo, false); err != nil {
 		return err
 	}
-	h.recordAssignment(c.UserContext(), id, fiber.Map{"store_no": *req.StoreNo})
+	h.recordAssignment(c, id, fiber.Map{"store_no": *req.StoreNo})
 	return httpx.OK(c, fiber.Map{"id": id, "assigned_store_id": *req.StoreNo, "talent_pool": false})
 }
 
-func (h *Handler) recordAssignment(ctx context.Context, id uuid.UUID, detail any) {
+func (h *Handler) recordAssignment(c *fiber.Ctx, id uuid.UUID, detail any) {
 	if h.activity == nil {
 		return
 	}
-	_ = h.activity.Record(ctx, activity.ActionAssignment, "application", id, detail)
+	uid, ip, ua := middleware.AuditActor(c)
+	_ = h.activity.RecordWith(c.UserContext(), activity.Actor{UserID: uid, IP: ip, UserAgent: ua}, activity.ActionAssignment, "application", id, detail)
 }
