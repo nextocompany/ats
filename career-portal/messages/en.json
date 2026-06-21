@@ -109,5 +109,18 @@
     "toLine": "Share to LINE",
     "toFacebook": "Share to Facebook",
     "copyOrShare": "Copy link or share"
+  },
+  "privacy": {
+    "heading": "Privacy Notice (PDPA)",
+    "fallbackBody": "CP Axtra collects, uses, and discloses applicants personal data for recruitment and selection purposes, in accordance with the Personal Data Protection Act B.E. 2562.",
+    "version": "Version {version}",
+    "lastUpdated": "Last updated {date}",
+    "rightsTitle": "Your rights",
+    "rightsBody": "You have the right to access and obtain a copy of your data, correct it, withdraw consent, and request erasure - all from your account page.",
+    "rightsCta": "Manage my data",
+    "cookieTitle": "Cookies",
+    "cookieBody": "This site uses only essential cookies for sign-in and language preference. There is no advertising or tracking.",
+    "contactTitle": "Contact us",
+    "contactBody": "For any personal-data protection questions, please contact the company Data Protection Officer (DPO)."
   }
 }
