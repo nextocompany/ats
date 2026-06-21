@@ -585,7 +585,9 @@
     "cat_operations": "Operations",
     "cat_candidates": "Candidates",
     "cat_hiring": "Hiring",
-    "cat_approvals": "Approvals"
+    "cat_approvals": "Approvals",
+    "sourceSso": "SSO",
+    "sourceLocal": "Local"
   },
   "members": {
     "eyebrow": "Member management",

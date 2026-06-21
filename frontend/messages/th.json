@@ -585,7 +585,9 @@
     "cat_operations": "ปฏิบัติการ",
     "cat_candidates": "ผู้สมัคร",
     "cat_hiring": "การจ้างงาน",
-    "cat_approvals": "การอนุมัติ"
+    "cat_approvals": "การอนุมัติ",
+    "sourceSso": "SSO",
+    "sourceLocal": "ภายใน"
   },
   "members": {
     "eyebrow": "จัดการสมาชิก",
