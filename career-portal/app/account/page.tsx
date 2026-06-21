@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
+import { DataRightsSection } from "@/components/auth/DataRightsSection";
 import { LinkLineButton } from "@/components/auth/LinkLineButton";
 import { ProfileForm } from "@/components/auth/ProfileForm";
 import { ResumeUploadStep } from "@/components/auth/ResumeUploadStep";
@@ -34,6 +35,18 @@ export default function AccountPage() {
     await logout();
     await refresh();
     router.replace("/jobs");
+  }
+
+  // After a self-erase the account + session are already gone server-side. Best-
+  // effort clear the cookie (the logout POST may 401 now - ignore it) and navigate
+  // away. No refresh(): re-fetching /me here would 401 and race the redirect.
+  async function onErased() {
+    try {
+      await logout();
+    } catch {
+      // session already invalid server-side; nothing to clean up
+    }
+    router.replace("/jobs?erased=1");
   }
 
   return (
@@ -78,6 +91,8 @@ export default function AccountPage() {
         </section>
 
         <OnboardingSection />
+
+        <DataRightsSection onErased={onErased} />
       </div>
     </PortalShell>
   );
