@@ -6,18 +6,85 @@ package dsar
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/nexto/hr-ats/internal/pdpa"
 )
 
-// Service assembles a subject's export, strictly scoped to one portal account.
-type Service struct{ pool *pgxpool.Pool }
+// AccountEraser fully erases a portal account + its candidate data, or reports
+// ErrErasureHeld when a legal hold applies. Satisfied by *pdpa.RetentionService.
+type AccountEraser interface {
+	EraseByAccount(ctx context.Context, accountID uuid.UUID) error
+}
+
+// ErasureResult is the outcome of a self-service erasure request.
+type ErasureResult string
+
+const (
+	// ErasureDone - the subject's data was erased immediately.
+	ErasureDone ErasureResult = "erased"
+	// ErasureHeld - a legal hold applies; a request was queued for HR/DPO.
+	ErasureHeld ErasureResult = "held"
+)
+
+// Service assembles a subject's export and runs self-service erasure, strictly
+// scoped to one portal account.
+type Service struct {
+	pool   *pgxpool.Pool
+	eraser AccountEraser
+}
 
 // New builds the DSAR service.
 func New(pool *pgxpool.Pool) *Service { return &Service{pool: pool} }
+
+// WithEraser wires the erasure engine used by self-service erasure, returning the
+// service for chaining. Without it, RequestErasure returns an error.
+func (s *Service) WithEraser(e AccountEraser) *Service {
+	s.eraser = e
+	return s
+}
+
+// RequestErasure runs a subject's self-service erasure (PDPA s.33). When no legal
+// hold applies the data is erased immediately and ErasureDone is returned; when a
+// linked subject is hired (legal hold) the erasure is queued for HR/DPO and
+// ErasureHeld is returned. The subject is never silently refused or over-erased.
+func (s *Service) RequestErasure(ctx context.Context, accountID uuid.UUID) (ErasureResult, error) {
+	if s.eraser == nil {
+		return "", fmt.Errorf("dsar: erasure engine not configured")
+	}
+	err := s.eraser.EraseByAccount(ctx, accountID)
+	if errors.Is(err, pdpa.ErrErasureHeld) {
+		if qerr := s.queueErasureRequest(ctx, accountID, "hired"); qerr != nil {
+			return "", qerr
+		}
+		return ErasureHeld, nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return ErasureDone, nil
+}
+
+// queueErasureRequest records a held erasure request for HR/DPO to action. It is a
+// no-op when a pending request already exists for the account (idempotent retries).
+func (s *Service) queueErasureRequest(ctx context.Context, accountID uuid.UUID, reason string) error {
+	const q = `
+		INSERT INTO dsar_requests (account_id, request_type, status, reason)
+		SELECT $1, 'erasure', 'pending', $2
+		WHERE NOT EXISTS (
+			SELECT 1 FROM dsar_requests
+			WHERE account_id = $1 AND request_type = 'erasure' AND status = 'pending'
+		)`
+	if _, err := s.pool.Exec(ctx, q, accountID, reason); err != nil {
+		return fmt.Errorf("dsar: queue erasure request: %w", err)
+	}
+	return nil
+}
 
 // Export is the full machine-readable copy of a subject's data. Blob CONTENTS are
 // not inlined (binary); their metadata is, so the subject knows what is held and

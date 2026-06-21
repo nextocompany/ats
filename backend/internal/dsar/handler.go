@@ -11,8 +11,12 @@ import (
 	"github.com/nexto/hr-ats/pkg/httpx"
 )
 
-// actionDSARExport is the audit action recorded for a subject access export.
-const actionDSARExport = "dsar_export"
+// Audit action names for subject-initiated DSAR events.
+const (
+	actionDSARExport    = "dsar_export"
+	actionDSARErase     = "dsar_erase"      // erased immediately
+	actionDSAREraseHeld = "dsar_erase_held" // queued for HR (legal hold)
+)
 
 // auditWriter records the access event (satisfied by *activity.Log). Optional.
 type auditWriter interface {
@@ -36,6 +40,42 @@ func NewHandler(svc *Service, audit auditWriter) *Handler {
 func RegisterRoutes(app *fiber.App, h *Handler, gate fiber.Handler) {
 	g := app.Group("/api/v1/public/auth/me")
 	g.Get("/export", gate, h.Export)
+	g.Post("/erase", gate, h.RequestErasure)
+}
+
+// RequestErasure handles POST /api/v1/public/auth/me/erase - the subject erases
+// their own data (PDPA s.33). Erased immediately unless a legal hold (hired)
+// applies, in which case the request is queued for HR/DPO. Strictly scoped to the
+// caller's own account; the action is audited.
+func (h *Handler) RequestErasure(c *fiber.Ctx) error {
+	acct := candidateauth.CandidateFromCtx(c)
+	if acct == nil {
+		return fiber.NewError(fiber.StatusUnauthorized, "login required")
+	}
+	result, err := h.svc.RequestErasure(c.UserContext(), acct.ID)
+	if err != nil {
+		return err
+	}
+	if result == ErasureHeld {
+		h.recordErase(c, acct.ID, actionDSAREraseHeld)
+		return httpx.OK(c, fiber.Map{
+			"status":  string(result),
+			"message": "คำขอลบข้อมูลถูกส่งให้เจ้าหน้าที่ดำเนินการ เนื่องจากมีข้อมูลที่ต้องเก็บตามกฎหมาย",
+		})
+	}
+	h.recordErase(c, acct.ID, actionDSARErase)
+	return httpx.OK(c, fiber.Map{"status": string(result)})
+}
+
+// recordErase audits a self-service erasure outcome against the subject's account.
+func (h *Handler) recordErase(c *fiber.Ctx, accountID uuid.UUID, action string) {
+	if h.audit == nil {
+		return
+	}
+	val := fiber.Map{"by": "self", "ip": c.IP()}
+	if err := h.audit.Record(c.UserContext(), action, "candidate_account", accountID, val); err != nil {
+		log.Warn().Err(err).Str("account_id", accountID.String()).Msg("dsar: erase audit record failed")
+	}
 }
 
 // Export handles GET /api/v1/public/auth/me/export - a JSON download of the

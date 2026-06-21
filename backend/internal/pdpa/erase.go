@@ -11,6 +11,101 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// ErrErasureHeld is returned by EraseByAccount when a linked subject is under
+// legal hold (hired - employment data retained on a different lawful basis), so a
+// self-service erasure must be queued for HR rather than auto-fulfilled.
+var ErrErasureHeld = errors.New("pdpa: erasure held (hired/legal-hold subject)")
+
+// EraseByAccount fully erases a portal account and every candidate behind it,
+// used by portal self-service DSAR erasure. It first refuses (ErrErasureHeld) if
+// any linked candidate is hired, so employment data under legal hold is never
+// auto-erased. Otherwise it erases all linked candidates (EraseSubject, whose
+// orphan logic also erases the account) and then force-erases the account to cover
+// the no-application case. Idempotent.
+func (s *RetentionService) EraseByAccount(ctx context.Context, accountID uuid.UUID) error {
+	var held int
+	if err := s.pool.QueryRow(ctx,
+		`SELECT count(*) FROM applications a
+		 JOIN candidates c ON c.id = a.candidate_id
+		 WHERE c.account_id = $1 AND a.status = 'hired'`, accountID,
+	).Scan(&held); err != nil {
+		return fmt.Errorf("pdpa: erasure hold check: %w", err)
+	}
+	if held > 0 {
+		return ErrErasureHeld
+	}
+
+	if err := s.EraseLinkedCandidates(ctx, accountID); err != nil {
+		return err
+	}
+	return s.eraseAccountDirect(ctx, accountID)
+}
+
+// eraseAccountDirect erases a portal account unconditionally (no orphan guard - the
+// caller has already erased every linked candidate), then purges its sessions, CRM
+// notes/tags, and OTPs, and deletes its resume blob. Idempotent: an already-
+// anonymized account is a no-op.
+func (s *RetentionService) eraseAccountDirect(ctx context.Context, accountID uuid.UUID) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("pdpa: erase account begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	const eraseAccount = `
+		WITH old AS (SELECT resume_blob_url, email FROM candidate_accounts WHERE id = $1 FOR UPDATE)
+		UPDATE candidate_accounts SET
+			full_name        = $2,
+			email            = NULL,
+			email_verified   = FALSE,
+			phone            = NULL,
+			line_user_id     = NULL,
+			line_display_id  = NULL,
+			google_sub       = NULL,
+			province         = NULL,
+			resume_blob_url   = NULL,
+			resume_file_type  = NULL,
+			status            = 'anonymized',
+			anonymized_at     = NOW(),
+			updated_at        = NOW()
+		WHERE id = $1 AND status <> 'anonymized'
+		RETURNING (SELECT resume_blob_url FROM old), (SELECT email FROM old)`
+
+	var oldResume, oldEmail *string
+	err = tx.QueryRow(ctx, eraseAccount, accountID, redactedName).Scan(&oldResume, &oldEmail)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil // already anonymized (e.g. by the orphan logic) - nothing to do
+	}
+	if err != nil {
+		return fmt.Errorf("pdpa: erase account: %w", err)
+	}
+
+	if _, err := tx.Exec(ctx, `DELETE FROM candidate_sessions WHERE account_id = $1`, accountID); err != nil {
+		return fmt.Errorf("pdpa: erase account sessions: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM member_notes WHERE account_id = $1`, accountID); err != nil {
+		return fmt.Errorf("pdpa: erase account notes: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM member_tags WHERE account_id = $1`, accountID); err != nil {
+		return fmt.Errorf("pdpa: erase account tags: %w", err)
+	}
+	if oldEmail != nil && *oldEmail != "" {
+		if _, err := tx.Exec(ctx, `DELETE FROM email_otps WHERE email = $1`, *oldEmail); err != nil {
+			return fmt.Errorf("pdpa: erase account otps: %w", err)
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("pdpa: erase account commit: %w", err)
+	}
+
+	if oldResume != nil && *oldResume != "" {
+		if derr := s.deleteBlob(ctx, *oldResume); derr != nil {
+			log.Warn().Err(derr).Str("account_id", accountID.String()).Msg("pdpa: account resume blob delete failed (orphaned)")
+		}
+	}
+	return nil
+}
+
 // EraseSubject irreversibly erases ALL personal data linked to one candidate: it
 // de-identifies the candidate row + every linked record's free-text PII, deletes
 // PII-bearing rows (onboarding documents, generated letters), purges every linked
