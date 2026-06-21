@@ -217,6 +217,10 @@ func main() {
 		log.Fatal().Err(err).Msg("auth middleware init failed")
 	}
 	app.Use(authMW)
+	// Stash the spoof-resistant client IP per request so PDPA audit handlers can
+	// attribute who/where (middleware.AuditActor) without re-threading the trust
+	// list. Runs after auth so DevUser is already in locals.
+	app.Use(middleware.ResolveClientIP(trustedProxies))
 	// CSRF guard for cookie-authed mutations: once the hr_auth cookie exists
 	// (SameSite=None in prod), state-changing requests must carry an allowed Origin.
 	// Safe methods, no-Origin machine calls, and bearer-authed requests pass.
@@ -311,10 +315,15 @@ func main() {
 	// api are cross-site under the apps.io public suffix). Built before the public
 	// handler so apply can be account-first.
 	emailSender := email.NewSender(cfg)
+	// Shared audit log (PDPA Phase 5.1): records who/where for PDPA-relevant events.
+	// Built here so candidate-facing handlers below are fully configured (audit wired)
+	// before their routes are registered.
+	activityLog := activity.New(pool)
 	caRepo := candidateauth.NewRepository(pool)
 	caSvc := candidateauth.NewService(caRepo, emailSender, blobClient, cfg.EmailOTPTTL, cfg.CandidateSessionTTL).
 		WithConsentPolicy(pdpaRepo)
 	caHandler := candidateauth.NewHandler(caSvc, cfg.SessionCookieName, !cfg.IsDevelopment())
+	caHandler.SetAudit(activityLog) // audit consent withdrawals (before RegisterRoutes)
 	// CSRF guard for cookie-authed endpoints: reject cross-origin state-changing
 	// requests (the session cookie is SameSite=None in prod, and multipart uploads
 	// skip CORS preflight). Safe methods (incl. the GET OAuth login/callback) pass.
@@ -366,7 +375,6 @@ func main() {
 
 	// HR Dashboard API (Sprint 4a): ranked inbox, bulk, resume signed-URLs,
 	// candidate detail/timeline, analytics, PDPA, users/me.
-	activityLog := activity.New(pool)
 	// Portal DSAR self-service (PDPA Phase 3): an authenticated candidate exports
 	// their own data (s.30 access + s.31 portability) and erases it (s.33; held for
 	// HR when a legal hold applies). Gated by the candidate session.
@@ -435,6 +443,7 @@ func main() {
 	breach.RegisterRoutes(app, breach.NewHandler(
 		breach.NewRepository(pool),
 		breach.DPOContact{Company: cfg.CompanyName},
+		activityLog,
 	))
 	interview.RegisterDashboardRoutes(app, interviewHandler)
 	// AI cross-position fit analysis: HR-triggered verdict combining the CV-screening

@@ -15,6 +15,7 @@ import (
 	"github.com/nexto/hr-ats/internal/applications"
 	"github.com/nexto/hr-ats/internal/auth"
 	"github.com/nexto/hr-ats/internal/candidateauth"
+	"github.com/nexto/hr-ats/internal/middleware"
 	"github.com/nexto/hr-ats/internal/pdpa"
 	"github.com/nexto/hr-ats/internal/positions"
 	"github.com/nexto/hr-ats/pkg/httpx"
@@ -315,7 +316,7 @@ func (h *Handler) finalizeApplication(c *fiber.Ctx, result applications.IntakeRe
 		ConsentGiven:  true,
 		Version:       consentVersion,
 		SourceChannel: "career_portal",
-	}, c.IP()); err != nil {
+	}, middleware.ClientIP(c)); err != nil {
 		log.Warn().Err(err).Str("candidate_id", result.CandidateID.String()).Msg("failed to record PDPA consent")
 	}
 	return httpx.Created(c, fiber.Map{"status_token": token})

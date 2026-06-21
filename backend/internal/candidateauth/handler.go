@@ -1,15 +1,25 @@
 package candidateauth
 
 import (
+	"context"
 	"errors"
 	"io"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 
+	"github.com/nexto/hr-ats/internal/activity"
+	"github.com/nexto/hr-ats/internal/middleware"
 	"github.com/nexto/hr-ats/pkg/httpx"
 )
+
+// auditWriter records consent events with actor attribution. Optional; satisfied
+// by *activity.Log.
+type auditWriter interface {
+	RecordWith(ctx context.Context, a activity.Actor, action, entityType string, entityID uuid.UUID, newValue any) error
+}
 
 const maxResumeBytes = 10 * 1024 * 1024
 
@@ -25,6 +35,7 @@ type Handler struct {
 	svc        *Service
 	cookieName string
 	secure     bool // Secure + SameSite=None in prod (cross-site portal↔api)
+	audit      auditWriter
 }
 
 // NewHandler builds the candidateauth handler. secure should be true outside
@@ -32,6 +43,9 @@ type Handler struct {
 func NewHandler(svc *Service, cookieName string, secure bool) *Handler {
 	return &Handler{svc: svc, cookieName: cookieName, secure: secure}
 }
+
+// SetAudit wires an optional audit writer used to log consent withdrawals.
+func (h *Handler) SetAudit(w auditWriter) { h.audit = w }
 
 // meView is the client-safe account projection (no raw subs / blob keys).
 type meView struct {
@@ -138,6 +152,14 @@ func (h *Handler) WithdrawConsent(c *fiber.Ctx) error {
 	}
 	if err := h.svc.WithdrawConsent(c.UserContext(), acct.ID, version); err != nil {
 		return err
+	}
+	// PDPA audit: the subject withdrew consent (actor = self, spoof-resistant IP).
+	if h.audit != nil {
+		acctID := acct.ID
+		a := activity.Actor{UserID: &acctID, IP: middleware.ClientIP(c), UserAgent: c.Get(fiber.HeaderUserAgent)}
+		if err := h.audit.RecordWith(c.UserContext(), a, activity.ActionConsentWithdraw, "candidate_account", acct.ID, fiber.Map{"version": version}); err != nil {
+			log.Warn().Err(err).Str("account_id", acct.ID.String()).Msg("candidateauth: consent-withdraw audit failed")
+		}
 	}
 	return httpx.OK(c, fiber.Map{"pdpa_consent": false})
 }

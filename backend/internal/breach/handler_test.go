@@ -102,7 +102,7 @@ func appWithRole(role string, repo Repository) *fiber.App {
 		c.Locals(middleware.UserContextKey, middleware.DevUser{ID: uuid.NewString(), Role: role})
 		return c.Next()
 	})
-	RegisterRoutes(fa, NewHandler(repo, DPOContact{Company: "CP Axtra"}))
+	RegisterRoutes(fa, NewHandler(repo, DPOContact{Company: "CP Axtra"}, nil))
 	return fa
 }
 

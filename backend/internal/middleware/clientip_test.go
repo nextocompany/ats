@@ -159,3 +159,64 @@ func TestRealClientIP_ThroughFiber(t *testing.T) {
 		})
 	}
 }
+
+// TestResolveClientIPAndAuditActor exercises the audit-attribution path: the
+// resolved IP is stashed in locals (ClientIP), and AuditActor reads the DevUser
+// id + user agent + that IP. EnforceTrustProxies here trusts 10.0.0.0/8 so the
+// edge-appended client wins.
+func TestResolveClientIPAndAuditActor(t *testing.T) {
+	trusted := mustCIDRs(t, "10.0.0.0/8")
+	app := fiber.New()
+	app.Use(func(c *fiber.Ctx) error {
+		// Simulate the auth middleware putting a DevUser in locals.
+		c.Locals(UserContextKey, DevUser{ID: "11111111-1111-1111-1111-111111111111", Role: "super_admin"})
+		return c.Next()
+	})
+	app.Use(ResolveClientIP(trusted))
+	app.Get("/", func(c *fiber.Ctx) error {
+		uid, ip, ua := AuditActor(c)
+		got := "nil"
+		if uid != nil {
+			got = uid.String()
+		}
+		return c.SendString(got + "|" + ip + "|" + ua + "|local=" + ClientIP(c))
+	})
+
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("X-Forwarded-For", "203.0.113.9, 10.0.0.5")
+	req.Header.Set("User-Agent", "test-agent/1.0")
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("app.Test: %v", err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	want := "11111111-1111-1111-1111-111111111111|203.0.113.9|test-agent/1.0|local=203.0.113.9"
+	if string(body) != want {
+		t.Errorf("AuditActor path: got %q want %q", string(body), want)
+	}
+}
+
+// TestAuditActor_NonUUIDAndMissing covers a non-UUID DevUser id (→ nil) and the
+// no-ResolveClientIP case (ClientIP → "").
+func TestAuditActor_NonUUIDAndMissing(t *testing.T) {
+	app := fiber.New()
+	app.Use(func(c *fiber.Ctx) error {
+		c.Locals(UserContextKey, DevUser{ID: "not-a-uuid", Role: "hr_staff"})
+		return c.Next()
+	})
+	app.Get("/", func(c *fiber.Ctx) error {
+		uid, ip, _ := AuditActor(c)
+		if uid != nil {
+			return c.SendString("UNEXPECTED-UID")
+		}
+		return c.SendString("nil-uid|ip=" + ip)
+	})
+	resp, err := app.Test(httptest.NewRequest("GET", "/", nil))
+	if err != nil {
+		t.Fatalf("app.Test: %v", err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	if string(body) != "nil-uid|ip=" {
+		t.Errorf("non-uuid/missing-resolve: got %q want %q", string(body), "nil-uid|ip=")
+	}
+}

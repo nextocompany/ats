@@ -102,7 +102,7 @@ func (h *Handler) auditExport(c *fiber.Ctx, count int) {
 	if h.activity == nil {
 		return
 	}
-	if err := h.activity.Record(c.UserContext(), actionMemberExport, "member", uuid.Nil, fiber.Map{"by": actor(c), "rows": count}); err != nil {
+	if err := h.activity.RecordWith(c.UserContext(), auditActor(c), actionMemberExport, "member", uuid.Nil, fiber.Map{"by": actor(c), "rows": count}); err != nil {
 		log.Warn().Err(err).Msg("members: export audit record failed")
 	}
 }

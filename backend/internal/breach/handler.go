@@ -1,6 +1,7 @@
 package breach
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"time"
@@ -9,10 +10,17 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 
+	"github.com/nexto/hr-ats/internal/activity"
 	"github.com/nexto/hr-ats/internal/middleware"
 	"github.com/nexto/hr-ats/internal/rbac"
 	"github.com/nexto/hr-ats/pkg/httpx"
 )
+
+// auditWriter records breach-register mutations with actor attribution. Optional
+// (nil ⇒ not audited); satisfied by *activity.Log.
+type auditWriter interface {
+	RecordWith(ctx context.Context, a activity.Actor, action, entityType string, entityID uuid.UUID, newValue any) error
+}
 
 const maxAffectedSubjects = 100_000_000 // sanity bound on the affected-count field
 
@@ -25,14 +33,28 @@ const clockSkew = time.Minute
 // for the generated PDPC notification (wired from config; Phase 5.4 fills the DPO
 // fields, until then the generator shows placeholders).
 type Handler struct {
-	repo Repository
-	dpo  DPOContact
-	now  func() time.Time
+	repo  Repository
+	dpo   DPOContact
+	audit auditWriter
+	now   func() time.Time
 }
 
-// NewHandler builds the breach handler.
-func NewHandler(repo Repository, dpo DPOContact) *Handler {
-	return &Handler{repo: repo, dpo: dpo, now: time.Now}
+// NewHandler builds the breach handler. audit may be nil (mutations are then not
+// written to the audit trail, but the operation still succeeds).
+func NewHandler(repo Repository, dpo DPOContact, audit auditWriter) *Handler {
+	return &Handler{repo: repo, dpo: dpo, audit: audit, now: time.Now}
+}
+
+// record writes an audit entry for a breach mutation, attributed to the caller.
+// Best-effort: an audit failure must not fail the operation.
+func (h *Handler) record(c *fiber.Ctx, action string, id uuid.UUID, detail any) {
+	if h.audit == nil {
+		return
+	}
+	uid, ip, ua := middleware.AuditActor(c)
+	if err := h.audit.RecordWith(c.UserContext(), activity.Actor{UserID: uid, IP: ip, UserAgent: ua}, action, "data_breach", id, detail); err != nil {
+		log.Warn().Err(err).Str("breach", id.String()).Str("action", action).Msg("breach: audit record failed")
+	}
 }
 
 // RegisterRoutes mounts the breach endpoints. Static action segments are declared
@@ -179,6 +201,7 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 	if err != nil {
 		return h.writeErr(c, err)
 	}
+	h.record(c, activity.ActionBreachRecord, b.ID, fiber.Map{"severity": b.Severity, "high_risk": b.HighRisk})
 	return httpx.Created(c, b)
 }
 
@@ -274,6 +297,7 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 	if err != nil {
 		return h.writeErr(c, err)
 	}
+	h.record(c, activity.ActionBreachUpdate, b.ID, nil)
 	return httpx.OK(c, b)
 }
 
@@ -304,6 +328,7 @@ func (h *Handler) NotifyPDPC(c *fiber.Ctx) error {
 	if err != nil {
 		return h.writeErr(c, err)
 	}
+	h.record(c, activity.ActionBreachNotifyPDPC, b.ID, nil)
 	return httpx.OK(c, b)
 }
 
@@ -328,6 +353,7 @@ func (h *Handler) NotifySubjects(c *fiber.Ctx) error {
 	if err != nil {
 		return h.writeErr(c, err)
 	}
+	h.record(c, activity.ActionBreachNotifySubj, b.ID, nil)
 	return httpx.OK(c, b)
 }
 
@@ -348,6 +374,7 @@ func (h *Handler) Resolve(c *fiber.Ctx) error {
 	if err != nil {
 		return h.writeErr(c, err)
 	}
+	h.record(c, activity.ActionBreachResolve, b.ID, nil)
 	return httpx.OK(c, b)
 }
 
@@ -362,6 +389,7 @@ func (h *Handler) Delete(c *fiber.Ctx) error {
 	if err := h.repo.Delete(c.UserContext(), id); err != nil {
 		return h.writeErr(c, err)
 	}
+	h.record(c, activity.ActionBreachDelete, id, nil)
 	return httpx.OK(c, fiber.Map{"deleted": id.String()})
 }
 
