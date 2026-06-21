@@ -592,6 +592,9 @@ export interface HRUser {
   subregion?: string;
   is_active: boolean;
   has_password: boolean;
+  source: "local" | "sso";
+  phone?: string;
+  is_dpo: boolean;
   last_login_at?: string | null;
   created_at: string;
 }

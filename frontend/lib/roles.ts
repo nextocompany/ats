@@ -53,6 +53,14 @@ export function isMemberAdmin(me: PermHolder): boolean {
   return can(me, PERMS.membersAdmin);
 }
 
+// canManageUsers gates the user-account console (assign role + scope to any
+// account, SSO or local). super_admin always; any role granted users.admin
+// (e.g. a CPO/CHRO role) qualifies too, so account management is not hardcoded
+// to super_admin.
+export function canManageUsers(me: PermHolder): boolean {
+  return can(me, PERMS.usersAdmin);
+}
+
 // canEraseMember gates the irreversible PDPA anonymize.
 export function canEraseMember(me: PermHolder): boolean {
   return can(me, PERMS.membersErase);

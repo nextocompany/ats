@@ -89,7 +89,15 @@ export function UserManagement() {
               {users.map((u) => (
                 <TableRow key={u.id}>
                   <TableCell>
-                    <div className="font-medium text-foreground">{u.full_name || "-"}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-foreground">{u.full_name || "-"}</span>
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+                      >
+                        {u.source === "sso" ? t("sourceSso") : t("sourceLocal")}
+                      </Badge>
+                    </div>
                     <div className="text-xs text-muted-foreground">{u.email}</div>
                   </TableCell>
                   <TableCell className="text-sm">{shortRole(u.role)}</TableCell>
@@ -245,6 +253,8 @@ function EditUserDialog({ user, onClose }: { user: HRUser | null; onClose: () =>
   const update = useUpdateHRUser();
   const [fullName, setFullName] = useState("");
   const [role, setRole] = useState("hr_staff");
+  const [storeId, setStoreId] = useState<string>("");
+  const [subregion, setSubregion] = useState("");
   const [active, setActive] = useState(true);
   const [newPassword, setNewPassword] = useState("");
   const [hydratedFor, setHydratedFor] = useState<string | null>(null);
@@ -255,6 +265,8 @@ function EditUserDialog({ user, onClose }: { user: HRUser | null; onClose: () =>
     setHydratedFor(user.id);
     setFullName(user.full_name);
     setRole(user.role);
+    setStoreId(user.store_id != null ? String(user.store_id) : "");
+    setSubregion(user.subregion ?? "");
     setActive(user.is_active);
     setNewPassword("");
     update.reset();
@@ -273,6 +285,8 @@ function EditUserDialog({ user, onClose }: { user: HRUser | null; onClose: () =>
       role,
       is_active: active,
     };
+    if (storeId.trim()) input.store_id = Number(storeId);
+    if (subregion.trim()) input.subregion = subregion.trim();
     if (newPassword) input.password = newPassword;
     await update.mutateAsync({ id: user.id, input }, { onSuccess: close });
   }
@@ -291,6 +305,23 @@ function EditUserDialog({ user, onClose }: { user: HRUser | null; onClose: () =>
           <Field label={t("fieldRole")}>
             <RoleSelect value={role} onChange={setRole} />
           </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label={t("fieldStore")}>
+              <Input
+                type="number"
+                value={storeId}
+                onChange={(e) => setStoreId(e.target.value)}
+                placeholder={t("storePlaceholder")}
+              />
+            </Field>
+            <Field label={t("fieldSubregion")}>
+              <Input
+                value={subregion}
+                onChange={(e) => setSubregion(e.target.value)}
+                placeholder={t("subregionPlaceholder")}
+              />
+            </Field>
+          </div>
           <div className="flex items-center justify-between rounded-lg border border-hairline px-3 py-2.5">
             <div>
               <p className="text-sm font-medium text-foreground">{t("accountActive")}</p>
@@ -298,15 +329,18 @@ function EditUserDialog({ user, onClose }: { user: HRUser | null; onClose: () =>
             </div>
             <Switch checked={active} onCheckedChange={setActive} />
           </div>
-          <Field label={t("fieldResetPassword")}>
-            <Input
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              placeholder={t("resetPasswordPlaceholder")}
-              autoComplete="new-password"
-            />
-          </Field>
+          {/* SSO accounts have no password; password reset applies to local accounts only. */}
+          {user?.source !== "sso" && (
+            <Field label={t("fieldResetPassword")}>
+              <Input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder={t("resetPasswordPlaceholder")}
+                autoComplete="new-password"
+              />
+            </Field>
+          )}
 
           {update.isError && (
             <p role="alert" className="text-xs font-medium text-destructive">

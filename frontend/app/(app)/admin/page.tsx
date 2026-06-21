@@ -9,11 +9,13 @@ import { UserManagement } from "@/components/admin/UserManagement";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { useAdminSettings, useMe, useUpdateAdminSettings } from "@/lib/queries";
+import { canManageUsers } from "@/lib/roles";
 
 export default function AdminPage() {
   const t = useTranslations("admin");
   const { data: me, isLoading: meLoading } = useMe();
   const isSuperAdmin = me?.role === "super_admin";
+  const canUsers = canManageUsers(me);
 
   const { data: settings, isLoading } = useAdminSettings(isSuperAdmin);
   const update = useUpdateAdminSettings();
@@ -33,7 +35,7 @@ export default function AdminPage() {
     return <Skeleton className="h-40 w-full rounded-xl" />;
   }
 
-  if (!isSuperAdmin) {
+  if (!isSuperAdmin && !canUsers) {
     return (
       <div className="settle space-y-8">
         <PageHeader eyebrow={t("eyebrow")} title={t("title")} />
@@ -53,6 +55,8 @@ export default function AdminPage() {
     <div className="settle space-y-8">
       <PageHeader eyebrow={t("eyebrow")} title={t("title")} meta={t("meta")} />
 
+      {isSuperAdmin && (
+        <>
       <section className="rounded-xl bg-card ring-1 ring-hairline">
         <header className="border-b border-hairline px-6 py-4">
           <p className="eyebrow">{t("ssoEyebrow")}</p>
@@ -113,8 +117,10 @@ export default function AdminPage() {
       </section>
 
       <RolesPermissions />
+        </>
+      )}
 
-      <UserManagement />
+      {canUsers && <UserManagement />}
     </div>
   );
 }
