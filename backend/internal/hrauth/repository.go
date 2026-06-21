@@ -28,7 +28,8 @@ func NewRepository(pool *pgxpool.Pool) Repository {
 // userColumns is the canonical projection shared by every read.
 const userColumns = `id, email, COALESCE(full_name, ''), COALESCE(role, ''),
 	store_id, COALESCE(subregion, ''), is_active,
-	(password_hash IS NOT NULL) AS has_password, last_login_at, created_at`
+	(password_hash IS NOT NULL) AS has_password, last_login_at, created_at,
+	COALESCE(source, 'local'), COALESCE(phone, ''), COALESCE(is_dpo, FALSE)`
 
 // scanUser reads a row in userColumns order.
 func scanUser(row pgx.Row) (User, error) {
@@ -37,6 +38,7 @@ func scanUser(row pgx.Row) (User, error) {
 		&u.ID, &u.Email, &u.FullName, &u.Role,
 		&u.StoreID, &u.Subregion, &u.IsActive,
 		&u.HasPassword, &u.LastLoginAt, &u.CreatedAt,
+		&u.Source, &u.Phone, &u.IsDPO,
 	); err != nil {
 		return User{}, err
 	}
@@ -52,7 +54,8 @@ func (r *pgRepository) FindCredentialsByEmail(ctx context.Context, email string)
 	err := r.pool.QueryRow(ctx, q, email).Scan(
 		&u.ID, &u.Email, &u.FullName, &u.Role,
 		&u.StoreID, &u.Subregion, &u.IsActive,
-		&u.HasPassword, &u.LastLoginAt, &u.CreatedAt, &hash,
+		&u.HasPassword, &u.LastLoginAt, &u.CreatedAt,
+		&u.Source, &u.Phone, &u.IsDPO, &hash,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return User{}, "", ErrNotFound
@@ -84,7 +87,8 @@ func (r *pgRepository) CreateSession(ctx context.Context, userID uuid.UUID, toke
 func (r *pgRepository) FindSessionUser(ctx context.Context, tokenHash string) (User, error) {
 	const q = `SELECT u.id, u.email, COALESCE(u.full_name, ''), COALESCE(u.role, ''),
 		u.store_id, COALESCE(u.subregion, ''), u.is_active,
-		(u.password_hash IS NOT NULL), u.last_login_at, u.created_at
+		(u.password_hash IS NOT NULL), u.last_login_at, u.created_at,
+		COALESCE(u.source, 'local'), COALESCE(u.phone, ''), COALESCE(u.is_dpo, FALSE)
 		FROM hr_sessions s JOIN users u ON u.id = s.user_id
 		WHERE s.token_hash = $1 AND s.revoked_at IS NULL AND s.expires_at > now()
 		  AND u.is_active = TRUE`
@@ -147,6 +151,40 @@ func (r *pgRepository) GetUser(ctx context.Context, id uuid.UUID) (User, error) 
 		return User{}, fmt.Errorf("hrauth: get user: %w", err)
 	}
 	return u, nil
+}
+
+// UpsertSSOUser persists (JIT-provisions) an Entra SSO identity into the users
+// table on sign-in. New accounts are created with NO role (default-deny: an admin
+// grants access in-app) and source 'sso'. The role is never overwritten here, so an
+// admin-assigned role survives subsequent logins. Matching is by azure_ad_oid; if a
+// local account already exists under the same email (no oid yet), the oid is linked
+// onto it rather than failing on the unique-email constraint.
+func (r *pgRepository) UpsertSSOUser(ctx context.Context, oid, email, fullName string) error {
+	const insert = `INSERT INTO users (azure_ad_oid, email, full_name, source, is_active, last_login_at)
+		VALUES ($1, $2, NULLIF($3, ''), 'sso', TRUE, now())
+		ON CONFLICT (azure_ad_oid) DO UPDATE
+		SET email         = EXCLUDED.email,
+		    full_name     = COALESCE(NULLIF(EXCLUDED.full_name, ''), users.full_name),
+		    last_login_at = now()`
+	_, err := r.pool.Exec(ctx, insert, oid, email, fullName)
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == uniqueViolation {
+		// The oid is new but the email already belongs to an existing (local) row
+		// with no oid: link this SSO identity onto it without touching its role.
+		const link = `UPDATE users
+			SET azure_ad_oid  = $1,
+			    full_name     = COALESCE(NULLIF($3, ''), full_name),
+			    last_login_at = now()
+			WHERE lower(email) = lower($2) AND azure_ad_oid IS NULL`
+		if _, lerr := r.pool.Exec(ctx, link, oid, email, fullName); lerr != nil {
+			return fmt.Errorf("hrauth: link sso user: %w", lerr)
+		}
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("hrauth: upsert sso user: %w", err)
+	}
+	return nil
 }
 
 func (r *pgRepository) CreateUser(ctx context.Context, email, fullName, role string, storeID *int, subregion, passwordHash string) (User, error) {

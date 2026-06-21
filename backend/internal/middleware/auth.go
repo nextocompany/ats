@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"log"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
@@ -31,6 +32,15 @@ type HRSessionValidator interface {
 	ValidateSession(ctx context.Context, token string) (auth.Identity, bool)
 }
 
+// SSOUserProvisioner JIT-provisions a verified Entra SSO identity into the app's
+// own user store on sign-in. The hrauth.Service satisfies it; defined here to keep
+// the dependency one-directional (hrauth imports this package). A nil provisioner ⇒
+// SSO users are not persisted. The call is best-effort: a failure is logged, never
+// blocks the already-authenticated request.
+type SSOUserProvisioner interface {
+	ProvisionSSOUser(ctx context.Context, id auth.Identity) error
+}
+
 // entraTenantPolicy is the authorisation gate for which directories may sign in:
 // the static AZURE_AD_ALLOWED_TENANTS allowlist, OR — when the admin toggle is on
 // — any tenant. The verifier has already validated the token cryptographically
@@ -56,7 +66,7 @@ func (p entraTenantPolicy) AllowsTenant(ctx context.Context, tenantID string) bo
 //
 // allowAll is the runtime tenant toggle (may be nil ⇒ static allowlist only).
 // sessions is the HR password-session validator (may be nil ⇒ Entra-only).
-func Auth(ctx context.Context, cfg *config.Config, allowAll AllowAllTenantsReader, sessions HRSessionValidator) (fiber.Handler, error) {
+func Auth(ctx context.Context, cfg *config.Config, allowAll AllowAllTenantsReader, sessions HRSessionValidator, provisioner SSOUserProvisioner) (fiber.Handler, error) {
 	if !cfg.UsesRealAuth() {
 		return MockJWT(cfg.IsDevelopment()), nil
 	}
@@ -80,6 +90,13 @@ func Auth(ctx context.Context, cfg *config.Config, allowAll AllowAllTenantsReade
 		// Path 1: Entra bearer token (SSO).
 		if tok := bearerToken(c); tok != "" {
 			if id, vErr := verifier.Verify(c.UserContext(), tok); vErr == nil {
+				// JIT-provision the SSO identity into our own user store (best-effort,
+				// throttled). A failure must not block the authenticated request.
+				if provisioner != nil {
+					if pErr := provisioner.ProvisionSSOUser(c.UserContext(), id); pErr != nil {
+						log.Printf("auth: sso user provisioning failed: %v", pErr)
+					}
+				}
 				setUser(c, id)
 				return c.Next()
 			}

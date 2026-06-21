@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/nexto/hr-ats/internal/auth"
 )
 
 // fakeRepo is an in-memory Repository for service tests.
@@ -15,6 +17,7 @@ type fakeRepo struct {
 	byID       map[uuid.UUID]string
 	sessions   map[string]session // keyed by tokenHash
 	touchCalls int
+	ssoUpserts int
 }
 
 type userRow struct {
@@ -91,6 +94,8 @@ func (f *fakeRepo) RevokeAllUserSessions(_ context.Context, userID uuid.UUID) er
 	return nil
 }
 
+func (f *fakeRepo) UpsertSSOUser(_ context.Context, _, _, _ string) error { f.ssoUpserts++; return nil }
+
 func (f *fakeRepo) ListUsers(context.Context) ([]User, error) {
 	out := []User{}
 	for _, r := range f.users {
@@ -138,6 +143,42 @@ func (f *fakeRepo) UpdateUser(_ context.Context, id uuid.UUID, in UpdateUserInpu
 }
 
 func newSvc(repo Repository) *Service { return NewService(repo, time.Hour) }
+
+func TestProvisionSSOUser_SkipsEmptyOID(t *testing.T) {
+	repo := newFakeRepo()
+	svc := newSvc(repo)
+	// A local password session carries a user UUID in Identity.ID via ValidateSession,
+	// but the SSO path is the only caller; an empty oid must be a no-op.
+	if err := svc.ProvisionSSOUser(context.Background(), auth.Identity{ID: ""}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if repo.ssoUpserts != 0 {
+		t.Fatalf("expected no upsert for empty oid, got %d", repo.ssoUpserts)
+	}
+}
+
+func TestProvisionSSOUser_Throttles(t *testing.T) {
+	repo := newFakeRepo()
+	svc := newSvc(repo)
+	clock := time.Unix(1_700_000_000, 0)
+	svc.now = func() time.Time { return clock }
+	id := auth.Identity{ID: "oid-1", Email: "Dpo@CPAxtra.com", Name: "DPO One"}
+
+	// First call provisions.
+	_ = svc.ProvisionSSOUser(context.Background(), id)
+	// Second call within the throttle window is skipped (no DB write).
+	_ = svc.ProvisionSSOUser(context.Background(), id)
+	if repo.ssoUpserts != 1 {
+		t.Fatalf("expected 1 upsert within throttle window, got %d", repo.ssoUpserts)
+	}
+
+	// After the window elapses, it provisions again.
+	clock = clock.Add(ssoProvisionThrottle + time.Minute)
+	_ = svc.ProvisionSSOUser(context.Background(), id)
+	if repo.ssoUpserts != 2 {
+		t.Fatalf("expected 2 upserts after throttle window, got %d", repo.ssoUpserts)
+	}
+}
 
 func TestLoginSuccess(t *testing.T) {
 	repo := newFakeRepo()
