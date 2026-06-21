@@ -762,3 +762,13 @@ export interface ConsentRecord {
   source_channel: string;
   created_at: string;
 }
+
+// PolicyDoc mirrors pdpa.ConsentDocument: the current published privacy/consent
+// notice, shown read-only on the dashboard /privacy reference page.
+export interface PolicyDoc {
+  version: string;
+  locale: string;
+  title: string;
+  body: string;
+  effective_at: string;
+}

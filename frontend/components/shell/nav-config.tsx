@@ -12,6 +12,7 @@ import {
   ClipboardList,
   CheckSquare,
   ShieldCheck,
+  Lock,
   Settings,
   type LucideIcon,
 } from "lucide-react";
@@ -79,6 +80,11 @@ export const PDPA_NAV: NavItem = { href: "/pdpa", label: "PDPA", key: "pdpa", ic
 // Admin is super_admin-only — appended via navForRole, never in the base NAV.
 export const ADMIN_NAV: NavItem = { href: "/admin", label: "Admin", key: "admin", icon: Settings };
 
+// Privacy is the internal privacy-notice + DPO-contact reference, open to every
+// authenticated user. It is a SECONDARY (footer) link, not part of the primary
+// Workspace nav, so it is in ALL_NAV (for breadcrumb resolution) but not navForRole.
+export const PRIVACY_NAV: NavItem = { href: "/privacy", label: "Privacy", key: "privacy", icon: Lock };
+
 // navForRole returns the nav items visible to a given role. Bulk upload for HR
 // uploader roles; super_admin + hr_manager see Members; super_admin also sees Admin.
 export function navForRole(me?: Me): NavItem[] {
@@ -96,7 +102,7 @@ export function navForRole(me?: Me): NavItem[] {
 }
 
 // ALL_NAV is every possible item, for pathname→item lookups (e.g. header title).
-export const ALL_NAV: NavItem[] = [...NAV, REPORTS_NAV, EXECUTIVE_NAV, SHORTLIST_NAV, APPROVALS_NAV, BULK_NAV, REQUISITIONS_NAV, MEMBERS_NAV, PDPA_NAV, ADMIN_NAV];
+export const ALL_NAV: NavItem[] = [...NAV, REPORTS_NAV, EXECUTIVE_NAV, SHORTLIST_NAV, APPROVALS_NAV, BULK_NAV, REQUISITIONS_NAV, MEMBERS_NAV, PDPA_NAV, ADMIN_NAV, PRIVACY_NAV];
 
 // Brand lockup — text-only institutional wordmark, no monogram tile or dot mark.
 // "CP AXTRA" tracked uppercase over an "ATS Console" line (HSBC/JPM register),
