@@ -38,6 +38,26 @@ async function getPolicy(locale: string): Promise<PolicyDoc | null> {
   }
 }
 
+// DpoContact is the published Data Protection Officer contact (PDPA s.41), shown
+// in the contact section so a data subject can reach the DPO.
+interface DpoContact {
+  name: string;
+  email: string;
+  phone: string;
+  company: string;
+}
+
+async function getDpo(): Promise<DpoContact | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/pdpa/dpo`, { cache: "no-store" });
+    if (!res.ok) return null;
+    const env = (await res.json()) as { success: boolean; data: DpoContact };
+    return env.success ? env.data : null;
+  } catch {
+    return null;
+  }
+}
+
 function formatDate(iso: string, locale: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
@@ -51,7 +71,8 @@ function formatDate(iso: string, locale: string): string {
 export default async function PrivacyPage() {
   const locale = await getLocale();
   const t = await getTranslations("privacy");
-  const doc = await getPolicy(locale);
+  const [doc, dpo] = await Promise.all([getPolicy(locale), getDpo()]);
+  const hasDpo = !!dpo && (dpo.name.trim() !== "" || dpo.email.trim() !== "" || dpo.phone.trim() !== "");
 
   // Body paragraphs split on blank lines; the registry seed is a single paragraph.
   const paragraphs = (doc?.body ?? t("fallbackBody")).split(/\n\s*\n/).filter(Boolean);
@@ -109,6 +130,48 @@ export default async function PrivacyPage() {
                 {t("contactTitle")}
               </h2>
               <p className="leading-relaxed text-foreground/90">{t("contactBody")}</p>
+              {hasDpo && dpo ? (
+                <dl className="mt-1 flex flex-col gap-1 text-sm text-foreground/90">
+                  {dpo.company.trim() !== "" ? (
+                    <div className="flex gap-2">
+                      <dt className="w-24 shrink-0 text-muted-foreground">{t("dpoCompany")}</dt>
+                      <dd>{dpo.company}</dd>
+                    </div>
+                  ) : null}
+                  {dpo.name.trim() !== "" ? (
+                    <div className="flex gap-2">
+                      <dt className="w-24 shrink-0 text-muted-foreground">{t("dpoName")}</dt>
+                      <dd>{dpo.name}</dd>
+                    </div>
+                  ) : null}
+                  {dpo.email.trim() !== "" ? (
+                    <div className="flex gap-2">
+                      <dt className="w-24 shrink-0 text-muted-foreground">{t("dpoEmail")}</dt>
+                      <dd>
+                        <a
+                          href={`mailto:${dpo.email}`}
+                          className="underline underline-offset-4 transition-colors hover:text-muted-foreground"
+                        >
+                          {dpo.email}
+                        </a>
+                      </dd>
+                    </div>
+                  ) : null}
+                  {dpo.phone.trim() !== "" ? (
+                    <div className="flex gap-2">
+                      <dt className="w-24 shrink-0 text-muted-foreground">{t("dpoPhone")}</dt>
+                      <dd>
+                        <a
+                          href={`tel:${dpo.phone.replace(/\s+/g, "")}`}
+                          className="underline underline-offset-4 transition-colors hover:text-muted-foreground"
+                        >
+                          {dpo.phone}
+                        </a>
+                      </dd>
+                    </div>
+                  ) : null}
+                </dl>
+              ) : null}
             </section>
           </article>
         </Container>
