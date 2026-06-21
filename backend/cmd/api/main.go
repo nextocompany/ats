@@ -24,6 +24,7 @@ import (
 	"github.com/nexto/hr-ats/internal/calendar"
 	"github.com/nexto/hr-ats/internal/candidateauth"
 	"github.com/nexto/hr-ats/internal/candidates"
+	"github.com/nexto/hr-ats/internal/dsar"
 	"github.com/nexto/hr-ats/internal/executive"
 	"github.com/nexto/hr-ats/internal/fit"
 	"github.com/nexto/hr-ats/internal/health"
@@ -365,6 +366,10 @@ func main() {
 	// HR Dashboard API (Sprint 4a): ranked inbox, bulk, resume signed-URLs,
 	// candidate detail/timeline, analytics, PDPA, users/me.
 	activityLog := activity.New(pool)
+	// Portal DSAR self-service (PDPA Phase 3): an authenticated candidate exports
+	// their own data (s.30 access + s.31 portability). Gated by the candidate session.
+	dsar.RegisterRoutes(app, dsar.NewHandler(dsar.New(pool), activityLog),
+		candidateauth.RequireCandidate(caSvc, cfg.SessionCookieName))
 	// Search indexer: no-op unless AI_SEARCH_PROVIDER=azure. Ensure the index
 	// exists at startup (best-effort — a transient Search outage must not block
 	// the api booting), and keep it fresh on bulk status changes.
