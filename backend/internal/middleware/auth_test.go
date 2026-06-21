@@ -11,7 +11,7 @@ import (
 )
 
 func TestAuth_DevPathInjectsSuperAdmin(t *testing.T) {
-	h, err := Auth(context.Background(), &config.Config{Env: "development", AuthProvider: "mock"}, nil, nil)
+	h, err := Auth(context.Background(), &config.Config{Env: "development", AuthProvider: "mock"}, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

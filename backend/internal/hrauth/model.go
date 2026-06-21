@@ -47,6 +47,9 @@ type User struct {
 	Subregion   string     `json:"subregion,omitempty"`
 	IsActive    bool       `json:"is_active"`
 	HasPassword bool       `json:"has_password"`
+	Source      string     `json:"source"` // 'local' (password) or 'sso' (Entra JIT)
+	Phone       string     `json:"phone,omitempty"`
+	IsDPO       bool       `json:"is_dpo"`
 	LastLoginAt *time.Time `json:"last_login_at,omitempty"`
 	CreatedAt   time.Time  `json:"created_at"`
 }

@@ -16,6 +16,7 @@ import (
 type Identity struct {
 	ID        string
 	Email     string
+	Name      string // display name (Entra `name` claim); used to seed the persisted user row
 	Role      string
 	StoreID   *int
 	Subregion string
@@ -43,6 +44,7 @@ type entraClaims struct {
 	OID       string   `json:"oid"`
 	TenantID  string   `json:"tid"`
 	Email     string   `json:"preferred_username"`
+	Name      string   `json:"name"` // display name, emitted in v2 ID tokens by default
 	Roles     []string `json:"roles"`
 	StoreID   *int     `json:"store_id"`
 	Subregion string   `json:"subregion"`
@@ -56,7 +58,7 @@ func mapIdentity(c entraClaims) Identity {
 	if len(c.Roles) > 0 {
 		role = c.Roles[0]
 	}
-	return Identity{ID: c.OID, Email: c.Email, Role: role, StoreID: c.StoreID, Subregion: c.Subregion}
+	return Identity{ID: c.OID, Email: c.Email, Name: c.Name, Role: role, StoreID: c.StoreID, Subregion: c.Subregion}
 }
 
 // oidcVerifier validates Entra ID tokens cryptographically, then defers the

@@ -213,7 +213,7 @@ func main() {
 	// Dynamic RBAC: allow assigning any role defined in rbac_roles (custom roles),
 	// not just the seven built-ins. Falls back to the built-in allowlist on error.
 	hrAuthSvc.SetRoleValidator(rbacRepo.RoleExists)
-	authMW, err := middleware.Auth(ctx, cfg, settingsSvc, hrAuthSvc)
+	authMW, err := middleware.Auth(ctx, cfg, settingsSvc, hrAuthSvc, hrAuthSvc)
 	if err != nil {
 		log.Fatal().Err(err).Msg("auth middleware init failed")
 	}

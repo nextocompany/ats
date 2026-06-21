@@ -4,12 +4,19 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/nexto/hr-ats/internal/auth"
 )
+
+// ssoProvisionThrottle is how long a successfully provisioned SSO oid is cached so
+// repeated bearer-token requests (every API call carries the token) do not each
+// trigger a DB upsert. A short window keeps last_login_at roughly fresh without a
+// write per request.
+const ssoProvisionThrottle = 15 * time.Minute
 
 // Repository is the hrauth data-access contract (Postgres-backed in production,
 // faked in tests).
@@ -27,6 +34,9 @@ type Repository interface {
 	RevokeSession(ctx context.Context, tokenHash string) error
 	RevokeAllUserSessions(ctx context.Context, userID uuid.UUID) error
 
+	// UpsertSSOUser JIT-provisions an Entra SSO identity into the users table on
+	// sign-in (new accounts get no role: an admin grants access in-app).
+	UpsertSSOUser(ctx context.Context, oid, email, fullName string) error
 	ListUsers(ctx context.Context) ([]User, error)
 	GetUser(ctx context.Context, id uuid.UUID) (User, error)
 	CreateUser(ctx context.Context, email, fullName, role string, storeID *int, subregion, passwordHash string) (User, error)
@@ -43,6 +53,8 @@ type Service struct {
 	// (the rbac_roles table). When nil, or on validator error, the built-in
 	// allowedRoles set is used (fail-safe: never widens beyond the known roles).
 	roleValid func(ctx context.Context, role string) (bool, error)
+	// ssoSeen throttles JIT provisioning: oid (string) -> last upsert time.Time.
+	ssoSeen sync.Map
 }
 
 // NewService builds the hrauth service.
@@ -134,6 +146,30 @@ func (s *Service) ValidateSession(ctx context.Context, token string) (auth.Ident
 		StoreID:   u.StoreID,
 		Subregion: u.Subregion,
 	}, true
+}
+
+// ProvisionSSOUser JIT-provisions a verified Entra SSO identity into the users
+// table (best-effort, throttled). It runs from the auth middleware after the token
+// is verified, so any failure is returned but must NOT block the request: the user
+// is already authenticated. A new row is created with no role (default-deny); an
+// admin grants access in-app. Called per request, so it skips the DB when the same
+// oid was provisioned within ssoProvisionThrottle.
+func (s *Service) ProvisionSSOUser(ctx context.Context, id auth.Identity) error {
+	oid := strings.TrimSpace(id.ID)
+	if oid == "" {
+		return nil // local sessions carry a user UUID, not an Entra oid: nothing to JIT.
+	}
+	now := s.now()
+	if last, ok := s.ssoSeen.Load(oid); ok {
+		if t, ok := last.(time.Time); ok && now.Sub(t) < ssoProvisionThrottle {
+			return nil
+		}
+	}
+	if err := s.repo.UpsertSSOUser(ctx, oid, normalizeEmail(id.Email), strings.TrimSpace(id.Name)); err != nil {
+		return err
+	}
+	s.ssoSeen.Store(oid, now)
+	return nil
 }
 
 // --- super_admin account provisioning -------------------------------------
