@@ -58,9 +58,11 @@ func (h *Handler) RequestErasure(c *fiber.Ctx) error {
 	}
 	if result == ErasureHeld {
 		h.recordErase(c, acct.ID, actionDSAREraseHeld)
+		// One message covers both the legal-hold case (hired) and a queued partial
+		// erasure: the subject's request is received and handled by staff.
 		return httpx.OK(c, fiber.Map{
 			"status":  string(result),
-			"message": "คำขอลบข้อมูลถูกส่งให้เจ้าหน้าที่ดำเนินการ เนื่องจากมีข้อมูลที่ต้องเก็บตามกฎหมาย",
+			"message": "คำขอลบข้อมูลของคุณถูกบันทึกและจะดำเนินการโดยเจ้าหน้าที่ บางข้อมูลอาจต้องเก็บไว้ตามกฎหมาย",
 		})
 	}
 	h.recordErase(c, acct.ID, actionDSARErase)

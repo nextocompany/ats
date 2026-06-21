@@ -5,7 +5,7 @@
 -- erasing or silently refusing.
 CREATE TABLE IF NOT EXISTS dsar_requests (
     id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    account_id   UUID NOT NULL REFERENCES candidate_accounts(id),
+    account_id   UUID NOT NULL REFERENCES candidate_accounts(id) ON DELETE CASCADE,
     request_type TEXT NOT NULL DEFAULT 'erasure',  -- erasure (+ future: access/rectify)
     status       TEXT NOT NULL DEFAULT 'pending',   -- pending | completed | rejected
     reason       TEXT,                              -- why held (e.g. 'hired')
