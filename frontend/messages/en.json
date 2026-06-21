@@ -18,7 +18,8 @@
     "members": "Members",
     "admin": "Admin",
     "requisitions": "Requisitions",
-    "pdpa": "PDPA / DPO"
+    "pdpa": "PDPA / DPO",
+    "privacy": "Privacy"
   },
   "shortlist": {
     "eyebrow": "Line manager",
@@ -960,5 +961,21 @@
     "consentVersionLabel": "Version {version}",
     "consentGiven": "Given",
     "consentWithdrawn": "Withdrawn"
+  },
+  "privacy": {
+    "eyebrow": "Data protection",
+    "title": "Privacy notice",
+    "meta": "The published privacy notice (the same document candidates see) and the DPO contact, for internal reference",
+    "version": "Version {version}",
+    "lastUpdated": "Last updated {date}",
+    "noticeUnavailable": "The privacy notice could not be loaded right now",
+    "notSet": "Not set",
+    "dpoTitle": "Data Protection Officer (DPO)",
+    "dpoCompany": "Organisation",
+    "dpoName": "Name",
+    "dpoEmail": "Email",
+    "dpoPhone": "Phone",
+    "dpoUnset": "DPO contact is not configured yet. Set PDPA_DPO_* on the server.",
+    "consoleLink": "Action data-subject requests and look up consent in the <a>PDPA / DPO console</a>"
   }
 }

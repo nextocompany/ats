@@ -7,7 +7,7 @@ import { LogOut } from "lucide-react";
 
 import { signOut } from "@/lib/auth";
 import { useMe } from "@/lib/queries";
-import { navForRole, BrandMark } from "./nav-config";
+import { navForRole, BrandMark, PRIVACY_NAV } from "./nav-config";
 import type { Me } from "@/lib/types";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -117,6 +117,17 @@ export function SideNav() {
 
         {/* Hairline closing the nav block */}
         <div className="mt-7 ml-3 h-px w-10 bg-sidebar-border" aria-hidden />
+
+        {/* Secondary: privacy notice + DPO reference, open to all. A quiet footer
+            link, deliberately outside the primary Workspace list. */}
+        <Link
+          href={PRIVACY_NAV.href}
+          aria-current={pathname.startsWith(PRIVACY_NAV.href) ? "page" : undefined}
+          className="mt-3 flex items-center gap-3 rounded-lg px-3 py-2 text-xs text-sidebar-foreground/55 transition-colors outline-none hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+        >
+          <PRIVACY_NAV.icon className="size-[0.95rem] shrink-0" strokeWidth={1.75} />
+          <span>{tNav(PRIVACY_NAV.key)}</span>
+        </Link>
       </nav>
 
       {/* Identity + sign-out */}

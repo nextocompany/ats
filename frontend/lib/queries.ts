@@ -57,6 +57,8 @@ import type {
   DsarRequest,
   DsarFilter,
   ConsentRecord,
+  DpoContact,
+  PolicyDoc,
 } from "./types";
 
 export function useMe() {
@@ -916,5 +918,22 @@ export function useRejectDsar() {
     mutationFn: ({ id, reason }: { id: string; reason: string }) =>
       api.post<DsarRequest>(`/api/v1/pdpa/admin/dsar-requests/${id}/reject`, { reason }).then((r) => r.data),
     onSuccess: () => invalidatePdpa(qc),
+  });
+}
+
+// --- Public PDPA reads (privacy notice + DPO contact), used by /privacy ---
+
+export function usePrivacyPolicy(locale: string) {
+  return useQuery({
+    queryKey: ["pdpa", "policy", locale],
+    queryFn: () =>
+      api.get<PolicyDoc>("/api/v1/pdpa/policy/current" + buildQuery({ locale })).then((r) => r.data),
+  });
+}
+
+export function usePublicDpo() {
+  return useQuery({
+    queryKey: ["pdpa", "dpo"],
+    queryFn: () => api.get<DpoContact>("/api/v1/pdpa/dpo").then((r) => r.data),
   });
 }
