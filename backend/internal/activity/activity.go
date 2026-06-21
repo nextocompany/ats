@@ -38,8 +38,9 @@ const (
 	ActionDSARErase        = "dsar_erase"
 	ActionDSAREraseHeld    = "dsar_erase_held"
 	ActionConsentWithdraw  = "consent_withdraw"
-	ActionDSARComplete     = "dsar_complete" // DPO closed a held request as fulfilled
-	ActionDSARReject       = "dsar_reject"   // DPO rejected a held request (with reason)
+	ActionConsentReaccept  = "consent_reaccept" // subject re-consented to a newer notice version
+	ActionDSARComplete     = "dsar_complete"    // DPO closed a held request as fulfilled
+	ActionDSARReject       = "dsar_reject"      // DPO rejected a held request (with reason)
 	ActionBreachRecord     = "breach_record"
 	ActionBreachUpdate     = "breach_update"
 	ActionBreachNotifyPDPC = "breach_notify_pdpc"

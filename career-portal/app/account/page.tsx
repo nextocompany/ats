@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 import { DataRightsSection } from "@/components/auth/DataRightsSection";
+import { ReconsentBanner } from "@/components/auth/ReconsentBanner";
 import { LinkLineButton } from "@/components/auth/LinkLineButton";
 import { ProfileForm } from "@/components/auth/ProfileForm";
 import { ResumeUploadStep } from "@/components/auth/ResumeUploadStep";
@@ -61,6 +62,8 @@ export default function AccountPage() {
             ออกจากระบบ
           </Button>
         </header>
+
+        <ReconsentBanner />
 
         <section className="flex flex-col gap-4">
           <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-foreground">ข้อมูลส่วนตัว</h2>

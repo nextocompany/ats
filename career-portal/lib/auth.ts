@@ -27,6 +27,11 @@ export function logout(): Promise<void> {
   return api.post("/api/v1/public/auth/logout").then(() => undefined);
 }
 
+// reacceptConsent re-consents to the current notice version (Phase 2 reconsent).
+export function reacceptConsent(): Promise<void> {
+  return api.post("/api/v1/public/auth/consent/accept").then(() => undefined);
+}
+
 // updateProfile saves profile fields (+ optional PDPA consent).
 export function updateProfile(input: ProfileInput): Promise<Account> {
   return api.patch<Account>("/api/v1/public/auth/profile", input).then((r) => r.data);
