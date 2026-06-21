@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/rs/zerolog/log"
 
 	"github.com/nexto/hr-ats/internal/pdpa"
 )
@@ -52,22 +53,32 @@ func (s *Service) WithEraser(e AccountEraser) *Service {
 // RequestErasure runs a subject's self-service erasure (PDPA s.33). When no legal
 // hold applies the data is erased immediately and ErasureDone is returned; when a
 // linked subject is hired (legal hold) the erasure is queued for HR/DPO and
-// ErasureHeld is returned. The subject is never silently refused or over-erased.
+// ErasureHeld is returned. A partial/transient erase failure is ALSO queued (not
+// surfaced as a dead 500) so a subject's request is never silently lost - erasure
+// is idempotent, so HR/a retry completes it. The subject is never over-erased.
 func (s *Service) RequestErasure(ctx context.Context, accountID uuid.UUID) (ErasureResult, error) {
 	if s.eraser == nil {
 		return "", fmt.Errorf("dsar: erasure engine not configured")
 	}
 	err := s.eraser.EraseByAccount(ctx, accountID)
-	if errors.Is(err, pdpa.ErrErasureHeld) {
+	switch {
+	case err == nil:
+		return ErasureDone, nil
+	case errors.Is(err, pdpa.ErrErasureHeld):
 		if qerr := s.queueErasureRequest(ctx, accountID, "hired"); qerr != nil {
 			return "", qerr
 		}
 		return ErasureHeld, nil
+	default:
+		// A linked candidate failed to erase mid-cascade (some siblings may already
+		// be anonymized). Record a pending request so the partial erasure is tracked
+		// and completed by HR / a retry rather than lost behind a 500.
+		log.Warn().Err(err).Str("account_id", accountID.String()).Msg("dsar: erasure incomplete; queued for completion")
+		if qerr := s.queueErasureRequest(ctx, accountID, "erase_incomplete"); qerr != nil {
+			return "", qerr
+		}
+		return ErasureHeld, nil
 	}
-	if err != nil {
-		return "", err
-	}
-	return ErasureDone, nil
 }
 
 // queueErasureRequest records a held erasure request for HR/DPO to action. It is a

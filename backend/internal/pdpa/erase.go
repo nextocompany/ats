@@ -74,7 +74,10 @@ func (s *RetentionService) eraseAccountDirect(ctx context.Context, accountID uui
 	var oldResume, oldEmail *string
 	err = tx.QueryRow(ctx, eraseAccount, accountID, redactedName).Scan(&oldResume, &oldEmail)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil // already anonymized (e.g. by the orphan logic) - nothing to do
+		// Already anonymized - the orphan logic in EraseSubject (run for the last
+		// linked candidate) erased the account AND purged its sessions/notes/tags/
+		// otps, so there is nothing left to clean up here.
+		return nil
 	}
 	if err != nil {
 		return fmt.Errorf("pdpa: erase account: %w", err)

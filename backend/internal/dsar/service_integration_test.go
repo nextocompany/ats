@@ -39,7 +39,7 @@ func TestExport_ScopedToCaller(t *testing.T) {
 	t.Cleanup(pool.Close)
 
 	if _, err := pool.Exec(ctx,
-		`TRUNCATE candidate_accounts, candidates, applications, positions, pdpa_consents RESTART IDENTITY CASCADE`); err != nil {
+		`TRUNCATE candidate_accounts, candidates, applications, positions, pdpa_consents, dsar_requests RESTART IDENTITY CASCADE`); err != nil {
 		t.Fatalf("truncate: %v", err)
 	}
 
