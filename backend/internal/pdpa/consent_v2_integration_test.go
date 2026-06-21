@@ -37,8 +37,9 @@ func TestCurrentVersion_FromRegistry(t *testing.T) {
 		t.Fatalf("expected seeded current version 1.0, got %q", v)
 	}
 
-	// Promote a v2.0 (th); 1.0 stays valid history but is no longer current.
-	if _, err := pool.Exec(ctx, `UPDATE consent_documents SET is_current = FALSE WHERE locale = 'th'`); err != nil {
+	// Promote a v2.0 (th only); 1.0 stays valid history but is no longer current.
+	// Demote ALL current rows first (mirrors a real promotion).
+	if _, err := pool.Exec(ctx, `UPDATE consent_documents SET is_current = FALSE WHERE is_current`); err != nil {
 		t.Fatalf("demote: %v", err)
 	}
 	if _, err := pool.Exec(ctx,
@@ -64,7 +65,7 @@ func TestCurrentVersion_FromRegistry(t *testing.T) {
 	if err != nil {
 		t.Fatalf("current doc en: %v", err)
 	}
-	// en has no v2.0 current row, so it falls back to th's current (v2.0).
+	// en has no current row for v2.0, so it falls back to the only current doc (th v2.0).
 	if doc.Version != "2.0" {
 		t.Errorf("expected en fallback to current th doc 2.0, got %q (%s)", doc.Version, doc.Locale)
 	}

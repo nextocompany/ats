@@ -1,6 +1,8 @@
 package pdpa
 
 import (
+	"errors"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 
@@ -31,8 +33,11 @@ func (h *Handler) CurrentPolicy(c *fiber.Ctx) error {
 		locale = "th"
 	}
 	doc, err := h.repo.CurrentDocuments(c.UserContext(), locale)
-	if err != nil {
+	if errors.Is(err, ErrNoCurrentDoc) {
 		return fiber.NewError(fiber.StatusNotFound, "no current consent document")
+	}
+	if err != nil {
+		return err // transient DB error → 5xx so the client retries, not a false 404
 	}
 	return httpx.OK(c, doc)
 }

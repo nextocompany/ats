@@ -33,6 +33,9 @@ type Repository interface {
 	UpdateProfile(ctx context.Context, accountID uuid.UUID, p ProfileUpdate) error
 	SetResume(ctx context.Context, accountID uuid.UUID, blobURL, fileType string) error
 	SetConsent(ctx context.Context, accountID uuid.UUID, version string) error
+	// MarkConsented updates only the consent snapshot (no ledger row) for the apply
+	// flow, where the candidate-keyed ledger row is the authoritative record.
+	MarkConsented(ctx context.Context, accountID uuid.UUID, version string) error
 	// WithdrawConsent flips the account to not-consented and appends a withdrawal
 	// row to the unified pdpa_consents ledger.
 	WithdrawConsent(ctx context.Context, accountID uuid.UUID, version string) error
@@ -216,9 +219,28 @@ func (r *pgRepository) SetResume(ctx context.Context, accountID uuid.UUID, blobU
 	return nil
 }
 
+// MarkConsented updates ONLY the account consent snapshot (no ledger row). Used by
+// the apply flow, where the authoritative ledger row is the candidate-keyed one
+// written by the apply handler - this just stops the member being re-prompted.
+func (r *pgRepository) MarkConsented(ctx context.Context, accountID uuid.UUID, version string) error {
+	const q = `
+		UPDATE candidate_accounts
+		SET pdpa_consent = TRUE, pdpa_version = $2, pdpa_consent_at = NOW(), updated_at = NOW()
+		WHERE id = $1`
+	tag, err := r.pool.Exec(ctx, q, accountID, version)
+	if err != nil {
+		return fmt.Errorf("candidateauth: mark consented: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // SetConsent records account consent: it updates the account snapshot AND appends
 // to the unified pdpa_consents ledger (account_id keyed) in one transaction, so the
-// portal and apply flows share a single queryable consent trail.
+// portal and apply flows share a single queryable consent trail. Used by the
+// portal profile/signup consent path (no candidate row exists there yet).
 func (r *pgRepository) SetConsent(ctx context.Context, accountID uuid.UUID, version string) error {
 	return r.writeConsent(ctx, accountID, version, true, "account")
 }
@@ -237,12 +259,22 @@ func (r *pgRepository) writeConsent(ctx context.Context, accountID uuid.UUID, ve
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
+	// On withdrawal (given=false) keep pdpa_version + pdpa_consent_at unchanged so
+	// the snapshot still reflects WHEN/WHAT the member originally consented to; only
+	// the boolean flips. The withdrawal event itself is captured in the ledger row.
 	const snap = `
-		UPDATE candidate_accounts
-		SET pdpa_consent = $2, pdpa_version = $3, pdpa_consent_at = NOW(), updated_at = NOW()
+		UPDATE candidate_accounts SET
+			pdpa_consent    = $2,
+			pdpa_version    = CASE WHEN $2 THEN $3 ELSE pdpa_version END,
+			pdpa_consent_at = CASE WHEN $2 THEN NOW() ELSE pdpa_consent_at END,
+			updated_at      = NOW()
 		WHERE id = $1`
-	if _, err := tx.Exec(ctx, snap, accountID, given, version); err != nil {
+	tag, err := tx.Exec(ctx, snap, accountID, given, version)
+	if err != nil {
 		return fmt.Errorf("candidateauth: consent snapshot: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
 	}
 	const ledger = `
 		INSERT INTO pdpa_consents (account_id, consent_given, consent_version, source_channel)

@@ -203,9 +203,16 @@ func (s *Service) SaveResume(ctx context.Context, accountID uuid.UUID, fileName,
 	return s.repo.SetResume(ctx, accountID, key, fileType)
 }
 
-// SaveConsent records PDPA consent on the account (captured once at signup).
+// SaveConsent records PDPA consent on the account + a ledger row (portal
+// profile/signup path, where no candidate row exists yet).
 func (s *Service) SaveConsent(ctx context.Context, accountID uuid.UUID, version string) error {
 	return s.repo.SetConsent(ctx, accountID, version)
+}
+
+// MarkConsented updates only the account consent snapshot (no ledger row). The
+// apply flow uses this; the candidate-keyed apply consent row is the ledger record.
+func (s *Service) MarkConsented(ctx context.Context, accountID uuid.UUID, version string) error {
+	return s.repo.MarkConsented(ctx, accountID, version)
 }
 
 // SavedResumeBytes downloads the account's saved resume for quick-apply.
