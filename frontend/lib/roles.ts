@@ -28,6 +28,8 @@ export const PERMS = {
   approvalSubmit: "approval.submit",
   requisitionManage: "requisition.manage",
   requisitionApprove: "requisition.approve",
+  breachManage: "breach.manage",
+  pdpaAdmin: "pdpa.admin",
 } as const;
 
 // can reports whether the user holds a permission key.
@@ -104,6 +106,11 @@ export function canManageRequisitions(me: PermHolder): boolean {
 // canApproveRequisitions gates approving a pending requisition into 'open'.
 export function canApproveRequisitions(me: PermHolder): boolean {
   return can(me, PERMS.requisitionApprove);
+}
+
+// canAdminPdpa gates the PDPA/DPO console (DSAR queue, consent lookup, overview).
+export function canAdminPdpa(me: PermHolder): boolean {
+  return can(me, PERMS.pdpaAdmin);
 }
 
 // canSubmitApproval gates opening a hiring-approval request.

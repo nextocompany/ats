@@ -707,3 +707,58 @@ export interface SearchFilter {
   page?: number;
   limit?: number;
 }
+
+// --- PDPA / DPO console (Phase 5.4) ---
+
+// DpoContact mirrors pdpa.DPOContact: the published Data Protection Officer
+// contact (s.41). Fields may be empty (config not set) → render a placeholder.
+export interface DpoContact {
+  name: string;
+  email: string;
+  phone: string;
+  company: string;
+}
+
+// PdpaOverview mirrors pdpaadmin.Overview: the console summary card data.
+export interface PdpaOverview {
+  dsar_pending: number;
+  breaches_open: number;
+  breaches_overdue: number;
+  current_consent_version: string;
+  retention_days: number;
+  retention_sweep_enabled: boolean;
+  dpo: DpoContact;
+}
+
+// DsarRequest mirrors pdpaadmin.DSARRequest: one queued data-subject request
+// joined with the account identity.
+export interface DsarRequest {
+  id: string;
+  account_id: string;
+  account_name: string;
+  account_email: string;
+  request_type: string;
+  status: string;
+  reason: string;
+  requested_at: string;
+  resolved_at: string | null;
+  resolved_by: string | null;
+}
+
+export interface DsarFilter {
+  status?: string;
+  page?: number;
+  limit?: number;
+}
+
+// ConsentRecord mirrors pdpaadmin.ConsentRecord: one row of a subject's consent
+// history (the unified ledger).
+export interface ConsentRecord {
+  id: string;
+  candidate_id: string | null;
+  account_id: string | null;
+  consent_given: boolean;
+  version: string;
+  source_channel: string;
+  created_at: string;
+}

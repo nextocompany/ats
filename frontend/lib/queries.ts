@@ -53,6 +53,10 @@ import type {
   StoreLoad,
   TimelineEntry,
   UpdateHRUserInput,
+  PdpaOverview,
+  DsarRequest,
+  DsarFilter,
+  ConsentRecord,
 } from "./types";
 
 export function useMe() {
@@ -851,5 +855,66 @@ export function useCloseRequisition() {
     mutationFn: (id: string) =>
       api.post<Requisition>(`/api/v1/requisitions/${id}/close`).then((r) => r.data),
     onSuccess: () => invalidateRequisitions(qc),
+  });
+}
+
+// --- PDPA / DPO console (Phase 5.4) ---
+
+export function usePdpaOverview(enabled = true) {
+  return useQuery({
+    queryKey: ["pdpa", "overview"],
+    queryFn: () => api.get<PdpaOverview>("/api/v1/pdpa/admin/overview").then((r) => r.data),
+    enabled,
+  });
+}
+
+// useDsarRequests keeps the {data, meta} wrapper so the page reads meta.total.
+export function useDsarRequests(filter: DsarFilter, enabled = true) {
+  return useQuery({
+    queryKey: ["pdpa", "dsar", filter],
+    queryFn: () =>
+      api.get<DsarRequest[]>(
+        "/api/v1/pdpa/admin/dsar-requests" +
+          buildQuery({ status: filter.status, page: filter.page, limit: filter.limit }),
+      ),
+    enabled,
+  });
+}
+
+// useConsentLookup fetches a subject's consent history; enabled only once a
+// selector (account_id or candidate_id) is supplied.
+export function useConsentLookup(params: { account_id?: string; candidate_id?: string }, enabled = true) {
+  return useQuery({
+    queryKey: ["pdpa", "consents", params],
+    queryFn: () =>
+      api
+        .get<ConsentRecord[]>(
+          "/api/v1/pdpa/admin/consents" +
+            buildQuery({ account_id: params.account_id, candidate_id: params.candidate_id }),
+        )
+        .then((r) => r.data),
+    enabled,
+  });
+}
+
+function invalidatePdpa(qc: ReturnType<typeof useQueryClient>) {
+  void qc.invalidateQueries({ queryKey: ["pdpa"] });
+}
+
+export function useCompleteDsar() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api.post<DsarRequest>(`/api/v1/pdpa/admin/dsar-requests/${id}/complete`).then((r) => r.data),
+    onSuccess: () => invalidatePdpa(qc),
+  });
+}
+
+export function useRejectDsar() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      api.post<DsarRequest>(`/api/v1/pdpa/admin/dsar-requests/${id}/reject`, { reason }).then((r) => r.data),
+    onSuccess: () => invalidatePdpa(qc),
   });
 }
