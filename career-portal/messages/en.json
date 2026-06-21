@@ -121,6 +121,10 @@
     "cookieTitle": "Cookies",
     "cookieBody": "This site uses only essential cookies for sign-in and language preference. There is no advertising or tracking.",
     "contactTitle": "Contact us",
-    "contactBody": "For any personal-data protection questions, please contact the company Data Protection Officer (DPO)."
+    "contactBody": "For any personal-data protection questions, please contact the company Data Protection Officer (DPO).",
+    "dpoCompany": "Organisation",
+    "dpoName": "Name",
+    "dpoEmail": "Email",
+    "dpoPhone": "Phone"
   }
 }
