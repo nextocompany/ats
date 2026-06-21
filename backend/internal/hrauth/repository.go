@@ -142,6 +142,21 @@ func (r *pgRepository) ListUsers(ctx context.Context) ([]User, error) {
 	return out, nil
 }
 
+// FindByAzureOID returns the active account linked to an Entra object id, used to
+// resolve an SSO request's in-app role/scope (authorization now lives in our store,
+// not the token claim). ErrNotFound when no active row exists for the oid.
+func (r *pgRepository) FindByAzureOID(ctx context.Context, oid string) (User, error) {
+	u, err := scanUser(r.pool.QueryRow(ctx,
+		`SELECT `+userColumns+` FROM users WHERE azure_ad_oid = $1 AND is_active = TRUE`, oid))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return User{}, ErrNotFound
+	}
+	if err != nil {
+		return User{}, fmt.Errorf("hrauth: find by azure oid: %w", err)
+	}
+	return u, nil
+}
+
 func (r *pgRepository) GetUser(ctx context.Context, id uuid.UUID) (User, error) {
 	u, err := scanUser(r.pool.QueryRow(ctx, `SELECT `+userColumns+` FROM users WHERE id = $1`, id))
 	if errors.Is(err, pgx.ErrNoRows) {

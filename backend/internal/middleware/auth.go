@@ -39,6 +39,10 @@ type HRSessionValidator interface {
 // blocks the already-authenticated request.
 type SSOUserProvisioner interface {
 	ProvisionSSOUser(ctx context.Context, id auth.Identity) error
+	// ResolveSSOUser returns the in-app identity (role + scope from the app's user
+	// store, not the token claim) for a verified Entra object id. ok is false when no
+	// active account exists yet, which the middleware treats as default-deny.
+	ResolveSSOUser(ctx context.Context, oid string) (auth.Identity, bool)
 }
 
 // entraTenantPolicy is the authorisation gate for which directories may sign in:
@@ -87,17 +91,30 @@ func Auth(ctx context.Context, cfg *config.Config, allowAll AllowAllTenantsReade
 		if isUnauthedPath(c.Path()) {
 			return c.Next()
 		}
-		// Path 1: Entra bearer token (SSO).
+		// Path 1: Entra bearer token (SSO). Authentication comes from the token, but
+		// authorization (role + scope) is resolved from our own user store, not the
+		// token's app-role claim: SSO proves identity, admins grant access in-app.
 		if tok := bearerToken(c); tok != "" {
 			if id, vErr := verifier.Verify(c.UserContext(), tok); vErr == nil {
-				// JIT-provision the SSO identity into our own user store (best-effort,
-				// throttled). A failure must not block the authenticated request.
-				if provisioner != nil {
-					if pErr := provisioner.ProvisionSSOUser(c.UserContext(), id); pErr != nil {
-						log.Printf("auth: sso user provisioning failed: %v", pErr)
-					}
+				if provisioner == nil {
+					// No in-app store wired (Entra-only legacy): fall back to the claim role.
+					setUser(c, id)
+					return c.Next()
 				}
-				setUser(c, id)
+				// JIT-provision the identity (best-effort, throttled); a failure must not
+				// block the already-authenticated request.
+				if pErr := provisioner.ProvisionSSOUser(c.UserContext(), id); pErr != nil {
+					log.Printf("auth: sso user provisioning failed: %v", pErr)
+				}
+				// Resolve role/scope from the user store. A missing/inactive/role-less
+				// account yields an authenticated-but-unauthorized identity (empty role),
+				// so the dashboard shows a "contact your administrator" state rather than
+				// silently granting the token's claim role.
+				if dbID, ok := provisioner.ResolveSSOUser(c.UserContext(), id.ID); ok {
+					setUser(c, dbID)
+				} else {
+					setUser(c, auth.Identity{ID: id.ID, Email: id.Email, Name: id.Name})
+				}
 				return c.Next()
 			}
 		}

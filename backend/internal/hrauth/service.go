@@ -37,6 +37,9 @@ type Repository interface {
 	// UpsertSSOUser JIT-provisions an Entra SSO identity into the users table on
 	// sign-in (new accounts get no role: an admin grants access in-app).
 	UpsertSSOUser(ctx context.Context, oid, email, fullName string) error
+	// FindByAzureOID returns the active account for an Entra object id (ErrNotFound
+	// when none/inactive), used to resolve an SSO request's in-app role + scope.
+	FindByAzureOID(ctx context.Context, oid string) (User, error)
 	ListUsers(ctx context.Context) ([]User, error)
 	GetUser(ctx context.Context, id uuid.UUID) (User, error)
 	CreateUser(ctx context.Context, email, fullName, role string, storeID *int, subregion, passwordHash string) (User, error)
@@ -170,6 +173,31 @@ func (s *Service) ProvisionSSOUser(ctx context.Context, id auth.Identity) error 
 	}
 	s.ssoSeen.Store(oid, now)
 	return nil
+}
+
+// ResolveSSOUser returns the in-app identity (role + scope from our user store, not
+// the Entra token claim) for a verified SSO object id. The bool is false when no
+// active account exists for the oid yet: the caller treats that as default-deny.
+// The returned ID stays the Entra oid so the audit actor is unchanged. An account
+// that exists but has no role yields an identity with an empty Role (authenticated
+// but unauthorized), so the dashboard can show a "contact your administrator" state.
+func (s *Service) ResolveSSOUser(ctx context.Context, oid string) (auth.Identity, bool) {
+	oid = strings.TrimSpace(oid)
+	if oid == "" {
+		return auth.Identity{}, false
+	}
+	u, err := s.repo.FindByAzureOID(ctx, oid)
+	if err != nil {
+		return auth.Identity{}, false
+	}
+	return auth.Identity{
+		ID:        oid,
+		Email:     u.Email,
+		Name:      u.FullName,
+		Role:      u.Role,
+		StoreID:   u.StoreID,
+		Subregion: u.Subregion,
+	}, true
 }
 
 // --- super_admin account provisioning -------------------------------------

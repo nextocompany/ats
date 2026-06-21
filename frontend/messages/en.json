@@ -977,5 +977,13 @@
     "dpoPhone": "Phone",
     "dpoUnset": "DPO contact is not configured yet. Set PDPA_DPO_* on the server.",
     "consoleLink": "Action data-subject requests and look up consent in the <a>PDPA / DPO console</a>"
+  },
+  "access": {
+    "title": "You do not have access yet",
+    "body": "Your account is signed in, but no permissions have been assigned to it. Access to this console is granted by an administrator.",
+    "contact": "Please contact your CPO, CHRO, or system administrator to request access.",
+    "signedInAs": "Signed in as",
+    "signOut": "Sign out",
+    "checking": "Checking your access…"
   }
 }

@@ -1,6 +1,7 @@
 import { AppHeader } from "@/components/shell/AppHeader";
 import { SideNav } from "@/components/shell/SideNav";
 import { MobileBar } from "@/components/shell/MobileBar";
+import { AccessGuard } from "@/components/shell/AccessGuard";
 
 // Shared chrome for all authenticated dashboard routes.
 // Desktop ≥1024: persistent navy-blue sidebar + slim context bar.
@@ -21,7 +22,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <MobileBar />
         <AppHeader />
         <main id="main" className="flex-1 px-5 pb-24 pt-7 sm:px-7 lg:px-8 lg:py-9 lg:pb-24">
-          <div className="mx-auto w-full max-w-[1240px]">{children}</div>
+          <div className="mx-auto w-full max-w-[1240px]">
+            <AccessGuard>{children}</AccessGuard>
+          </div>
         </main>
       </div>
     </div>
