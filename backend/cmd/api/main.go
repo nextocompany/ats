@@ -21,6 +21,7 @@ import (
 	"github.com/nexto/hr-ats/internal/activity"
 	"github.com/nexto/hr-ats/internal/applications"
 	"github.com/nexto/hr-ats/internal/auth"
+	"github.com/nexto/hr-ats/internal/breach"
 	"github.com/nexto/hr-ats/internal/calendar"
 	"github.com/nexto/hr-ats/internal/candidateauth"
 	"github.com/nexto/hr-ats/internal/candidates"
@@ -427,6 +428,14 @@ func main() {
 	// openings as rows in the shared `vacancies` table (source='manual'), RBAC-scoped.
 	// Approved requisitions flow into branch assignment + executive + portal automatically.
 	requisitions.RegisterRoutes(app, requisitions.NewHandler(requisitions.NewRepository(pool)))
+	// PDPA breach register (DPO/legal): record personal-data breaches, drive the
+	// s.37(4) 72h PDPC-notification countdown, and generate the notification
+	// content. Gated to breach.manage; company-wide (no RBAC data-scope). The DPO
+	// contact block is wired from config (Phase 5.4 fills the DPO fields).
+	breach.RegisterRoutes(app, breach.NewHandler(
+		breach.NewRepository(pool),
+		breach.DPOContact{Company: cfg.CompanyName},
+	))
 	interview.RegisterDashboardRoutes(app, interviewHandler)
 	// AI cross-position fit analysis: HR-triggered verdict combining the CV-screening
 	// result + the AI pre-interview, matched against the whole Master JD catalogue.
