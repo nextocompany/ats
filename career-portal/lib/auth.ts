@@ -55,6 +55,12 @@ export function getResumes(): Promise<AccountResume[]> {
   return api.get<{ resumes: AccountResume[] }>("/api/v1/public/auth/resumes").then((r) => r.data.resumes);
 }
 
+// getResumeViewUrl returns a short-lived signed URL to open one of the account's
+// CVs (PDFs/images render inline, docx downloads). Account-scoped server-side.
+export function getResumeViewUrl(id: string): Promise<string> {
+  return api.get<{ url: string }>(`/api/v1/public/auth/resumes/${id}/file`).then((r) => r.data.url);
+}
+
 // setDefaultResume marks one resume the default used for quick-apply.
 export function setDefaultResume(id: string): Promise<AccountResume[]> {
   return api

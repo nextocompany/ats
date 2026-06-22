@@ -102,6 +102,15 @@ func (f *fakeRepo) DeleteResume(_ context.Context, accountID, resumeID uuid.UUID
 	return key, nil
 }
 
+func (f *fakeRepo) ResumeBlobKey(_ context.Context, accountID, resumeID uuid.UUID) (string, string, error) {
+	for _, r := range f.resumes[accountID] {
+		if r.ID == resumeID {
+			return f.keys[resumeID], r.FileType, nil
+		}
+	}
+	return "", "", ErrNotFound
+}
+
 func (f *fakeRepo) newAccount() *Account {
 	// Mirror the DB default (status NOT NULL DEFAULT 'active') so the suspension
 	// guard in issueSessionFor doesn't reject freshly-created fake accounts.
@@ -295,6 +304,9 @@ func (b *fakeBlob) Download(_ context.Context, name string) ([]byte, error) {
 func (b *fakeBlob) Delete(_ context.Context, name string) error {
 	delete(b.uploaded, name)
 	return nil
+}
+func (b *fakeBlob) SignedURL(name string, _ time.Duration) (string, error) {
+	return "https://blob/" + name + "?sig=test", nil
 }
 
 // --- tests -------------------------------------------------------------------
@@ -515,6 +527,39 @@ func TestResumeLibrary_DefaultCapPromote(t *testing.T) {
 	// Unknown id is a not-found, not a silent success.
 	if err := svc.SetDefaultResume(ctx, acct.ID, uuid.New()); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("set-default unknown id: want ErrNotFound, got %v", err)
+	}
+}
+
+func TestResumeViewURL_OwnerAndIsolation(t *testing.T) {
+	repo := newFakeRepo()
+	svc, _ := newTestService(repo)
+	ctx := context.Background()
+	owner := repo.newAccount()
+	other := repo.newAccount()
+
+	if err := svc.AddResume(ctx, owner.ID, "cv.pdf", "pdf", "application/pdf", []byte("a")); err != nil {
+		t.Fatal(err)
+	}
+	list, _ := svc.ListResumes(ctx, owner.ID)
+	rid := list[0].ID
+
+	// Owner gets a signed URL.
+	url, err := svc.ResumeViewURL(ctx, owner.ID, rid)
+	if err != nil {
+		t.Fatalf("owner view: %v", err)
+	}
+	if !strings.Contains(url, "sig=") {
+		t.Fatalf("want signed url, got %q", url)
+	}
+
+	// Another account cannot resolve the owner's resume (no IDOR).
+	if _, err := svc.ResumeViewURL(ctx, other.ID, rid); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("cross-account view: want ErrNotFound, got %v", err)
+	}
+
+	// Unknown id is a not-found, not a server error.
+	if _, err := svc.ResumeViewURL(ctx, owner.ID, uuid.New()); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("unknown id: want ErrNotFound, got %v", err)
 	}
 }
 

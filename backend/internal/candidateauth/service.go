@@ -12,12 +12,19 @@ import (
 	"github.com/nexto/hr-ats/pkg/email"
 )
 
-// BlobStore is the subset of pkg/blob the service needs (resume save + read + delete).
+// BlobStore is the subset of pkg/blob the service needs (resume save + read +
+// delete + view). SignedURL takes no ctx — that mirrors *blob.Client.
 type BlobStore interface {
 	Upload(ctx context.Context, name string, data []byte, contentType string) (string, error)
 	Download(ctx context.Context, name string) ([]byte, error)
 	Delete(ctx context.Context, name string) error
+	SignedURL(name string, ttl time.Duration) (string, error)
 }
+
+// resumeViewTTL bounds how long a candidate's resume-view link stays valid (the
+// browser opens it immediately, so a short window is enough). Mirrors the HR
+// dashboard's resumeURLTTL.
+const resumeViewTTL = 15 * time.Minute
 
 // Session is an issued candidate session: the raw token (set in the cookie) and
 // its expiry. Only the hash is persisted.
@@ -237,6 +244,18 @@ func (s *Service) ListResumes(ctx context.Context, accountID uuid.UUID) ([]Resum
 // SetDefaultResume marks one resume the default (used for quick-apply).
 func (s *Service) SetDefaultResume(ctx context.Context, accountID, resumeID uuid.UUID) error {
 	return s.repo.SetDefaultResume(ctx, accountID, resumeID)
+}
+
+// ResumeViewURL returns a short-lived signed URL for one of the account's resumes
+// so the candidate can open the file in the browser. The lookup is account-scoped
+// (ErrNotFound for a resume the account does not own), so it cannot resolve another
+// member's CV. PDFs/images render inline; docx downloads under its original name.
+func (s *Service) ResumeViewURL(ctx context.Context, accountID, resumeID uuid.UUID) (string, error) {
+	key, _, err := s.repo.ResumeBlobKey(ctx, accountID, resumeID)
+	if err != nil {
+		return "", err
+	}
+	return s.blob.SignedURL(key, resumeViewTTL)
 }
 
 // DeleteResume removes a resume and its blob (best-effort). Deleting the default

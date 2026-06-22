@@ -295,6 +295,27 @@ func (h *Handler) ListResumes(c *fiber.Ctx) error {
 	return h.respondResumes(c, acct.ID)
 }
 
+// ViewResume handles GET /resumes/:id/file (RequireCandidate): a short-lived
+// signed URL for the candidate's own CV. Account-scoped lookup → no IDOR.
+func (h *Handler) ViewResume(c *fiber.Ctx) error {
+	acct := CandidateFromCtx(c)
+	if acct == nil {
+		return fiber.NewError(fiber.StatusUnauthorized, "login required")
+	}
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "invalid resume id")
+	}
+	url, err := h.svc.ResumeViewURL(c.UserContext(), acct.ID, id)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return fiber.NewError(fiber.StatusNotFound, "resume not found")
+		}
+		return err
+	}
+	return httpx.OK(c, fiber.Map{"url": url, "expires_in_seconds": int(resumeViewTTL.Seconds())})
+}
+
 // SetDefaultResume handles POST /resumes/:id/default (RequireCandidate).
 func (h *Handler) SetDefaultResume(c *fiber.Ctx) error {
 	acct := CandidateFromCtx(c)

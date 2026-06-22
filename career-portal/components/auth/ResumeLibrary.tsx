@@ -6,7 +6,7 @@
 import { useEffect, useState } from "react";
 
 import { ApiError } from "@/lib/api";
-import { deleteResume, getResumes, RESUME_LIMIT, setDefaultResume, uploadResume } from "@/lib/auth";
+import { deleteResume, getResumes, getResumeViewUrl, RESUME_LIMIT, setDefaultResume, uploadResume } from "@/lib/auth";
 import { useCandidate } from "@/lib/session";
 import type { AccountResume } from "@/lib/types";
 import { UPLOAD_ACCEPT_ATTR, validateUploadFile } from "@/lib/upload";
@@ -64,6 +64,26 @@ export function ResumeLibrary() {
       );
     } finally {
       setBusy(false);
+    }
+  }
+
+  // view opens a CV in a new tab. The blank tab is opened synchronously (inside
+  // the click gesture) so Safari does not block it, then redirected once the
+  // short-lived signed URL resolves. opener is severed (cross-origin blob host).
+  async function view(id: string) {
+    setError(null);
+    const w = window.open("about:blank", "_blank");
+    try {
+      const url = await getResumeViewUrl(id);
+      if (w) {
+        w.opener = null;
+        w.location.replace(url);
+      } else {
+        window.location.assign(url); // popup blocked → navigate current tab
+      }
+    } catch {
+      w?.close();
+      setError("เปิดไฟล์ไม่สำเร็จ กรุณาลองใหม่");
     }
   }
 
@@ -126,6 +146,14 @@ export function ResumeLibrary() {
                   {formatDate(r.created_at) ? ` · ${formatDate(r.created_at)}` : ""}
                 </p>
               </div>
+              <button
+                type="button"
+                onClick={() => view(r.id)}
+                disabled={busy}
+                className="shrink-0 rounded-md border border-line px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-secondary disabled:opacity-50"
+              >
+                ดูไฟล์
+              </button>
               {!r.is_default ? (
                 <button
                   type="button"

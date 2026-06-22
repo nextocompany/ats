@@ -19,6 +19,7 @@ func RegisterRoutes(app *fiber.App, h *Handler) {
 	g.Patch("/profile", gate, h.UpdateProfile)
 	g.Post("/resume", gate, h.UploadResume) // adds to the library (cap MaxResumes)
 	g.Get("/resumes", gate, h.ListResumes)
+	g.Get("/resumes/:id/file", gate, h.ViewResume) // short-lived signed URL to open the CV
 	g.Post("/resumes/:id/default", gate, h.SetDefaultResume)
 	g.Delete("/resumes/:id", gate, h.DeleteResume)
 	g.Post("/consent/withdraw", gate, h.WithdrawConsent)

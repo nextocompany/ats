@@ -43,6 +43,10 @@ type Repository interface {
 	// DeleteResume removes a resume and returns its blob key (for blob cleanup).
 	// If the deleted resume was the default, the newest remaining one is promoted.
 	DeleteResume(ctx context.Context, accountID, resumeID uuid.UUID) (string, error)
+	// ResumeBlobKey returns the blob key + file type for one resume, scoped to the
+	// owning account (account_id from the session, never the request) so a member
+	// can only resolve their own CVs. Returns ErrNotFound otherwise.
+	ResumeBlobKey(ctx context.Context, accountID, resumeID uuid.UUID) (key, fileType string, err error)
 	SetConsent(ctx context.Context, accountID uuid.UUID, version string) error
 	// MarkConsented updates only the consent snapshot (no ledger row) for the apply
 	// flow, where the candidate-keyed ledger row is the authoritative record.
@@ -319,6 +323,20 @@ func (r *pgRepository) SetDefaultResume(ctx context.Context, accountID, resumeID
 		return fmt.Errorf("candidateauth: sync default pointer: %w", err)
 	}
 	return tx.Commit(ctx)
+}
+
+func (r *pgRepository) ResumeBlobKey(ctx context.Context, accountID, resumeID uuid.UUID) (string, string, error) {
+	var key, fileType string
+	err := r.pool.QueryRow(ctx,
+		`SELECT blob_key, file_type FROM candidate_account_resumes WHERE id = $1 AND account_id = $2`,
+		resumeID, accountID).Scan(&key, &fileType)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", "", ErrNotFound
+	}
+	if err != nil {
+		return "", "", fmt.Errorf("candidateauth: resume blob key: %w", err)
+	}
+	return key, fileType, nil
 }
 
 func (r *pgRepository) DeleteResume(ctx context.Context, accountID, resumeID uuid.UUID) (string, error) {
