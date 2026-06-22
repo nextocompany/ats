@@ -3,6 +3,7 @@
 // Compliance snapshot for the PDPA console: a stat strip (DSAR queue depth,
 // breach status with the overdue count escalated, consent version, retention)
 // plus the published DPO contact card.
+import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { AlertTriangle } from "lucide-react";
 
@@ -27,6 +28,10 @@ export function PdpaOverviewCards({ overview }: { overview: PdpaOverview }) {
   const t = useTranslations("pdpa");
   const dpo = overview.dpo;
   const placeholder = (v: string | null | undefined) => (!v || v.trim() === "" ? t("notSet") : v);
+  // The snapshot features only the lead officer; the full roster lives on /privacy
+  // so this card never grows unbounded with a large directory.
+  const primaryOfficer = dpo.officers.find((o) => o.is_primary) ?? dpo.officers[0];
+  const extraOfficers = Math.max(0, dpo.officers.length - 1);
 
   return (
     <div className="space-y-4">
@@ -65,23 +70,31 @@ export function PdpaOverviewCards({ overview }: { overview: PdpaOverview }) {
               <span className="w-20 shrink-0 text-muted-foreground">{t("dpoCompany")}</span>
               <span className="text-foreground">{placeholder(dpo.company)}</span>
             </div>
-            {dpo.officers.length > 0 ? (
-              dpo.officers.map((o, i) => (
-                <dl key={i} className="space-y-1 border-t border-hairline pt-2">
+            {primaryOfficer ? (
+              <>
+                <dl className="space-y-1 border-t border-hairline pt-2">
                   <div className="flex gap-2">
                     <dt className="w-20 shrink-0 text-muted-foreground">{t("dpoName")}</dt>
-                    <dd className="text-foreground">{placeholder(o.name)}</dd>
+                    <dd className="text-foreground">{placeholder(primaryOfficer.name)}</dd>
                   </div>
                   <div className="flex gap-2">
                     <dt className="w-20 shrink-0 text-muted-foreground">{t("dpoEmail")}</dt>
-                    <dd className="text-foreground">{placeholder(o.email)}</dd>
+                    <dd className="text-foreground">{placeholder(primaryOfficer.email)}</dd>
                   </div>
                   <div className="flex gap-2">
                     <dt className="w-20 shrink-0 text-muted-foreground">{t("dpoPhone")}</dt>
-                    <dd className="text-foreground">{placeholder(o.phone)}</dd>
+                    <dd className="text-foreground">{placeholder(primaryOfficer.phone)}</dd>
                   </div>
                 </dl>
-              ))
+                {extraOfficers > 0 && (
+                  <Link
+                    href="/privacy"
+                    className="inline-block pt-1 text-xs font-medium text-foreground underline underline-offset-4 transition-colors hover:text-muted-foreground"
+                  >
+                    {t("dpoMore", { count: extraOfficers })}
+                  </Link>
+                )}
+              </>
             ) : (
               <p className="text-muted-foreground">{t("dpoUnset")}</p>
             )}

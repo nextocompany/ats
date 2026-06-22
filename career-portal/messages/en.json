@@ -125,6 +125,8 @@
     "dpoCompany": "Organisation",
     "dpoName": "Name",
     "dpoEmail": "Email",
-    "dpoPhone": "Phone"
+    "dpoPhone": "Phone",
+    "dpoPrimaryBadge": "Lead DPO",
+    "dpoMore": "Additional officers ({count})"
   }
 }

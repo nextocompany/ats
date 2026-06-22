@@ -45,6 +45,7 @@ interface DpoOfficer {
   name: string;
   email: string;
   phone: string;
+  is_primary: boolean;
 }
 interface DpoDirectory {
   company: string;
@@ -80,6 +81,54 @@ export default async function PrivacyPage() {
 
   // Body paragraphs split on blank lines; the registry seed is a single paragraph.
   const paragraphs = (doc?.body ?? t("fallbackBody")).split(/\n\s*\n/).filter(Boolean);
+
+  // Feature the lead officer; the rest collapse behind a native <details> so the
+  // legal contact stays visible without JS while a long roster stays compact.
+  // The API sorts primary-first, so officers[0] is the fallback lead.
+  const primaryOfficer = officers.find((o) => o.is_primary) ?? officers[0];
+  const otherOfficers = officers.filter((o) => o !== primaryOfficer);
+
+  const renderOfficer = (o: DpoOfficer, key: number, lead: boolean) => (
+    <dl key={key} className="flex flex-col gap-1 rounded-lg border border-line p-3">
+      {lead && otherOfficers.length > 0 ? (
+        <span className="mb-1 inline-block w-fit rounded bg-foreground/5 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          {t("dpoPrimaryBadge")}
+        </span>
+      ) : null}
+      {o.name.trim() !== "" ? (
+        <div className="flex gap-2">
+          <dt className="w-24 shrink-0 text-muted-foreground">{t("dpoName")}</dt>
+          <dd>{o.name}</dd>
+        </div>
+      ) : null}
+      {o.email.trim() !== "" ? (
+        <div className="flex gap-2">
+          <dt className="w-24 shrink-0 text-muted-foreground">{t("dpoEmail")}</dt>
+          <dd>
+            <a
+              href={`mailto:${o.email}`}
+              className="underline underline-offset-4 transition-colors hover:text-muted-foreground"
+            >
+              {o.email}
+            </a>
+          </dd>
+        </div>
+      ) : null}
+      {o.phone.trim() !== "" ? (
+        <div className="flex gap-2">
+          <dt className="w-24 shrink-0 text-muted-foreground">{t("dpoPhone")}</dt>
+          <dd>
+            <a
+              href={`tel:${o.phone.replace(/\s+/g, "")}`}
+              className="underline underline-offset-4 transition-colors hover:text-muted-foreground"
+            >
+              {o.phone}
+            </a>
+          </dd>
+        </div>
+      ) : null}
+    </dl>
+  );
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -134,7 +183,7 @@ export default async function PrivacyPage() {
                 {t("contactTitle")}
               </h2>
               <p className="leading-relaxed text-foreground/90">{t("contactBody")}</p>
-              {officers.length > 0 ? (
+              {primaryOfficer ? (
                 <div className="mt-1 flex flex-col gap-4 text-sm text-foreground/90">
                   {dpo?.company.trim() ? (
                     <p>
@@ -142,42 +191,17 @@ export default async function PrivacyPage() {
                       {dpo.company}
                     </p>
                   ) : null}
-                  {officers.map((o, i) => (
-                    <dl key={i} className="flex flex-col gap-1 border-t border-line pt-3 first:border-t-0 first:pt-0">
-                      {o.name.trim() !== "" ? (
-                        <div className="flex gap-2">
-                          <dt className="w-24 shrink-0 text-muted-foreground">{t("dpoName")}</dt>
-                          <dd>{o.name}</dd>
-                        </div>
-                      ) : null}
-                      {o.email.trim() !== "" ? (
-                        <div className="flex gap-2">
-                          <dt className="w-24 shrink-0 text-muted-foreground">{t("dpoEmail")}</dt>
-                          <dd>
-                            <a
-                              href={`mailto:${o.email}`}
-                              className="underline underline-offset-4 transition-colors hover:text-muted-foreground"
-                            >
-                              {o.email}
-                            </a>
-                          </dd>
-                        </div>
-                      ) : null}
-                      {o.phone.trim() !== "" ? (
-                        <div className="flex gap-2">
-                          <dt className="w-24 shrink-0 text-muted-foreground">{t("dpoPhone")}</dt>
-                          <dd>
-                            <a
-                              href={`tel:${o.phone.replace(/\s+/g, "")}`}
-                              className="underline underline-offset-4 transition-colors hover:text-muted-foreground"
-                            >
-                              {o.phone}
-                            </a>
-                          </dd>
-                        </div>
-                      ) : null}
-                    </dl>
-                  ))}
+                  {renderOfficer(primaryOfficer, 0, true)}
+                  {otherOfficers.length > 0 ? (
+                    <details className="group rounded-lg border border-line">
+                      <summary className="cursor-pointer list-none px-3 py-2.5 font-medium text-foreground transition-colors hover:text-muted-foreground">
+                        {t("dpoMore", { count: otherOfficers.length })}
+                      </summary>
+                      <div className="grid gap-3 p-3 pt-0 sm:grid-cols-2">
+                        {otherOfficers.map((o, i) => renderOfficer(o, i + 1, false))}
+                      </div>
+                    </details>
+                  ) : null}
                 </div>
               ) : null}
             </section>

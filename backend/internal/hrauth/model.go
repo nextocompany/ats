@@ -39,19 +39,20 @@ var allowedRoles = map[string]bool{
 
 // User is a local HR account projection (never carries the password hash).
 type User struct {
-	ID          uuid.UUID  `json:"id"`
-	Email       string     `json:"email"`
-	FullName    string     `json:"full_name"`
-	Role        string     `json:"role"`
-	StoreID     *int       `json:"store_id,omitempty"`
-	Subregion   string     `json:"subregion,omitempty"`
-	IsActive    bool       `json:"is_active"`
-	HasPassword bool       `json:"has_password"`
-	Source      string     `json:"source"` // 'local' (password) or 'sso' (Entra JIT)
-	Phone       string     `json:"phone,omitempty"`
-	IsDPO       bool       `json:"is_dpo"`
-	LastLoginAt *time.Time `json:"last_login_at,omitempty"`
-	CreatedAt   time.Time  `json:"created_at"`
+	ID           uuid.UUID  `json:"id"`
+	Email        string     `json:"email"`
+	FullName     string     `json:"full_name"`
+	Role         string     `json:"role"`
+	StoreID      *int       `json:"store_id,omitempty"`
+	Subregion    string     `json:"subregion,omitempty"`
+	IsActive     bool       `json:"is_active"`
+	HasPassword  bool       `json:"has_password"`
+	Source       string     `json:"source"` // 'local' (password) or 'sso' (Entra JIT)
+	Phone        string     `json:"phone,omitempty"`
+	IsDPO        bool       `json:"is_dpo"`
+	IsPrimaryDPO bool       `json:"is_primary_dpo"` // the registered / lead DPO (at most one)
+	LastLoginAt  *time.Time `json:"last_login_at,omitempty"`
+	CreatedAt    time.Time  `json:"created_at"`
 }
 
 // NewUserInput is the super_admin-supplied data to provision a local account.
@@ -67,12 +68,13 @@ type NewUserInput struct {
 // UpdateUserInput carries the editable fields. Pointers distinguish "not
 // supplied" from "set to zero value" so a partial update never blanks a field.
 type UpdateUserInput struct {
-	FullName  *string
-	Role      *string
-	StoreID   *int
-	Subregion *string
-	IsActive  *bool
-	Phone     *string // DPO contact phone (PDPA s.41)
-	IsDPO     *bool   // designate/clear the account as a published Data Protection Officer
-	Password  *string // when set, resets the password (must pass the policy)
+	FullName     *string
+	Role         *string
+	StoreID      *int
+	Subregion    *string
+	IsActive     *bool
+	Phone        *string // DPO contact phone (PDPA s.41)
+	IsDPO        *bool   // designate/clear the account as a published Data Protection Officer
+	IsPrimaryDPO *bool   // mark as the primary/lead DPO (promoting demotes any other primary)
+	Password     *string // when set, resets the password (must pass the policy)
 }

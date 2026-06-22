@@ -9,9 +9,10 @@ import (
 // derived from accounts flagged is_dpo, not a static config value, so the DPO
 // contact stays correct as designations change.
 type DPOOfficer struct {
-	Name  string `json:"name"`
-	Email string `json:"email"`
-	Phone string `json:"phone"`
+	Name      string `json:"name"`
+	Email     string `json:"email"`
+	Phone     string `json:"phone"`
+	IsPrimary bool   `json:"is_primary"` // the registered / lead officer (at most one)
 }
 
 // DPODirectory is the published DPO block: the controller (company) plus every
@@ -22,12 +23,14 @@ type DPODirectory struct {
 	Officers []DPOOfficer `json:"officers"`
 }
 
-// ListDPOOfficers returns the active accounts designated as DPOs, ordered by name.
+// ListDPOOfficers returns the active accounts designated as DPOs. The primary
+// (lead) officer sorts first so clients can feature it; the rest follow by name.
 func (r *Repo) ListDPOOfficers(ctx context.Context) ([]DPOOfficer, error) {
-	const q = `SELECT COALESCE(full_name, ''), email, COALESCE(phone, '')
+	const q = `SELECT COALESCE(full_name, ''), email, COALESCE(phone, ''),
+		COALESCE(is_primary_dpo, FALSE)
 		FROM users
 		WHERE is_dpo = TRUE AND is_active = TRUE
-		ORDER BY full_name, email`
+		ORDER BY is_primary_dpo DESC, full_name, email`
 	rows, err := r.pool.Query(ctx, q)
 	if err != nil {
 		return nil, fmt.Errorf("pdpa: list dpo officers: %w", err)
@@ -36,7 +39,7 @@ func (r *Repo) ListDPOOfficers(ctx context.Context) ([]DPOOfficer, error) {
 	officers := []DPOOfficer{}
 	for rows.Next() {
 		var o DPOOfficer
-		if err := rows.Scan(&o.Name, &o.Email, &o.Phone); err != nil {
+		if err := rows.Scan(&o.Name, &o.Email, &o.Phone, &o.IsPrimary); err != nil {
 			return nil, fmt.Errorf("pdpa: scan dpo officer: %w", err)
 		}
 		officers = append(officers, o)

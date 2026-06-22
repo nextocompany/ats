@@ -18,6 +18,7 @@ type fakeRepo struct {
 	sessions   map[string]session // keyed by tokenHash
 	touchCalls int
 	ssoUpserts int
+	lastUpdate *UpdateUserInput // the input that reached UpdateUser, for invariant assertions
 }
 
 type userRow struct {
@@ -143,6 +144,8 @@ func (f *fakeRepo) CreateUser(_ context.Context, email, fullName, role string, s
 }
 
 func (f *fakeRepo) UpdateUser(_ context.Context, id uuid.UUID, in UpdateUserInput, hash *string) (User, error) {
+	captured := in
+	f.lastUpdate = &captured
 	email, ok := f.byID[id]
 	if !ok {
 		return User{}, ErrNotFound
@@ -153,6 +156,12 @@ func (f *fakeRepo) UpdateUser(_ context.Context, id uuid.UUID, in UpdateUserInpu
 	}
 	if in.IsActive != nil {
 		r.u.IsActive = *in.IsActive
+	}
+	if in.IsDPO != nil {
+		r.u.IsDPO = *in.IsDPO
+	}
+	if in.IsPrimaryDPO != nil {
+		r.u.IsPrimaryDPO = *in.IsPrimaryDPO
 	}
 	if hash != nil {
 		r.hash = *hash
@@ -383,5 +392,41 @@ func TestUpdateUserSelfLockoutRejected(t *testing.T) {
 	name := "The Boss"
 	if _, err := svc.UpdateUser(context.Background(), id, id.String(), UpdateUserInput{FullName: &name}); err != nil {
 		t.Fatalf("self name edit should be allowed, got %v", err)
+	}
+}
+
+// Designating a primary DPO must also publish them as a DPO: a "primary" that is
+// not even listed would be a broken directory.
+func TestUpdateUserPrimaryDpoImpliesDpo(t *testing.T) {
+	repo := newFakeRepo()
+	id := repo.seed("officer@cpaxtra.com", "screening99", "hr_manager", true)
+	svc := newSvc(repo)
+
+	primary := true
+	u, err := svc.UpdateUser(context.Background(), id, otherAdmin, UpdateUserInput{IsPrimaryDPO: &primary})
+	if err != nil {
+		t.Fatalf("UpdateUser: %v", err)
+	}
+	if repo.lastUpdate == nil || repo.lastUpdate.IsDPO == nil || !*repo.lastUpdate.IsDPO {
+		t.Fatal("promoting to primary DPO must force is_dpo true")
+	}
+	if !u.IsDPO || !u.IsPrimaryDPO {
+		t.Fatalf("want DPO + primary, got is_dpo=%v primary=%v", u.IsDPO, u.IsPrimaryDPO)
+	}
+}
+
+// Clearing the DPO designation must also clear the primary mark, so an unlisted
+// account is never left flagged as the lead officer.
+func TestUpdateUserClearingDpoClearsPrimary(t *testing.T) {
+	repo := newFakeRepo()
+	id := repo.seed("officer@cpaxtra.com", "screening99", "hr_manager", true)
+	svc := newSvc(repo)
+
+	notDpo := false
+	if _, err := svc.UpdateUser(context.Background(), id, otherAdmin, UpdateUserInput{IsDPO: &notDpo}); err != nil {
+		t.Fatalf("UpdateUser: %v", err)
+	}
+	if repo.lastUpdate == nil || repo.lastUpdate.IsPrimaryDPO == nil || *repo.lastUpdate.IsPrimaryDPO {
+		t.Fatal("clearing is_dpo must force is_primary_dpo false")
 	}
 }

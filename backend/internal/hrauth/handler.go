@@ -123,14 +123,15 @@ func (h *Handler) CreateUser(c *fiber.Ctx) error {
 }
 
 type updateUserReq struct {
-	FullName  *string `json:"full_name"`
-	Role      *string `json:"role"`
-	StoreID   *int    `json:"store_id"`
-	Subregion *string `json:"subregion"`
-	IsActive  *bool   `json:"is_active"`
-	Phone     *string `json:"phone"`
-	IsDPO     *bool   `json:"is_dpo"`
-	Password  *string `json:"password"`
+	FullName     *string `json:"full_name"`
+	Role         *string `json:"role"`
+	StoreID      *int    `json:"store_id"`
+	Subregion    *string `json:"subregion"`
+	IsActive     *bool   `json:"is_active"`
+	Phone        *string `json:"phone"`
+	IsDPO        *bool   `json:"is_dpo"`
+	IsPrimaryDPO *bool   `json:"is_primary_dpo"`
+	Password     *string `json:"password"`
 }
 
 // UpdateUser handles PATCH /api/v1/admin/users/:id.
@@ -150,7 +151,8 @@ func (h *Handler) UpdateUser(c *fiber.Ctx) error {
 	user, err := h.svc.UpdateUser(c.UserContext(), id, caller.ID, UpdateUserInput{
 		FullName: req.FullName, Role: req.Role, StoreID: req.StoreID,
 		Subregion: req.Subregion, IsActive: req.IsActive,
-		Phone: req.Phone, IsDPO: req.IsDPO, Password: req.Password,
+		Phone: req.Phone, IsDPO: req.IsDPO, IsPrimaryDPO: req.IsPrimaryDPO,
+		Password: req.Password,
 	})
 	if err != nil {
 		return h.writeUserError(c, err)

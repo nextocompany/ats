@@ -1,0 +1,11 @@
+-- 000037: primary DPO designation (PDPA DPO feature).
+--
+-- Among the published Data Protection Officers (accounts flagged is_dpo), at most
+-- one is the registered / lead officer shown prominently on the privacy notice,
+-- with the rest listed as additional contacts. This is a presentation + governance
+-- distinction, not a permission: a primary DPO is still just a published contact.
+--
+-- Single-primary is enforced in the application (promoting an account to primary
+-- demotes any other primary in the same transaction), so no unique index is needed
+-- and an admin never has to clear the old primary by hand.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_primary_dpo BOOLEAN NOT NULL DEFAULT FALSE;

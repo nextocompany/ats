@@ -248,6 +248,16 @@ func (s *Service) UpdateUser(ctx context.Context, id uuid.UUID, callerID string,
 			return User{}, ErrSelfLockout
 		}
 	}
+	// Keep the DPO flags consistent: a primary DPO must also be a published DPO,
+	// and clearing the DPO designation also clears the primary mark. This way the
+	// directory never carries a "primary" that is not even listed.
+	if in.IsPrimaryDPO != nil && *in.IsPrimaryDPO {
+		t := true
+		in.IsDPO = &t
+	} else if in.IsDPO != nil && !*in.IsDPO {
+		f := false
+		in.IsPrimaryDPO = &f
+	}
 	var passwordHash *string
 	if in.Password != nil {
 		if err := validatePassword(*in.Password); err != nil {

@@ -125,6 +125,8 @@
     "dpoCompany": "หน่วยงาน",
     "dpoName": "ชื่อ",
     "dpoEmail": "อีเมล",
-    "dpoPhone": "โทร"
+    "dpoPhone": "โทร",
+    "dpoPrimaryBadge": "DPO หลัก",
+    "dpoMore": "เจ้าหน้าที่เพิ่มเติม ({count})"
   }
 }
