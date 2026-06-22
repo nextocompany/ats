@@ -63,7 +63,7 @@ export function ReassignControl({ applicationId, app }: { applicationId: string;
       </p>
       <div className="mt-3 flex flex-col gap-2">
         <Select value={value} onValueChange={assignStore} disabled={reassign.isPending}>
-          <SelectTrigger size="sm">
+          <SelectTrigger size="sm" className="w-full">
             <SelectValue placeholder={t("reassignPlaceholder")}>
               {(v: string | null) => {
                 const s = (stores ?? []).find((s) => String(s.store_no) === v)
@@ -72,7 +72,12 @@ export function ReassignControl({ applicationId, app }: { applicationId: string;
               }}
             </SelectValue>
           </SelectTrigger>
-          <SelectContent>
+          {/* Let the dropdown size to the (long) store names instead of locking to
+              the narrow trigger width, capped to the viewport so it never overflows. */}
+          <SelectContent
+            alignItemWithTrigger={false}
+            className="w-auto min-w-(--anchor-width) max-w-[min(28rem,calc(100vw-2rem))]"
+          >
             {(stores ?? []).map((s) => (
               <SelectItem key={s.store_no} value={String(s.store_no)}>
                 {s.store_name} · {s.province}
