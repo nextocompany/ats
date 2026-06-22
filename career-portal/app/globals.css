@@ -16,11 +16,11 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
 
-  /* One neutral superfamily: Anuphan display headings, IBM Plex Sans Thai
-     Looped body/UI. Thai+Latin parity; hierarchy comes from scale, not type. */
+  /* Noto Sans Thai for all UI text (Thai + Latin), one family for body and
+     headings. Thai+Latin parity; hierarchy comes from scale + weight, not type. */
   --font-sans: var(--font-body), system-ui, sans-serif;
   --font-mono: ui-monospace, monospace;
-  --font-heading: var(--font-display), var(--font-body), system-ui, sans-serif;
+  --font-heading: var(--font-body), system-ui, sans-serif;
 
   --color-ring: var(--ring);
   --color-input: var(--input);
@@ -106,8 +106,8 @@
   html {
     @apply font-sans;
   }
-  /* Institutional headings: Anuphan display, balanced wrap, tight tracking, but
-     enough line-height that Thai never clips. Quiet authority, not loud. */
+  /* Headings: Noto Sans Thai, balanced wrap, tight tracking, but enough
+     line-height that Thai never clips. Quiet authority, not loud. */
   h1,
   h2,
   h3,
@@ -119,7 +119,7 @@
   }
   /* Tabular display numerals (scale band, counts). */
   .num {
-    font-family: var(--font-display);
+    font-family: var(--font-body);
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum" 1;
   }
