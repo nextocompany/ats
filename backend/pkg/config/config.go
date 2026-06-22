@@ -37,6 +37,13 @@ type Config struct {
 	AzureDocIntelEndpoint string
 	AzureDocIntelKey      string
 
+	// Azure OpenAI embeddings power semantic (vector) candidate search. Empty
+	// deployment = semantic off (keyword-only). Reuses the AzureOpenAIEndpoint/Key
+	// above. Dims pins the embedding size so a *-large deployment can't silently
+	// break the index (text-embedding-3-small → 1536).
+	AzureOpenAIEmbedDeployment string
+	AzureOpenAIEmbedDims       int
+
 	// Gemini AI settings — required only when AIProvider == "gemini".
 	GeminiAPIKey string
 	GeminiModel  string
@@ -255,6 +262,9 @@ func Load() (*Config, error) {
 		AzureDocIntelEndpoint: os.Getenv("AZURE_DOC_INTEL_ENDPOINT"),
 		AzureDocIntelKey:      os.Getenv("AZURE_DOC_INTEL_KEY"),
 
+		AzureOpenAIEmbedDeployment: os.Getenv("AZURE_OPENAI_EMBED_DEPLOYMENT"),
+		AzureOpenAIEmbedDims:       getenvInt("AZURE_OPENAI_EMBED_DIMS", 1536),
+
 		GeminiAPIKey: os.Getenv("GEMINI_API_KEY"),
 		GeminiModel:  getenv("GEMINI_MODEL", "gemini-2.0-flash"),
 
@@ -444,6 +454,14 @@ func Load() (*Config, error) {
 	if c.UsesAzureSearch() && (c.AzureSearchEndpoint == "" || c.AzureSearchKey == "") {
 		return nil, fmt.Errorf("config: AZURE_SEARCH_ENDPOINT and AZURE_SEARCH_KEY are required when AI_SEARCH_PROVIDER=azure")
 	}
+	if c.AzureOpenAIEmbedDeployment != "" {
+		if c.AzureOpenAIEndpoint == "" || c.AzureOpenAIKey == "" {
+			return nil, fmt.Errorf("config: AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_KEY are required when AZURE_OPENAI_EMBED_DEPLOYMENT is set")
+		}
+		if c.AzureOpenAIEmbedDims <= 0 {
+			return nil, fmt.Errorf("config: AZURE_OPENAI_EMBED_DIMS must be positive")
+		}
+	}
 	if c.UsesRealAuth() && (c.AzureADTenantID == "" || c.AzureADClientID == "") {
 		return nil, fmt.Errorf("config: AZURE_AD_TENANT_ID and AZURE_AD_CLIENT_ID are required when AUTH_PROVIDER=real")
 	}
@@ -562,6 +580,13 @@ func (c *Config) UsesGeminiAI() bool {
 // for candidate search. Mock (Postgres trigram) is the default.
 func (c *Config) UsesAzureSearch() bool {
 	return c.AISearchProvider == AIProviderAzure
+}
+
+// UsesSemanticSearch reports whether hybrid (keyword + vector) candidate search
+// is active. It layers on Azure AI Search and needs an Azure OpenAI embeddings
+// deployment; absent either, search stays keyword-only.
+func (c *Config) UsesSemanticSearch() bool {
+	return c.UsesAzureSearch() && c.AzureOpenAIEmbedDeployment != ""
 }
 
 // IsDevelopment reports whether the process is running in local development.

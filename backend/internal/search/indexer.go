@@ -20,30 +20,41 @@ const maxBatch = 500
 // Doc is one candidate's searchable projection — their best application's
 // status/score/store plus the candidate's name/province/subregion. JSON keys
 // match the index field names (and azure.go's query response) exactly.
+//
+// Content / ContentVector power semantic search. Content is the text blob
+// (name + province + ai_summary) the projection always builds; ContentVector is
+// filled at index time by the embedder. Both are omitempty so a keyword-only
+// index (semantic off) never receives fields it doesn't define: the indexer
+// also clears Content in that mode (see pushChunk).
 type Doc struct {
-	CandidateID     string   `json:"candidate_id"`
-	FullName        string   `json:"full_name"`
-	Province        string   `json:"province"`
-	Subregion       string   `json:"subregion"`
-	AssignedStoreID *int     `json:"assigned_store_id"`
-	Status          string   `json:"status"`
-	AIScore         *float64 `json:"ai_score"`
+	CandidateID     string    `json:"candidate_id"`
+	FullName        string    `json:"full_name"`
+	Province        string    `json:"province"`
+	Subregion       string    `json:"subregion"`
+	AssignedStoreID *int      `json:"assigned_store_id"`
+	Status          string    `json:"status"`
+	AIScore         *float64  `json:"ai_score"`
+	Content         string    `json:"content,omitempty"`
+	ContentVector   []float32 `json:"content_vector,omitempty"`
 }
 
 // Indexer manages the candidate search index: schema creation, document upserts,
-// and document deletes (PDPA erasure). The mock implementation is a no-op so
-// local/CI need no Azure creds.
+// document deletes (PDPA erasure), and index drop (semantic migration). The mock
+// implementation is a no-op so local/CI need no Azure creds.
 type Indexer interface {
 	EnsureIndex(ctx context.Context) error
+	DropIndex(ctx context.Context) error
 	UpsertBatch(ctx context.Context, docs []Doc) error
 	Delete(ctx context.Context, candidateIDs []string) error
 }
 
 // NewIndexer selects the implementation by config — Azure push when
-// AI_SEARCH_PROVIDER=azure, otherwise a no-op (mirrors NewSearcher).
-func NewIndexer(cfg *config.Config) Indexer {
+// AI_SEARCH_PROVIDER=azure, otherwise a no-op (mirrors NewSearcher). A non-nil
+// embedder enables semantic indexing (content + content_vector); nil keeps the
+// index keyword-only. Delete-only callers (PDPA erasure) may pass nil.
+func NewIndexer(cfg *config.Config, embedder Embedder) Indexer {
 	if cfg.UsesAzureSearch() {
-		return newAzureIndexer(cfg)
+		return newAzureIndexer(cfg, embedder)
 	}
 	return noopIndexer{}
 }
@@ -53,23 +64,32 @@ func NewIndexer(cfg *config.Config) Indexer {
 type noopIndexer struct{}
 
 func (noopIndexer) EnsureIndex(context.Context) error        { return nil }
+func (noopIndexer) DropIndex(context.Context) error          { return nil }
 func (noopIndexer) UpsertBatch(context.Context, []Doc) error { return nil }
 func (noopIndexer) Delete(context.Context, []string) error   { return nil }
 
 // azureIndexer pushes documents into an Azure AI Search index via the REST push
-// API. Constructed only when AI_SEARCH_PROVIDER=azure.
+// API. Constructed only when AI_SEARCH_PROVIDER=azure. A non-nil embedder turns
+// on semantic indexing; dims must match the embedder's output and the index
+// schema's vector field.
 type azureIndexer struct {
 	endpoint string
 	key      string
 	index    string
+	dims     int
+	embedder Embedder
+	semantic bool
 	http     *http.Client
 }
 
-func newAzureIndexer(cfg *config.Config) *azureIndexer {
+func newAzureIndexer(cfg *config.Config, embedder Embedder) *azureIndexer {
 	return &azureIndexer{
 		endpoint: strings.TrimRight(cfg.AzureSearchEndpoint, "/"),
 		key:      cfg.AzureSearchKey,
 		index:    cfg.AzureSearchIndex,
+		dims:     cfg.AzureOpenAIEmbedDims,
+		embedder: embedder,
+		semantic: embedder != nil,
 		http:     &http.Client{Timeout: 30 * time.Second},
 	}
 }
@@ -99,8 +119,15 @@ type indexResponse struct {
 
 // UpsertBatch upserts docs in chunks of maxBatch. /docs/index returns 200 even
 // on per-document failures, so each response is inspected and the first failure
-// surfaced.
+// surfaced. When semantic is on, every doc's Content is embedded first; an embed
+// failure fails the whole batch rather than pushing vector-less docs (which would
+// be silently invisible to vector search).
 func (s *azureIndexer) UpsertBatch(ctx context.Context, docs []Doc) error {
+	if s.semantic {
+		if err := s.embedDocs(ctx, docs); err != nil {
+			return err
+		}
+	}
 	for start := 0; start < len(docs); start += maxBatch {
 		end := start + maxBatch
 		if end > len(docs) {
@@ -109,6 +136,29 @@ func (s *azureIndexer) UpsertBatch(ctx context.Context, docs []Doc) error {
 		if err := s.pushChunk(ctx, docs[start:end]); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// embedDocs fills each doc's ContentVector from its Content. Mutates the docs in
+// place (caller owns the slice). The embedder handles its own sub-batching/retry.
+func (s *azureIndexer) embedDocs(ctx context.Context, docs []Doc) error {
+	if len(docs) == 0 {
+		return nil
+	}
+	texts := make([]string, len(docs))
+	for i := range docs {
+		texts[i] = docs[i].Content
+	}
+	vecs, err := s.embedder.Embed(ctx, texts)
+	if err != nil {
+		return fmt.Errorf("search: embed docs: %w", err)
+	}
+	if len(vecs) != len(docs) {
+		return fmt.Errorf("search: embed returned %d vectors for %d docs", len(vecs), len(docs))
+	}
+	for i := range docs {
+		docs[i].ContentVector = vecs[i]
 	}
 	return nil
 }
@@ -136,6 +186,12 @@ func (s *azureIndexer) Delete(ctx context.Context, candidateIDs []string) error 
 func (s *azureIndexer) pushChunk(ctx context.Context, docs []Doc) error {
 	actions := make([]indexAction, 0, len(docs))
 	for _, d := range docs {
+		if !s.semantic {
+			// Keyword-only index has no content/content_vector fields; clearing
+			// them lets omitempty drop them so Azure doesn't reject unknown fields.
+			d.Content = ""
+			d.ContentVector = nil
+		}
 		actions = append(actions, indexAction{Action: "mergeOrUpload", Doc: d})
 	}
 	return s.postActions(ctx, actions)

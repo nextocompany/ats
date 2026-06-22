@@ -117,8 +117,10 @@ func main() {
 		positions.NewRepository(pool),
 	)
 	// Keep the search index fresh as applications are scored (no-op unless
-	// AI_SEARCH_PROVIDER=azure). Best-effort inside the pipeline — never fatal.
-	processor.SetIndexer(search.NewCandidateSync(pool, search.NewIndexer(cfg)))
+	// AI_SEARCH_PROVIDER=azure). A non-nil embedder (AZURE_OPENAI_EMBED_DEPLOYMENT
+	// set) makes scored candidates semantically searchable. Best-effort inside the
+	// pipeline, never fatal.
+	processor.SetIndexer(search.NewCandidateSync(pool, search.NewIndexer(cfg, ai.NewEmbedder(cfg))))
 
 	redisOpt, err := queue.RedisOpt(cfg.RedisURL)
 	if err != nil {
@@ -146,7 +148,7 @@ func main() {
 	// Retention sweep (Sprint 7): anonymize expired candidate PII. The search
 	// indexer (no-op unless AI_SEARCH_PROVIDER=azure) lets erasure also remove the
 	// subject from the search index.
-	retentionSvc := pdpa.NewRetentionService(pool, blobClient, search.NewIndexer(cfg), activity.New(pool), cfg.RetentionDays)
+	retentionSvc := pdpa.NewRetentionService(pool, blobClient, search.NewIndexer(cfg, nil), activity.New(pool), cfg.RetentionDays)
 
 	// Auth cleanup (candidate membership): purge expired OTP/session rows.
 	authCleanupSvc := candidateauth.NewCleanupService(pool)

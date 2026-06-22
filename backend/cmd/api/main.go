@@ -19,6 +19,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/nexto/hr-ats/internal/activity"
+	"github.com/nexto/hr-ats/internal/ai"
 	"github.com/nexto/hr-ats/internal/applications"
 	"github.com/nexto/hr-ats/internal/auth"
 	"github.com/nexto/hr-ats/internal/breach"
@@ -379,13 +380,16 @@ func main() {
 	// Portal DSAR self-service (PDPA Phase 3): an authenticated candidate exports
 	// their own data (s.30 access + s.31 portability) and erases it (s.33; held for
 	// HR when a legal hold applies). Gated by the candidate session.
-	dsarEraser := pdpa.NewRetentionService(pool, blobClient, search.NewIndexer(cfg), activityLog, cfg.RetentionDays)
+	dsarEraser := pdpa.NewRetentionService(pool, blobClient, search.NewIndexer(cfg, nil), activityLog, cfg.RetentionDays)
 	dsar.RegisterRoutes(app, dsar.NewHandler(dsar.New(pool).WithEraser(dsarEraser), activityLog),
 		candidateauth.RequireCandidate(caSvc, cfg.SessionCookieName))
-	// Search indexer: no-op unless AI_SEARCH_PROVIDER=azure. Ensure the index
-	// exists at startup (best-effort — a transient Search outage must not block
-	// the api booting), and keep it fresh on bulk status changes.
-	searchIndexer := search.NewIndexer(cfg)
+	// Search indexer: no-op unless AI_SEARCH_PROVIDER=azure. A non-nil embedder
+	// (set only when AZURE_OPENAI_EMBED_DEPLOYMENT is configured) turns on semantic
+	// indexing/query. Ensure the index exists at startup (best-effort: a transient
+	// Search outage must not block the api booting, and keep it fresh on bulk
+	// status changes.
+	searchEmbedder := ai.NewEmbedder(cfg)
+	searchIndexer := search.NewIndexer(cfg, searchEmbedder)
 	if cfg.UsesAzureSearch() {
 		if err := searchIndexer.EnsureIndex(ctx); err != nil {
 			log.Warn().Err(err).Msg("search: ensure index failed at startup (non-fatal)")
@@ -458,12 +462,12 @@ func main() {
 	// directly; resume URLs are signed on demand and erased on anonymize via the blob
 	// client (passed as both signer and deleter). The eraser cascades account erasure
 	// into full PDPA erasure of the applicant data behind it.
-	memberEraser := pdpa.NewRetentionService(pool, blobClient, search.NewIndexer(cfg), activityLog, cfg.RetentionDays)
+	memberEraser := pdpa.NewRetentionService(pool, blobClient, search.NewIndexer(cfg, nil), activityLog, cfg.RetentionDays)
 	members.RegisterDashboardRoutes(app, members.NewHandler(members.NewRepository(pool), activityLog, blobClient, blobClient).WithEraser(memberEraser))
 	// Candidate search (Sprint 5c) — registered BEFORE profiles so the static
 	// /candidates/search path takes precedence over /candidates/:id. Mock Postgres
 	// trigram by default; Azure AI Search behind config.
-	search.RegisterRoutes(app, search.NewHandler(search.NewSearcher(cfg, pool)))
+	search.RegisterRoutes(app, search.NewHandler(search.NewSearcher(cfg, pool, searchEmbedder)))
 	profiles.RegisterRoutes(app, profiles.NewHandler(candidateRepo, appRepo))
 	// Analytics + report exports (Sprint 5b): on-demand export rides the same
 	// export service the scheduler/worker use; delivery via the notify seam.

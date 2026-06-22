@@ -12,7 +12,7 @@ import (
 )
 
 func TestCandidateIndexSchema(t *testing.T) {
-	raw, err := json.Marshal(candidateIndexSchema("candidates"))
+	raw, err := json.Marshal(candidateIndexSchema("candidates", 1536, false))
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
@@ -26,6 +26,35 @@ func TestCandidateIndexSchema(t *testing.T) {
 	} {
 		if !strings.Contains(s, want) {
 			t.Errorf("schema missing %q\nin: %s", want, s)
+		}
+	}
+	// Keyword-only schema must carry NO vector field or vectorSearch block.
+	for _, absent := range []string{`content_vector`, `vectorSearch`, `vectorSearchProfile`} {
+		if strings.Contains(s, absent) {
+			t.Errorf("keyword schema should not contain %q\nin: %s", absent, s)
+		}
+	}
+}
+
+// TestCandidateIndexSchema_Semantic asserts the vector field + HNSW vectorSearch
+// block appear with the configured dims when semantic is on. Field/property names
+// match Azure AI Search api-version 2024-07-01 (k, vectorSearchProfile,
+// algorithms+profiles), see azure.go vectorQuery for the query side.
+func TestCandidateIndexSchema_Semantic(t *testing.T) {
+	raw, err := json.Marshal(candidateIndexSchema("candidates", 1536, true))
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	s := string(raw)
+	for _, want := range []string{
+		`"name":"content"`,
+		`"name":"content_vector"`, `"type":"Collection(Edm.Single)"`,
+		`"dimensions":1536`, `"vectorSearchProfile":"candidate-hnsw-profile"`,
+		`"vectorSearch":`, `"algorithms":`, `"profiles":`,
+		`"kind":"hnsw"`, `"metric":"cosine"`,
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("semantic schema missing %q\nin: %s", want, s)
 		}
 	}
 }
@@ -218,6 +247,114 @@ func TestDelete_EmptyIsNoop(t *testing.T) {
 		t.Error("expected no HTTP request for empty delete list")
 	}
 }
+
+// fakeEmbedder returns fixed-length vectors (or an error) for the index/query
+// embed-path tests, with no network call.
+type fakeEmbedder struct {
+	dims int
+	err  error
+}
+
+func (f fakeEmbedder) Embed(_ context.Context, texts []string) ([][]float32, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	out := make([][]float32, len(texts))
+	for i := range texts {
+		v := make([]float32, f.dims)
+		for j := range v {
+			v[j] = float32(i + 1) // distinct, non-zero per doc
+		}
+		out[i] = v
+	}
+	return out, nil
+}
+
+// TestUpsertBatch_SemanticEmbedsAndSendsVector verifies that with an embedder the
+// indexer embeds each doc's Content and posts content + content_vector.
+func TestUpsertBatch_SemanticEmbedsAndSendsVector(t *testing.T) {
+	var got struct {
+		Value []map[string]any `json:"value"`
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(body, &got)
+		_, _ = io.WriteString(w, `{"value":[{"key":"c1","status":true,"statusCode":200}]}`)
+	}))
+	defer srv.Close()
+
+	idx := &azureIndexer{endpoint: srv.URL, key: "k", index: "candidates",
+		dims: 8, embedder: fakeEmbedder{dims: 8}, semantic: true, http: http.DefaultClient}
+	err := idx.UpsertBatch(context.Background(), []Doc{{CandidateID: "c1", FullName: "สมชาย", Content: "สมชาย กรุงเทพ"}})
+	if err != nil {
+		t.Fatalf("UpsertBatch: %v", err)
+	}
+	if len(got.Value) != 1 {
+		t.Fatalf("expected 1 action, got %d", len(got.Value))
+	}
+	a := got.Value[0]
+	if a["content"] != "สมชาย กรุงเทพ" {
+		t.Errorf("content = %v, want the blob", a["content"])
+	}
+	vec, ok := a["content_vector"].([]any)
+	if !ok || len(vec) != 8 {
+		t.Errorf("content_vector = %v, want 8-element array", a["content_vector"])
+	}
+}
+
+// TestUpsertBatch_KeywordStripsContent ensures a keyword-only indexer (no
+// embedder) never sends content/content_vector: the index has no such fields.
+func TestUpsertBatch_KeywordStripsContent(t *testing.T) {
+	var got struct {
+		Value []map[string]any `json:"value"`
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(body, &got)
+		_, _ = io.WriteString(w, `{"value":[{"key":"c1","status":true,"statusCode":200}]}`)
+	}))
+	defer srv.Close()
+
+	idx := newTestIndexer(srv.URL) // semantic=false, embedder=nil
+	// Content is populated by the projection even in keyword mode; it must be stripped.
+	if err := idx.UpsertBatch(context.Background(), []Doc{{CandidateID: "c1", Content: "should be dropped"}}); err != nil {
+		t.Fatalf("UpsertBatch: %v", err)
+	}
+	a := got.Value[0]
+	if _, present := a["content"]; present {
+		t.Errorf("keyword push must not include content, got %v", a["content"])
+	}
+	if _, present := a["content_vector"]; present {
+		t.Error("keyword push must not include content_vector")
+	}
+}
+
+// TestUpsertBatch_EmbedFailureFailsBatch confirms an embed error aborts the upsert
+// rather than pushing vector-less (silently unsearchable) docs.
+func TestUpsertBatch_EmbedFailureFailsBatch(t *testing.T) {
+	called := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		called = true
+		_, _ = io.WriteString(w, `{"value":[]}`)
+	}))
+	defer srv.Close()
+
+	idx := &azureIndexer{endpoint: srv.URL, key: "k", index: "candidates",
+		dims: 8, embedder: fakeEmbedder{err: errEmbed}, semantic: true, http: http.DefaultClient}
+	err := idx.UpsertBatch(context.Background(), []Doc{{CandidateID: "c1", Content: "x"}})
+	if err == nil {
+		t.Fatal("expected error when embedding fails")
+	}
+	if called {
+		t.Error("must not push docs when embedding failed")
+	}
+}
+
+var errEmbed = errFake("embed boom")
+
+type errFake string
+
+func (e errFake) Error() string { return string(e) }
 
 // idFromInt makes a stable distinct id string per index without Math/rand.
 func idFromInt(i int) string {
