@@ -590,6 +590,9 @@
     "sourceLocal": "Local",
     "dpoDesignate": "Data Protection Officer",
     "dpoDesignateHelp": "Publish this account as a DPO on the privacy notice (PDPA s.41).",
+    "dpoPrimary": "Primary (lead) DPO",
+    "dpoPrimaryHelp": "Feature this officer on the privacy notice. Promoting demotes any other primary.",
+    "dpoPrimaryBadge": "Lead DPO",
     "fieldPhone": "DPO phone",
     "phonePlaceholder": "e.g. 02-000-0000",
     "dpoBadge": "DPO"
@@ -968,6 +971,7 @@
     "consentVersionLabel": "Version {version}",
     "consentGiven": "Given",
     "consentWithdrawn": "Withdrawn",
+    "dpoMore": "+{count} more officers (view all)",
     "dpoUnset": "No DPO has been designated yet. Set one in Admin → user accounts."
   },
   "privacy": {
@@ -983,6 +987,8 @@
     "dpoName": "Name",
     "dpoEmail": "Email",
     "dpoPhone": "Phone",
+    "dpoPrimaryBadge": "Lead DPO",
+    "dpoMore": "Additional officers ({count})",
     "dpoUnset": "DPO contact is not configured yet. Set PDPA_DPO_* on the server.",
     "consoleLink": "Action data-subject requests and look up consent in the <a>PDPA / DPO console</a>"
   },

@@ -98,7 +98,9 @@ export function UserManagement() {
                         {u.source === "sso" ? t("sourceSso") : t("sourceLocal")}
                       </Badge>
                       {u.is_dpo ? (
-                        <Badge className="text-[10px] font-medium uppercase tracking-wide">{t("dpoBadge")}</Badge>
+                        <Badge className="text-[10px] font-medium uppercase tracking-wide">
+                          {u.is_primary_dpo ? t("dpoPrimaryBadge") : t("dpoBadge")}
+                        </Badge>
                       ) : null}
                     </div>
                     <div className="text-xs text-muted-foreground">{u.email}</div>
@@ -260,6 +262,7 @@ function EditUserDialog({ user, onClose }: { user: HRUser | null; onClose: () =>
   const [subregion, setSubregion] = useState("");
   const [active, setActive] = useState(true);
   const [isDpo, setIsDpo] = useState(false);
+  const [isPrimaryDpo, setIsPrimaryDpo] = useState(false);
   const [phone, setPhone] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [hydratedFor, setHydratedFor] = useState<string | null>(null);
@@ -274,6 +277,7 @@ function EditUserDialog({ user, onClose }: { user: HRUser | null; onClose: () =>
     setSubregion(user.subregion ?? "");
     setActive(user.is_active);
     setIsDpo(user.is_dpo);
+    setIsPrimaryDpo(user.is_primary_dpo);
     setPhone(user.phone ?? "");
     setNewPassword("");
     update.reset();
@@ -295,6 +299,9 @@ function EditUserDialog({ user, onClose }: { user: HRUser | null; onClose: () =>
     if (storeId.trim()) input.store_id = Number(storeId);
     if (subregion.trim()) input.subregion = subregion.trim();
     input.is_dpo = isDpo;
+    // A primary mark only applies to a published DPO; clear it otherwise so the
+    // backend invariant and the UI never disagree.
+    input.is_primary_dpo = isDpo && isPrimaryDpo;
     input.phone = phone.trim();
     if (newPassword) input.password = newPassword;
     await update.mutateAsync({ id: user.id, input }, { onSuccess: close });
@@ -348,13 +355,24 @@ function EditUserDialog({ user, onClose }: { user: HRUser | null; onClose: () =>
             <Switch checked={isDpo} onCheckedChange={setIsDpo} />
           </div>
           {isDpo && (
-            <Field label={t("fieldPhone")}>
-              <Input
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder={t("phonePlaceholder")}
-              />
-            </Field>
+            <>
+              {/* Primary/lead DPO: the one featured on the privacy notice. Promoting
+                  this account demotes any other primary (enforced server-side). */}
+              <div className="flex items-center justify-between rounded-lg border border-hairline px-3 py-2.5">
+                <div>
+                  <p className="text-sm font-medium text-foreground">{t("dpoPrimary")}</p>
+                  <p className="text-xs text-muted-foreground">{t("dpoPrimaryHelp")}</p>
+                </div>
+                <Switch checked={isPrimaryDpo} onCheckedChange={setIsPrimaryDpo} />
+              </div>
+              <Field label={t("fieldPhone")}>
+                <Input
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder={t("phonePlaceholder")}
+                />
+              </Field>
+            </>
           )}
           {/* SSO accounts have no password; password reset applies to local accounts only. */}
           {user?.source !== "sso" && (

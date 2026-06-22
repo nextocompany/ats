@@ -595,6 +595,7 @@ export interface HRUser {
   source: "local" | "sso";
   phone?: string;
   is_dpo: boolean;
+  is_primary_dpo: boolean;
   last_login_at?: string | null;
   created_at: string;
 }
@@ -618,6 +619,7 @@ export interface UpdateHRUserInput {
   is_active?: boolean;
   phone?: string;
   is_dpo?: boolean;
+  is_primary_dpo?: boolean;
   password?: string;
 }
 
@@ -720,6 +722,7 @@ export interface DpoOfficer {
   name: string;
   email: string;
   phone: string;
+  is_primary: boolean;
 }
 
 // DpoDirectory mirrors pdpa.DPODirectory: the controller (company) plus every

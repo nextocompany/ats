@@ -590,6 +590,9 @@
     "sourceLocal": "ภายใน",
     "dpoDesignate": "เจ้าหน้าที่คุ้มครองข้อมูล (DPO)",
     "dpoDesignateHelp": "เผยแพร่บัญชีนี้เป็น DPO บนประกาศความเป็นส่วนตัว (PDPA ม.41)",
+    "dpoPrimary": "DPO หลัก",
+    "dpoPrimaryHelp": "แสดงเจ้าหน้าที่คนนี้เป็นหลักบนประกาศความเป็นส่วนตัว การตั้งเป็นหลักจะปลดคนหลักเดิมโดยอัตโนมัติ",
+    "dpoPrimaryBadge": "DPO หลัก",
     "fieldPhone": "เบอร์โทร DPO",
     "phonePlaceholder": "เช่น 02-000-0000",
     "dpoBadge": "DPO"
@@ -968,6 +971,7 @@
     "consentVersionLabel": "เวอร์ชัน {version}",
     "consentGiven": "ให้ความยินยอม",
     "consentWithdrawn": "ถอนความยินยอม",
+    "dpoMore": "อีก {count} ท่าน (ดูทั้งหมด)",
     "dpoUnset": "ยังไม่ได้กำหนด DPO กำหนดได้ที่ Admin → บัญชีผู้ใช้"
   },
   "privacy": {
@@ -983,6 +987,8 @@
     "dpoName": "ชื่อ",
     "dpoEmail": "อีเมล",
     "dpoPhone": "โทร",
+    "dpoPrimaryBadge": "DPO หลัก",
+    "dpoMore": "เจ้าหน้าที่เพิ่มเติม ({count})",
     "dpoUnset": "ยังไม่ได้ตั้งค่าข้อมูลติดต่อ DPO กรุณาตั้งค่า PDPA_DPO_* ในระบบ",
     "consoleLink": "จัดการคำขอของเจ้าของข้อมูลและตรวจสอบความยินยอมได้ที่ <a>คอนโซล PDPA / DPO</a>"
   },

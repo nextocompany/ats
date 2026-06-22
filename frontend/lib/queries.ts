@@ -109,7 +109,14 @@ export function useUpdateHRUser() {
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: UpdateHRUserInput }) =>
       api.patch<HRUser>(`/api/v1/admin/users/${id}`, input).then((r) => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["hr-users"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["hr-users"] });
+      // Editing is_dpo/phone changes the published DPO directory; refresh the
+      // DPO reads (privacy page) and the PDPA console overview so a newly
+      // designated officer appears without a hard reload.
+      qc.invalidateQueries({ queryKey: ["pdpa", "dpo"] });
+      qc.invalidateQueries({ queryKey: ["pdpa", "overview"] });
+    },
   });
 }
 

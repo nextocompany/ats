@@ -29,7 +29,8 @@ func NewRepository(pool *pgxpool.Pool) Repository {
 const userColumns = `id, email, COALESCE(full_name, ''), COALESCE(role, ''),
 	store_id, COALESCE(subregion, ''), is_active,
 	(password_hash IS NOT NULL) AS has_password, last_login_at, created_at,
-	COALESCE(source, 'local'), COALESCE(phone, ''), COALESCE(is_dpo, FALSE)`
+	COALESCE(source, 'local'), COALESCE(phone, ''), COALESCE(is_dpo, FALSE),
+	COALESCE(is_primary_dpo, FALSE)`
 
 // scanUser reads a row in userColumns order.
 func scanUser(row pgx.Row) (User, error) {
@@ -38,7 +39,7 @@ func scanUser(row pgx.Row) (User, error) {
 		&u.ID, &u.Email, &u.FullName, &u.Role,
 		&u.StoreID, &u.Subregion, &u.IsActive,
 		&u.HasPassword, &u.LastLoginAt, &u.CreatedAt,
-		&u.Source, &u.Phone, &u.IsDPO,
+		&u.Source, &u.Phone, &u.IsDPO, &u.IsPrimaryDPO,
 	); err != nil {
 		return User{}, err
 	}
@@ -55,7 +56,7 @@ func (r *pgRepository) FindCredentialsByEmail(ctx context.Context, email string)
 		&u.ID, &u.Email, &u.FullName, &u.Role,
 		&u.StoreID, &u.Subregion, &u.IsActive,
 		&u.HasPassword, &u.LastLoginAt, &u.CreatedAt,
-		&u.Source, &u.Phone, &u.IsDPO, &hash,
+		&u.Source, &u.Phone, &u.IsDPO, &u.IsPrimaryDPO, &hash,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return User{}, "", ErrNotFound
@@ -88,7 +89,8 @@ func (r *pgRepository) FindSessionUser(ctx context.Context, tokenHash string) (U
 	const q = `SELECT u.id, u.email, COALESCE(u.full_name, ''), COALESCE(u.role, ''),
 		u.store_id, COALESCE(u.subregion, ''), u.is_active,
 		(u.password_hash IS NOT NULL), u.last_login_at, u.created_at,
-		COALESCE(u.source, 'local'), COALESCE(u.phone, ''), COALESCE(u.is_dpo, FALSE)
+		COALESCE(u.source, 'local'), COALESCE(u.phone, ''), COALESCE(u.is_dpo, FALSE),
+		COALESCE(u.is_primary_dpo, FALSE)
 		FROM hr_sessions s JOIN users u ON u.id = s.user_id
 		WHERE s.token_hash = $1 AND s.revoked_at IS NULL AND s.expires_at > now()
 		  AND u.is_active = TRUE`
@@ -256,6 +258,9 @@ func (r *pgRepository) UpdateUser(ctx context.Context, id uuid.UUID, in UpdateUs
 	if in.IsDPO != nil {
 		add("is_dpo", *in.IsDPO)
 	}
+	if in.IsPrimaryDPO != nil {
+		add("is_primary_dpo", *in.IsPrimaryDPO)
+	}
 	if passwordHash != nil {
 		add("password_hash", *passwordHash)
 		set = append(set, "password_updated_at = now()")
@@ -266,12 +271,41 @@ func (r *pgRepository) UpdateUser(ctx context.Context, id uuid.UUID, in UpdateUs
 	args = append(args, id)
 	q := fmt.Sprintf(`UPDATE users SET %s WHERE id = $%d RETURNING %s`,
 		strings.Join(set, ", "), len(args), userColumns)
-	u, err := scanUser(r.pool.QueryRow(ctx, q, args...))
+
+	// The common case is a plain single-row update. Promoting an account to the
+	// primary DPO is the exception: at most one primary may exist, so demote any
+	// other primary first, atomically, before this row is set.
+	promoting := in.IsPrimaryDPO != nil && *in.IsPrimaryDPO
+	if !promoting {
+		u, err := scanUser(r.pool.QueryRow(ctx, q, args...))
+		if errors.Is(err, pgx.ErrNoRows) {
+			return User{}, ErrNotFound
+		}
+		if err != nil {
+			return User{}, fmt.Errorf("hrauth: update user: %w", err)
+		}
+		return u, nil
+	}
+
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return User{}, fmt.Errorf("hrauth: update user (begin): %w", err)
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx,
+		`UPDATE users SET is_primary_dpo = FALSE WHERE is_primary_dpo = TRUE AND id <> $1`, id,
+	); err != nil {
+		return User{}, fmt.Errorf("hrauth: demote primary dpo: %w", err)
+	}
+	u, err := scanUser(tx.QueryRow(ctx, q, args...))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return User{}, ErrNotFound
 	}
 	if err != nil {
 		return User{}, fmt.Errorf("hrauth: update user: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return User{}, fmt.Errorf("hrauth: update user (commit): %w", err)
 	}
 	return u, nil
 }
