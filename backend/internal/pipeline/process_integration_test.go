@@ -62,6 +62,15 @@ func (f fakeParser) Parse(context.Context, string, string) (ai.Profile, error) {
 	return f.profile, f.err
 }
 
+// recordingIndexer captures the candidate ids the pipeline asks to index, so a
+// test can assert it indexes the canonical (post-dedup) candidate.
+type recordingIndexer struct{ ids []uuid.UUID }
+
+func (r *recordingIndexer) Index(_ context.Context, id uuid.UUID) error {
+	r.ids = append(r.ids, id)
+	return nil
+}
+
 type fixture struct {
 	pool *pgxpool.Pool
 	blob *blob.Client
@@ -245,6 +254,46 @@ func TestPipeline_DuplicateRepointed(t *testing.T) {
 	}
 	if app.DedupState != dedup.StateAutoMerged {
 		t.Errorf("expected dedup_state auto_merged, got %q", app.DedupState)
+	}
+}
+
+// TestPipeline_IndexesCanonicalAfterDedup is the regression guard for the
+// index-staleness bug: when an upload is deduped onto an existing canonical, the
+// pipeline must index the CANONICAL candidate id, not the just-created (now
+// is_duplicate_of) one. Indexing the deduped id no-ops against the index
+// projection (which excludes duplicates), leaving the canonical's search doc
+// stale (missing this better-scoring application).
+func TestPipeline_IndexesCanonicalAfterDedup(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+	pos := seedPosition(t, f, 1, 6)
+	seedStoreVacancy(t, f, pos)
+
+	canonical, err := f.cand.Create(ctx, candidates.Candidate{
+		FullName: "สมชาย ใจดี", Phone: "0812345678", Status: "available",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	p := seedCandidateApp(t, f, pos)
+	dedupedID := uuid.MustParse(p.CandidateID) // the new candidate that will be merged away
+
+	rec := &recordingIndexer{}
+	proc := f.processor(ai.NewMockOCR(), ai.NewMockParser())
+	proc.SetIndexer(rec)
+	if err := proc.HandleProcessApplication(ctx, task(t, p)); err != nil {
+		t.Fatalf("pipeline error: %v", err)
+	}
+
+	if len(rec.ids) != 1 {
+		t.Fatalf("expected exactly 1 index call, got %d", len(rec.ids))
+	}
+	if rec.ids[0] == dedupedID {
+		t.Fatal("indexed the deduped candidate id - no-ops against the projection, canonical doc goes stale")
+	}
+	if rec.ids[0] != canonical.ID {
+		t.Errorf("indexed %v, want canonical %v", rec.ids[0], canonical.ID)
 	}
 }
 

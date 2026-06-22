@@ -123,7 +123,8 @@ func (pr *Processor) HandleProcessApplication(ctx context.Context, t *asynq.Task
 		Str("blob", payload.BlobName).
 		Logger()
 
-	if err := pr.run(ctx, payload, appID, candID, positionID, logger); err != nil {
+	canonicalID, err := pr.run(ctx, payload, appID, candID, positionID, logger)
+	if err != nil {
 		logger.Error().Err(err).Msg("pipeline failed")
 		if serr := pr.apps.SetStatus(ctx, appID, applications.StatusFailed); serr != nil {
 			logger.Error().Err(serr).Msg("failed to mark application failed")
@@ -131,48 +132,58 @@ func (pr *Processor) HandleProcessApplication(ctx context.Context, t *asynq.Task
 		return err
 	}
 
-	// Keep the search index fresh — best-effort. The candidate's searchable state
-	// (status/score/store) is now final; a stale index must never fail the task.
-	if err := pr.indexer.Index(ctx, candID); err != nil {
+	// Keep the search index fresh - best-effort. Index the CANONICAL candidate
+	// (post-dedup), not the pre-dedup payload id: a deduped candidate is marked
+	// is_duplicate_of and is excluded from the index projection, so indexing it
+	// would no-op and leave the canonical doc stale (missing this application).
+	// The canonical's searchable state (status/score/store) is now final; a stale
+	// index must never fail the task.
+	if err := pr.indexer.Index(ctx, canonicalID); err != nil {
 		logger.Warn().Err(err).Msg("search index update failed (non-fatal)")
 	}
 	return nil
 }
 
-func (pr *Processor) run(ctx context.Context, p queue.ProcessApplicationPayload, appID, candID, positionID uuid.UUID, logger zerolog.Logger) error {
+// run executes the pipeline and returns the CANONICAL candidate id (post-dedup)
+// so the caller indexes the right candidate. The returned id is the pre-dedup
+// candID until Step 3 resolves a canonical, so even an early error returns a
+// sensible (if unused) id.
+func (pr *Processor) run(ctx context.Context, p queue.ProcessApplicationPayload, appID, candID, positionID uuid.UUID, logger zerolog.Logger) (uuid.UUID, error) {
+	canonicalID := candID
+
 	// Step 1 — OCR.
 	raw, err := pr.blob.Download(ctx, p.BlobName)
 	if err != nil {
-		return fmt.Errorf("pipeline: download: %w", err)
+		return canonicalID, fmt.Errorf("pipeline: download: %w", err)
 	}
 	ocrRes, err := pr.ocr.Extract(ctx, raw, p.FileType)
 	if err != nil {
-		return fmt.Errorf("pipeline: ocr: %w", err)
+		return canonicalID, fmt.Errorf("pipeline: ocr: %w", err)
 	}
 	needsReview := ocrRes.Confidence < ocrConfidenceThreshold
 	if needsReview {
-		logger.Warn().Float64("confidence", ocrRes.Confidence).Msg("low OCR confidence — flagging manual review")
+		logger.Warn().Float64("confidence", ocrRes.Confidence).Msg("low OCR confidence - flagging manual review")
 	}
 	ocrURL, err := pr.blob.Upload(ctx, fmt.Sprintf("ocr/%s/text.md", appID), []byte(ocrRes.Text), "text/markdown")
 	if err != nil {
-		return fmt.Errorf("pipeline: upload ocr text: %w", err)
+		return canonicalID, fmt.Errorf("pipeline: upload ocr text: %w", err)
 	}
 
 	// Step 2 — CV parse.
 	profile, err := pr.parser.Parse(ctx, ocrRes.Text, p.PositionID)
 	if err != nil {
-		return fmt.Errorf("pipeline: parse: %w", err)
+		return canonicalID, fmt.Errorf("pipeline: parse: %w", err)
 	}
 	if err := profile.Validate(); err != nil {
-		return fmt.Errorf("pipeline: invalid profile: %w", err)
+		return canonicalID, fmt.Errorf("pipeline: invalid profile: %w", err)
 	}
 	profileJSON, err := json.MarshalIndent(profile, "", "  ")
 	if err != nil {
-		return fmt.Errorf("pipeline: marshal profile: %w", err)
+		return canonicalID, fmt.Errorf("pipeline: marshal profile: %w", err)
 	}
 	profileURL, err := pr.blob.Upload(ctx, fmt.Sprintf("profiles/%s/parsed_profile.json", appID), profileJSON, "application/json")
 	if err != nil {
-		return fmt.Errorf("pipeline: upload profile: %w", err)
+		return canonicalID, fmt.Errorf("pipeline: upload profile: %w", err)
 	}
 	if err := pr.candidates.UpdateProfileFields(ctx, candID, candidates.ProfileFields{
 		FullName: profile.Personal.Name,
@@ -180,7 +191,7 @@ func (pr *Processor) run(ctx context.Context, p queue.ProcessApplicationPayload,
 		Email:    profile.Personal.Email,
 		Address:  profile.Personal.Address,
 	}); err != nil {
-		return fmt.Errorf("pipeline: update candidate: %w", err)
+		return canonicalID, fmt.Errorf("pipeline: update candidate: %w", err)
 	}
 	if err := pr.apps.SetParseResults(ctx, appID, applications.ParseResult{
 		OCRTextBlobURL:       ocrURL,
@@ -188,23 +199,23 @@ func (pr *Processor) run(ctx context.Context, p queue.ProcessApplicationPayload,
 		OCRConfidence:        ocrRes.Confidence,
 		NeedsManualReview:    needsReview,
 	}); err != nil {
-		return fmt.Errorf("pipeline: set parse results: %w", err)
+		return canonicalID, fmt.Errorf("pipeline: set parse results: %w", err)
 	}
 
 	// Step 3 — Dedup. Reconcile the just-created candidate against existing ones.
 	decision, err := pr.dedup.Reconcile(ctx, candID, profile.Personal.Name, profile.Personal.Phone, profile.Personal.Email, profile.Personal.IDCard)
 	if err != nil {
-		return fmt.Errorf("pipeline: dedup: %w", err)
+		return canonicalID, fmt.Errorf("pipeline: dedup: %w", err)
 	}
-	canonicalID := decision.CanonicalID
+	canonicalID = decision.CanonicalID
 	if decision.State != dedup.StateNone {
 		if err := pr.apps.SetDedupState(ctx, appID, decision.State, decision.Confidence); err != nil {
-			return fmt.Errorf("pipeline: set dedup state: %w", err)
+			return canonicalID, fmt.Errorf("pipeline: set dedup state: %w", err)
 		}
 	}
 	if canonicalID != candID {
 		if err := pr.apps.SetCanonicalCandidate(ctx, appID, canonicalID); err != nil {
-			return fmt.Errorf("pipeline: repoint candidate: %w", err)
+			return canonicalID, fmt.Errorf("pipeline: repoint candidate: %w", err)
 		}
 		logger.Info().Str("canonical", canonicalID.String()).Str("state", decision.State).Msg("duplicate reconciled")
 	}
@@ -212,11 +223,11 @@ func (pr *Processor) run(ctx context.Context, p queue.ProcessApplicationPayload,
 	// Load the position (Master JD) + canonical candidate (for province).
 	pos, err := pr.positions.FindByID(ctx, positionID)
 	if err != nil {
-		return fmt.Errorf("pipeline: load position: %w", err)
+		return canonicalID, fmt.Errorf("pipeline: load position: %w", err)
 	}
 	cand, err := pr.candidates.FindByID(ctx, canonicalID)
 	if err != nil {
-		return fmt.Errorf("pipeline: load candidate: %w", err)
+		return canonicalID, fmt.Errorf("pipeline: load candidate: %w", err)
 	}
 	jd := scoring.JD{
 		Title:               pos.TitleTH,
@@ -230,32 +241,32 @@ func (pr *Processor) run(ctx context.Context, p queue.ProcessApplicationPayload,
 	// Step 4 — Score (location signal first so it folds into the total).
 	locationScore, err := pr.assigner.LocationScore(ctx, cand.Province, positionID)
 	if err != nil {
-		return fmt.Errorf("pipeline: location score: %w", err)
+		return canonicalID, fmt.Errorf("pipeline: location score: %w", err)
 	}
 	result, err := pr.scorer.Score(ctx, profile, jd, locationScore)
 	if err != nil {
-		return fmt.Errorf("pipeline: score: %w", err)
+		return canonicalID, fmt.Errorf("pipeline: score: %w", err)
 	}
 
 	// Step 5 — Must-have gate.
 	if !result.MustHavePassed {
 		if err := pr.persistScore(ctx, appID, applications.StatusRejected, result); err != nil {
-			return err
+			return canonicalID, err
 		}
 		logger.Info().Int("score", result.Total).Msg("auto-rejected (must-have gate)")
-		return nil
+		return canonicalID, nil
 	}
 
 	// Step 6 — Branch assignment.
 	assignment, err := pr.assigner.Assign(ctx, cand.Province, positionID, pos.FormatTypes)
 	if err != nil {
-		return fmt.Errorf("pipeline: assign: %w", err)
+		return canonicalID, fmt.Errorf("pipeline: assign: %w", err)
 	}
 	if err := pr.apps.SetAssignment(ctx, appID, assignment.StoreNo, assignment.TalentPool); err != nil {
-		return fmt.Errorf("pipeline: set assignment: %w", err)
+		return canonicalID, fmt.Errorf("pipeline: set assignment: %w", err)
 	}
 	if err := pr.persistScore(ctx, appID, applications.StatusScored, result); err != nil {
-		return err
+		return canonicalID, err
 	}
 
 	logger.Info().
@@ -266,7 +277,7 @@ func (pr *Processor) run(ctx context.Context, p queue.ProcessApplicationPayload,
 
 	// Step 7 — best-effort HR notification (email + Teams) for store-assigned hires.
 	pr.notifyScored(ctx, appID, cand.FullName, pos.TitleTH, result.Total, assignment.StoreNo)
-	return nil
+	return canonicalID, nil
 }
 
 // notifyScored pings store HR that a new candidate was screened, scored, and
