@@ -41,14 +41,17 @@ func TestSendTeams_PostsAdaptiveCard(t *testing.T) {
 		t.Fatalf("attachment not an adaptive card: %+v", got.Attachments)
 	}
 	body := got.Attachments[0].Content.Body
-	if got.Attachments[0].Content.Type != "AdaptiveCard" || len(body) != 3 {
-		t.Fatalf("want AdaptiveCard with 3 blocks (title + 2 lines), got type=%q blocks=%d",
+	if got.Attachments[0].Content.Type != "AdaptiveCard" || len(body) != 4 {
+		t.Fatalf("want AdaptiveCard with 4 blocks (brand + title + 2 lines), got type=%q blocks=%d",
 			got.Attachments[0].Content.Type, len(body))
 	}
-	if body[0].Text != "หัวข้อ" || body[0].Weight != "Bolder" {
-		t.Fatalf("first block should be the bold title, got %+v", body[0])
+	if body[0].Text != teamsBrandHeader {
+		t.Fatalf("first block should be the brand header %q, got %+v", teamsBrandHeader, body[0])
 	}
-	if body[1].Text != "บรรทัด 1" || body[2].Text != "บรรทัด 2" {
+	if body[1].Text != "หัวข้อ" || body[1].Weight != "Bolder" {
+		t.Fatalf("second block should be the bold title, got %+v", body[1])
+	}
+	if body[2].Text != "บรรทัด 1" || body[3].Text != "บรรทัด 2" {
 		t.Fatalf("body lines not split per TextBlock: %+v", body)
 	}
 }
