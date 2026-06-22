@@ -7,13 +7,53 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 )
 
-// sendTeams posts a plain-text message to an MS Teams Incoming Webhook. The
-// webhook URL is the secret (no auth header). Mirrors the LINE push HTTP pattern
-// in rest.go. Teams replies 200 with body "1" on success — any 2xx is success.
-func sendTeams(ctx context.Context, hc *http.Client, webhookURL, text string) error {
-	payload := map[string]string{"text": text}
+// sendTeams posts an Adaptive Card to an MS Teams channel webhook. The payload is
+// the {"type":"message","attachments":[adaptive card]} shape that a Power Automate
+// "Workflows" flow posts to a channel natively (Microsoft's supported replacement
+// for the retired O365 Incoming Webhook connector, which accepted plain
+// {"text":...}). title renders as a bold heading; text is split into one TextBlock
+// per line so multi-field HR notifications keep their layout. Workflows replies
+// 202 Accepted on success, so any 2xx is success.
+func sendTeams(ctx context.Context, hc *http.Client, webhookURL, title, text string) error {
+	blocks := make([]map[string]any, 0, 8)
+	if strings.TrimSpace(title) != "" {
+		blocks = append(blocks, map[string]any{
+			"type":   "TextBlock",
+			"text":   title,
+			"weight": "Bolder",
+			"size":   "Medium",
+			"wrap":   true,
+		})
+	}
+	// One TextBlock per non-empty line: a TextBlock does not render "\n" as a
+	// break, so the body's per-field lines must become separate blocks.
+	for _, line := range strings.Split(text, "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		blocks = append(blocks, map[string]any{
+			"type":    "TextBlock",
+			"text":    line,
+			"wrap":    true,
+			"spacing": "Small",
+		})
+	}
+
+	payload := map[string]any{
+		"type": "message",
+		"attachments": []map[string]any{{
+			"contentType": "application/vnd.microsoft.card.adaptive",
+			"content": map[string]any{
+				"$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+				"type":    "AdaptiveCard",
+				"version": "1.4",
+				"body":    blocks,
+			},
+		}},
+	}
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("notify: marshal teams card: %w", err)

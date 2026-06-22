@@ -11,19 +11,45 @@ import (
 	"github.com/nexto/hr-ats/pkg/email"
 )
 
-func TestSendTeams_PostsText(t *testing.T) {
-	var got map[string]string
+func TestSendTeams_PostsAdaptiveCard(t *testing.T) {
+	var got struct {
+		Type        string `json:"type"`
+		Attachments []struct {
+			ContentType string `json:"contentType"`
+			Content     struct {
+				Type string `json:"type"`
+				Body []struct {
+					Text   string `json:"text"`
+					Weight string `json:"weight"`
+				} `json:"body"`
+			} `json:"content"`
+		} `json:"attachments"`
+	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewDecoder(r.Body).Decode(&got)
-		_, _ = w.Write([]byte("1"))
+		w.WriteHeader(http.StatusAccepted) // Workflows replies 202
 	}))
 	defer srv.Close()
 
-	if err := sendTeams(context.Background(), srv.Client(), srv.URL, "hello team"); err != nil {
+	if err := sendTeams(context.Background(), srv.Client(), srv.URL, "หัวข้อ", "บรรทัด 1\nบรรทัด 2"); err != nil {
 		t.Fatalf("sendTeams err: %v", err)
 	}
-	if got["text"] != "hello team" {
-		t.Fatalf("teams payload text=%q, want %q", got["text"], "hello team")
+	if got.Type != "message" {
+		t.Fatalf("payload type=%q, want message", got.Type)
+	}
+	if len(got.Attachments) != 1 || got.Attachments[0].ContentType != "application/vnd.microsoft.card.adaptive" {
+		t.Fatalf("attachment not an adaptive card: %+v", got.Attachments)
+	}
+	body := got.Attachments[0].Content.Body
+	if got.Attachments[0].Content.Type != "AdaptiveCard" || len(body) != 3 {
+		t.Fatalf("want AdaptiveCard with 3 blocks (title + 2 lines), got type=%q blocks=%d",
+			got.Attachments[0].Content.Type, len(body))
+	}
+	if body[0].Text != "หัวข้อ" || body[0].Weight != "Bolder" {
+		t.Fatalf("first block should be the bold title, got %+v", body[0])
+	}
+	if body[1].Text != "บรรทัด 1" || body[2].Text != "บรรทัด 2" {
+		t.Fatalf("body lines not split per TextBlock: %+v", body)
 	}
 }
 
@@ -32,7 +58,7 @@ func TestSendTeams_Non2xxIsError(t *testing.T) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer srv.Close()
-	if err := sendTeams(context.Background(), srv.Client(), srv.URL, "x"); err == nil {
+	if err := sendTeams(context.Background(), srv.Client(), srv.URL, "subj", "x"); err == nil {
 		t.Fatal("expected error on 500, got nil")
 	}
 }
