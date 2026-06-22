@@ -267,14 +267,70 @@ func (h *Handler) UploadResume(c *fiber.Ctx) error {
 	if err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "could not read uploaded file")
 	}
-	if err := h.svc.SaveResume(c.UserContext(), acct.ID, fileHeader.Filename, fileType, contentType, data); err != nil {
+	if err := h.svc.AddResume(c.UserContext(), acct.ID, fileHeader.Filename, fileType, contentType, data); err != nil {
+		if errors.Is(err, ErrResumeLimit) {
+			return fiber.NewError(fiber.StatusConflict, "resume limit reached (max 5) - delete one first")
+		}
 		return err
 	}
-	updated, err := h.svc.repo.GetByID(c.UserContext(), acct.ID)
+	return h.respondResumes(c, acct.ID)
+}
+
+// respondResumes returns the account's current CV history (newest first). Shared
+// by upload / set-default / delete so the client always gets the fresh list.
+func (h *Handler) respondResumes(c *fiber.Ctx, accountID uuid.UUID) error {
+	list, err := h.svc.ListResumes(c.UserContext(), accountID)
 	if err != nil {
 		return err
 	}
-	return httpx.OK(c, toMeView(updated))
+	return httpx.OK(c, fiber.Map{"resumes": list})
+}
+
+// ListResumes handles GET /resumes (RequireCandidate).
+func (h *Handler) ListResumes(c *fiber.Ctx) error {
+	acct := CandidateFromCtx(c)
+	if acct == nil {
+		return fiber.NewError(fiber.StatusUnauthorized, "login required")
+	}
+	return h.respondResumes(c, acct.ID)
+}
+
+// SetDefaultResume handles POST /resumes/:id/default (RequireCandidate).
+func (h *Handler) SetDefaultResume(c *fiber.Ctx) error {
+	acct := CandidateFromCtx(c)
+	if acct == nil {
+		return fiber.NewError(fiber.StatusUnauthorized, "login required")
+	}
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "invalid resume id")
+	}
+	if err := h.svc.SetDefaultResume(c.UserContext(), acct.ID, id); err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return fiber.NewError(fiber.StatusNotFound, "resume not found")
+		}
+		return err
+	}
+	return h.respondResumes(c, acct.ID)
+}
+
+// DeleteResume handles DELETE /resumes/:id (RequireCandidate).
+func (h *Handler) DeleteResume(c *fiber.Ctx) error {
+	acct := CandidateFromCtx(c)
+	if acct == nil {
+		return fiber.NewError(fiber.StatusUnauthorized, "login required")
+	}
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "invalid resume id")
+	}
+	if err := h.svc.DeleteResume(c.UserContext(), acct.ID, id); err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return fiber.NewError(fiber.StatusNotFound, "resume not found")
+		}
+		return err
+	}
+	return h.respondResumes(c, acct.ID)
 }
 
 func (h *Handler) setSessionCookie(c *fiber.Ctx, sess Session) {

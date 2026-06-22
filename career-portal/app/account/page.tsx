@@ -7,7 +7,7 @@ import { DataRightsSection } from "@/components/auth/DataRightsSection";
 import { ReconsentBanner } from "@/components/auth/ReconsentBanner";
 import { LinkLineButton } from "@/components/auth/LinkLineButton";
 import { ProfileForm } from "@/components/auth/ProfileForm";
-import { ResumeUploadStep } from "@/components/auth/ResumeUploadStep";
+import { ResumeLibrary } from "@/components/auth/ResumeLibrary";
 import { OnboardingSection } from "@/components/onboarding/OnboardingSection";
 import { PortalShell } from "@/components/PortalShell";
 import { Button } from "@/components/ui/button";
@@ -89,7 +89,7 @@ export default function AccountPage() {
         <section className="flex flex-col gap-4">
           <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-foreground">เรซูเม่</h2>
           <div className="rounded-xl border border-line bg-card p-6">
-            <ResumeUploadStep account={candidate} submitLabel="อัปเดตเรซูเม่" onUploaded={() => undefined} />
+            <ResumeLibrary />
           </div>
         </section>
 

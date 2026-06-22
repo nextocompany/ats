@@ -152,6 +152,15 @@ export interface Account {
   pdpa_needs_reconsent?: boolean;
 }
 
+// One entry in a candidate's CV history (GET /api/v1/public/auth/resumes).
+export interface AccountResume {
+  id: string;
+  original_filename: string;
+  file_type: string;
+  is_default: boolean;
+  created_at: string;
+}
+
 // PATCH /api/v1/public/auth/profile body.
 export interface ProfileInput {
   full_name?: string;

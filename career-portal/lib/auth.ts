@@ -2,7 +2,7 @@
 // httpOnly session cookie sent by lib/api (credentials:'include'). OAuth flows
 // (LINE/Google) are top-level navigations — see lib/line.ts.
 import { api } from "./api";
-import type { Account, Letter, Offer, OfferResponseInput, OnboardingStatus, ProfileInput } from "./types";
+import type { Account, AccountResume, Letter, Offer, OfferResponseInput, OnboardingStatus, ProfileInput } from "./types";
 
 export { lineLoginUrl, googleLoginUrl } from "./line";
 
@@ -37,11 +37,34 @@ export function updateProfile(input: ProfileInput): Promise<Account> {
   return api.patch<Account>("/api/v1/public/auth/profile", input).then((r) => r.data);
 }
 
-// uploadResume stores the account's reusable resume.
-export function uploadResume(file: File): Promise<Account> {
+// RESUME_LIMIT mirrors the server cap (candidateauth.MaxResumes).
+export const RESUME_LIMIT = 5;
+
+// uploadResume adds a CV to the account's library and returns the updated history
+// (newest first). Throws ApiError(409) when the library is already full.
+export function uploadResume(file: File): Promise<AccountResume[]> {
   const form = new FormData();
   form.set("resume", file);
-  return api.postForm<Account>("/api/v1/public/auth/resume", form).then((r) => r.data);
+  return api
+    .postForm<{ resumes: AccountResume[] }>("/api/v1/public/auth/resume", form)
+    .then((r) => r.data.resumes);
+}
+
+// getResumes lists the account's CV history (newest first).
+export function getResumes(): Promise<AccountResume[]> {
+  return api.get<{ resumes: AccountResume[] }>("/api/v1/public/auth/resumes").then((r) => r.data.resumes);
+}
+
+// setDefaultResume marks one resume the default used for quick-apply.
+export function setDefaultResume(id: string): Promise<AccountResume[]> {
+  return api
+    .post<{ resumes: AccountResume[] }>(`/api/v1/public/auth/resumes/${id}/default`)
+    .then((r) => r.data.resumes);
+}
+
+// deleteResume removes a CV; deleting the default promotes the newest remaining.
+export function deleteResume(id: string): Promise<AccountResume[]> {
+  return api.del<{ resumes: AccountResume[] }>(`/api/v1/public/auth/resumes/${id}`).then((r) => r.data.resumes);
 }
 
 // getMyOffers lists the member's offers (Module-3 3.6).
