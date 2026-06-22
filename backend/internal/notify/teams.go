@@ -10,15 +10,30 @@ import (
 	"strings"
 )
 
+// teamsBrandHeader is shown at the top of every card so the source is
+// unmistakable. The channel "sender" identity is fixed by Power Automate (the
+// Workflows app) and cannot be set from the card payload, so we brand the card
+// body instead.
+const teamsBrandHeader = "HR ATS System"
+
 // sendTeams posts an Adaptive Card to an MS Teams channel webhook. The payload is
 // the {"type":"message","attachments":[adaptive card]} shape that a Power Automate
 // "Workflows" flow posts to a channel natively (Microsoft's supported replacement
 // for the retired O365 Incoming Webhook connector, which accepted plain
-// {"text":...}). title renders as a bold heading; text is split into one TextBlock
-// per line so multi-field HR notifications keep their layout. Workflows replies
-// 202 Accepted on success, so any 2xx is success.
+// {"text":...}). A brand header leads, then title renders as a bold heading; text
+// is split into one TextBlock per line so multi-field HR notifications keep their
+// layout. Workflows replies 202 Accepted on success, so any 2xx is success.
 func sendTeams(ctx context.Context, hc *http.Client, webhookURL, title, text string) error {
 	blocks := make([]map[string]any, 0, 8)
+	blocks = append(blocks, map[string]any{
+		"type":    "TextBlock",
+		"text":    teamsBrandHeader,
+		"weight":  "Bolder",
+		"color":   "Accent",
+		"size":    "Small",
+		"spacing": "None",
+		"wrap":    true,
+	})
 	if strings.TrimSpace(title) != "" {
 		blocks = append(blocks, map[string]any{
 			"type":   "TextBlock",
