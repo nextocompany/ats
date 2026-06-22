@@ -12,10 +12,11 @@ import (
 	"github.com/nexto/hr-ats/pkg/email"
 )
 
-// BlobStore is the subset of pkg/blob the service needs (resume save + read).
+// BlobStore is the subset of pkg/blob the service needs (resume save + read + delete).
 type BlobStore interface {
 	Upload(ctx context.Context, name string, data []byte, contentType string) (string, error)
 	Download(ctx context.Context, name string) ([]byte, error)
+	Delete(ctx context.Context, name string) error
 }
 
 // Session is an issued candidate session: the raw token (set in the cookie) and
@@ -201,6 +202,54 @@ func (s *Service) SaveResume(ctx context.Context, accountID uuid.UUID, fileName,
 		return fmt.Errorf("candidateauth: upload resume: %w", err)
 	}
 	return s.repo.SetResume(ctx, accountID, key, fileType)
+}
+
+// AddResume adds a CV to the account's library (newest first). The account's
+// FIRST resume becomes the default. Blocks at MaxResumes with ErrResumeLimit -
+// the candidate must delete one first. Stores the blob KEY (not a URL) so
+// quick-apply can Download the default.
+func (s *Service) AddResume(ctx context.Context, accountID uuid.UUID, fileName, fileType, contentType string, data []byte) error {
+	count, err := s.repo.CountResumes(ctx, accountID)
+	if err != nil {
+		return err
+	}
+	if count >= MaxResumes {
+		return ErrResumeLimit
+	}
+	id := uuid.New()
+	key := fmt.Sprintf("accounts/%s/%s/%s", accountID, id, fileName)
+	if _, err := s.blob.Upload(ctx, key, data, contentType); err != nil {
+		return fmt.Errorf("candidateauth: upload resume: %w", err)
+	}
+	if err := s.repo.InsertResume(ctx, accountID, id, key, fileName, fileType, count == 0); err != nil {
+		// Best-effort cleanup of the orphaned blob; the DB row is the source of truth.
+		_ = s.blob.Delete(ctx, key)
+		return err
+	}
+	return nil
+}
+
+// ListResumes returns the account's CV history, newest first.
+func (s *Service) ListResumes(ctx context.Context, accountID uuid.UUID) ([]Resume, error) {
+	return s.repo.ListResumes(ctx, accountID)
+}
+
+// SetDefaultResume marks one resume the default (used for quick-apply).
+func (s *Service) SetDefaultResume(ctx context.Context, accountID, resumeID uuid.UUID) error {
+	return s.repo.SetDefaultResume(ctx, accountID, resumeID)
+}
+
+// DeleteResume removes a resume and its blob (best-effort). Deleting the default
+// promotes the newest remaining resume.
+func (s *Service) DeleteResume(ctx context.Context, accountID, resumeID uuid.UUID) error {
+	key, err := s.repo.DeleteResume(ctx, accountID, resumeID)
+	if err != nil {
+		return err
+	}
+	if key != "" {
+		_ = s.blob.Delete(ctx, key) // row already gone; blob cleanup is best-effort
+	}
+	return nil
 }
 
 // SaveConsent records PDPA consent on the account + a ledger row (portal

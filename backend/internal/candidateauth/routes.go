@@ -17,7 +17,10 @@ func RegisterRoutes(app *fiber.App, h *Handler) {
 	gate := RequireCandidate(h.svc, h.cookieName)
 	g.Get("/me", gate, h.Me)
 	g.Patch("/profile", gate, h.UpdateProfile)
-	g.Post("/resume", gate, h.UploadResume)
+	g.Post("/resume", gate, h.UploadResume) // adds to the library (cap MaxResumes)
+	g.Get("/resumes", gate, h.ListResumes)
+	g.Post("/resumes/:id/default", gate, h.SetDefaultResume)
+	g.Delete("/resumes/:id", gate, h.DeleteResume)
 	g.Post("/consent/withdraw", gate, h.WithdrawConsent)
 	g.Post("/consent/accept", gate, h.AcceptConsent)
 }

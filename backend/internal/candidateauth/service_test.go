@@ -21,6 +21,8 @@ type fakeRepo struct {
 	byGoogle map[string]uuid.UUID
 	sessions map[string]uuid.UUID // tokenHash -> accountID (live)
 	otps     map[string]string    // email -> live codeHash (single, unconsumed)
+	resumes  map[uuid.UUID][]Resume
+	keys     map[uuid.UUID]string // resumeID -> blob key
 }
 
 func newFakeRepo() *fakeRepo {
@@ -31,7 +33,73 @@ func newFakeRepo() *fakeRepo {
 		byGoogle: map[string]uuid.UUID{},
 		sessions: map[string]uuid.UUID{},
 		otps:     map[string]string{},
+		resumes:  map[uuid.UUID][]Resume{},
+		keys:     map[uuid.UUID]string{},
 	}
+}
+
+func (f *fakeRepo) ListResumes(_ context.Context, accountID uuid.UUID) ([]Resume, error) {
+	return f.resumes[accountID], nil
+}
+
+func (f *fakeRepo) CountResumes(_ context.Context, accountID uuid.UUID) (int, error) {
+	return len(f.resumes[accountID]), nil
+}
+
+func (f *fakeRepo) InsertResume(_ context.Context, accountID, id uuid.UUID, blobKey, filename, fileType string, makeDefault bool) error {
+	// Prepend so the slice stays newest-first, matching the SQL ORDER BY.
+	f.resumes[accountID] = append([]Resume{{ID: id, OriginalFilename: filename, FileType: fileType, IsDefault: makeDefault, CreatedAt: time.Now()}}, f.resumes[accountID]...)
+	f.keys[id] = blobKey
+	if makeDefault {
+		f.accounts[accountID].ResumeBlobURL = blobKey
+		f.accounts[accountID].ResumeFileType = fileType
+	}
+	return nil
+}
+
+func (f *fakeRepo) SetDefaultResume(_ context.Context, accountID, resumeID uuid.UUID) error {
+	list := f.resumes[accountID]
+	found := false
+	for i := range list {
+		list[i].IsDefault = list[i].ID == resumeID
+		if list[i].ID == resumeID {
+			found = true
+			f.accounts[accountID].ResumeBlobURL = f.keys[resumeID]
+			f.accounts[accountID].ResumeFileType = list[i].FileType
+		}
+	}
+	if !found {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (f *fakeRepo) DeleteResume(_ context.Context, accountID, resumeID uuid.UUID) (string, error) {
+	list := f.resumes[accountID]
+	idx := -1
+	for i := range list {
+		if list[i].ID == resumeID {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		return "", ErrNotFound
+	}
+	wasDefault := list[idx].IsDefault
+	key := f.keys[resumeID]
+	f.resumes[accountID] = append(list[:idx], list[idx+1:]...)
+	delete(f.keys, resumeID)
+	if wasDefault && len(f.resumes[accountID]) > 0 {
+		nl := f.resumes[accountID]
+		nl[0].IsDefault = true // newest-first → index 0
+		f.accounts[accountID].ResumeBlobURL = f.keys[nl[0].ID]
+		f.accounts[accountID].ResumeFileType = nl[0].FileType
+	} else if wasDefault {
+		f.accounts[accountID].ResumeBlobURL = ""
+		f.accounts[accountID].ResumeFileType = ""
+	}
+	return key, nil
 }
 
 func (f *fakeRepo) newAccount() *Account {
@@ -224,6 +292,10 @@ func (b *fakeBlob) Download(_ context.Context, name string) ([]byte, error) {
 	}
 	return nil, errors.New("not found")
 }
+func (b *fakeBlob) Delete(_ context.Context, name string) error {
+	delete(b.uploaded, name)
+	return nil
+}
 
 // --- tests -------------------------------------------------------------------
 
@@ -385,4 +457,73 @@ func TestOTPHelpers(t *testing.T) {
 	if err != nil || strings.TrimSpace(tok) == "" {
 		t.Fatalf("randToken: %q %v", tok, err)
 	}
+}
+
+func TestResumeLibrary_DefaultCapPromote(t *testing.T) {
+	repo := newFakeRepo()
+	svc, _ := newTestService(repo)
+	ctx := context.Background()
+	acct := repo.newAccount()
+
+	// First upload becomes the default.
+	if err := svc.AddResume(ctx, acct.ID, "a.pdf", "pdf", "application/pdf", []byte("a")); err != nil {
+		t.Fatal(err)
+	}
+	list, _ := svc.ListResumes(ctx, acct.ID)
+	if len(list) != 1 || !list[0].IsDefault {
+		t.Fatalf("first resume must be default, got %+v", list)
+	}
+
+	// Fill to MaxResumes; the 6th is blocked.
+	for _, n := range []string{"2.pdf", "3.pdf", "4.pdf", "5.pdf"} {
+		if err := svc.AddResume(ctx, acct.ID, n, "pdf", "application/pdf", []byte("x")); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := svc.AddResume(ctx, acct.ID, "x.pdf", "pdf", "application/pdf", []byte("x")); !errors.Is(err, ErrResumeLimit) {
+		t.Fatalf("expected ErrResumeLimit at %d, got %v", MaxResumes, err)
+	}
+	list, _ = svc.ListResumes(ctx, acct.ID)
+	if len(list) != MaxResumes || countDefaults(list) != 1 {
+		t.Fatalf("want %d resumes with exactly 1 default, got %d/%d", MaxResumes, len(list), countDefaults(list))
+	}
+
+	// Switch the default to the newest (index 0), pointer must follow.
+	newest := list[0]
+	if err := svc.SetDefaultResume(ctx, acct.ID, newest.ID); err != nil {
+		t.Fatal(err)
+	}
+	if repo.accounts[acct.ID].ResumeBlobURL == "" {
+		t.Fatal("default pointer not synced after set-default")
+	}
+	list, _ = svc.ListResumes(ctx, acct.ID)
+	for _, r := range list {
+		if (r.ID == newest.ID) != r.IsDefault {
+			t.Fatalf("default not switched correctly: %+v", r)
+		}
+	}
+
+	// Deleting the default promotes another; exactly one default remains.
+	if err := svc.DeleteResume(ctx, acct.ID, newest.ID); err != nil {
+		t.Fatal(err)
+	}
+	list, _ = svc.ListResumes(ctx, acct.ID)
+	if len(list) != MaxResumes-1 || countDefaults(list) != 1 {
+		t.Fatalf("after deleting default want %d with 1 default, got %d/%d", MaxResumes-1, len(list), countDefaults(list))
+	}
+
+	// Unknown id is a not-found, not a silent success.
+	if err := svc.SetDefaultResume(ctx, acct.ID, uuid.New()); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("set-default unknown id: want ErrNotFound, got %v", err)
+	}
+}
+
+func countDefaults(list []Resume) int {
+	n := 0
+	for _, r := range list {
+		if r.IsDefault {
+			n++
+		}
+	}
+	return n
 }

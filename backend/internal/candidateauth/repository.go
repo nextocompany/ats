@@ -32,6 +32,17 @@ type Repository interface {
 	LinkLine(ctx context.Context, accountID uuid.UUID, sub, displayID string) error
 	UpdateProfile(ctx context.Context, accountID uuid.UUID, p ProfileUpdate) error
 	SetResume(ctx context.Context, accountID uuid.UUID, blobURL, fileType string) error
+
+	// Resume library (CV history, capped at MaxResumes, exactly one default).
+	// The candidate_accounts.resume_blob_url/resume_file_type pointer is kept in
+	// sync with the default by Insert/SetDefault/Delete so quick-apply is unchanged.
+	ListResumes(ctx context.Context, accountID uuid.UUID) ([]Resume, error)
+	CountResumes(ctx context.Context, accountID uuid.UUID) (int, error)
+	InsertResume(ctx context.Context, accountID, id uuid.UUID, blobKey, filename, fileType string, makeDefault bool) error
+	SetDefaultResume(ctx context.Context, accountID, resumeID uuid.UUID) error
+	// DeleteResume removes a resume and returns its blob key (for blob cleanup).
+	// If the deleted resume was the default, the newest remaining one is promoted.
+	DeleteResume(ctx context.Context, accountID, resumeID uuid.UUID) (string, error)
 	SetConsent(ctx context.Context, accountID uuid.UUID, version string) error
 	// MarkConsented updates only the consent snapshot (no ledger row) for the apply
 	// flow, where the candidate-keyed ledger row is the authoritative record.
@@ -217,6 +228,147 @@ func (r *pgRepository) SetResume(ctx context.Context, accountID uuid.UUID, blobU
 		return fmt.Errorf("candidateauth: set resume: %w", err)
 	}
 	return nil
+}
+
+// syncDefaultPointer points candidate_accounts at the given default resume blob,
+// keeping the denormalized quick-apply read path correct.
+const syncDefaultPointer = `UPDATE candidate_accounts SET resume_blob_url = $2, resume_file_type = $3, updated_at = NOW() WHERE id = $1`
+
+func (r *pgRepository) ListResumes(ctx context.Context, accountID uuid.UUID) ([]Resume, error) {
+	const q = `SELECT id, COALESCE(original_filename,''), file_type, is_default, created_at
+	           FROM candidate_account_resumes WHERE account_id = $1 ORDER BY created_at DESC`
+	rows, err := r.pool.Query(ctx, q, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("candidateauth: list resumes: %w", err)
+	}
+	defer rows.Close()
+	var out []Resume
+	for rows.Next() {
+		var res Resume
+		if err := rows.Scan(&res.ID, &res.OriginalFilename, &res.FileType, &res.IsDefault, &res.CreatedAt); err != nil {
+			return nil, fmt.Errorf("candidateauth: scan resume: %w", err)
+		}
+		out = append(out, res)
+	}
+	return out, rows.Err()
+}
+
+func (r *pgRepository) CountResumes(ctx context.Context, accountID uuid.UUID) (int, error) {
+	var n int
+	if err := r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM candidate_account_resumes WHERE account_id = $1`, accountID).Scan(&n); err != nil {
+		return 0, fmt.Errorf("candidateauth: count resumes: %w", err)
+	}
+	return n, nil
+}
+
+// InsertResume adds a resume. makeDefault must only be set when the account has
+// no other resume (the caller guarantees this), so no existing default is unset.
+func (r *pgRepository) InsertResume(ctx context.Context, accountID, id uuid.UUID, blobKey, filename, fileType string, makeDefault bool) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("candidateauth: insert resume begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	if _, err := tx.Exec(ctx,
+		`INSERT INTO candidate_account_resumes (id, account_id, blob_key, original_filename, file_type, is_default)
+		 VALUES ($1, $2, $3, $4, $5, $6)`,
+		id, accountID, blobKey, filename, fileType, makeDefault); err != nil {
+		return fmt.Errorf("candidateauth: insert resume: %w", err)
+	}
+	if makeDefault {
+		if _, err := tx.Exec(ctx, syncDefaultPointer, accountID, blobKey, fileType); err != nil {
+			return fmt.Errorf("candidateauth: sync default pointer: %w", err)
+		}
+	}
+	return tx.Commit(ctx)
+}
+
+func (r *pgRepository) SetDefaultResume(ctx context.Context, accountID, resumeID uuid.UUID) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("candidateauth: set default begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var blobKey, fileType string
+	err = tx.QueryRow(ctx,
+		`SELECT blob_key, file_type FROM candidate_account_resumes WHERE id = $1 AND account_id = $2`,
+		resumeID, accountID).Scan(&blobKey, &fileType)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("candidateauth: set default lookup: %w", err)
+	}
+	// Two ordered statements, NOT a single `is_default = (id = $2)`: the partial
+	// unique index (account_id WHERE is_default) is enforced per-row and is not
+	// deferrable, so a single statement could momentarily have two defaults and
+	// throw a unique violation. Clear the old default first, then set the new one.
+	if _, err := tx.Exec(ctx,
+		`UPDATE candidate_account_resumes SET is_default = FALSE WHERE account_id = $1 AND is_default`,
+		accountID); err != nil {
+		return fmt.Errorf("candidateauth: clear default: %w", err)
+	}
+	if _, err := tx.Exec(ctx,
+		`UPDATE candidate_account_resumes SET is_default = TRUE WHERE id = $1 AND account_id = $2`,
+		resumeID, accountID); err != nil {
+		return fmt.Errorf("candidateauth: set default: %w", err)
+	}
+	if _, err := tx.Exec(ctx, syncDefaultPointer, accountID, blobKey, fileType); err != nil {
+		return fmt.Errorf("candidateauth: sync default pointer: %w", err)
+	}
+	return tx.Commit(ctx)
+}
+
+func (r *pgRepository) DeleteResume(ctx context.Context, accountID, resumeID uuid.UUID) (string, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return "", fmt.Errorf("candidateauth: delete resume begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var blobKey string
+	var wasDefault bool
+	err = tx.QueryRow(ctx,
+		`SELECT blob_key, is_default FROM candidate_account_resumes WHERE id = $1 AND account_id = $2`,
+		resumeID, accountID).Scan(&blobKey, &wasDefault)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	if err != nil {
+		return "", fmt.Errorf("candidateauth: delete lookup: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM candidate_account_resumes WHERE id = $1`, resumeID); err != nil {
+		return "", fmt.Errorf("candidateauth: delete resume: %w", err)
+	}
+	if wasDefault {
+		// Promote the newest remaining resume to default and re-point the account.
+		var nid uuid.UUID
+		var nkey, ntype string
+		e := tx.QueryRow(ctx,
+			`SELECT id, blob_key, file_type FROM candidate_account_resumes
+			 WHERE account_id = $1 ORDER BY created_at DESC LIMIT 1`, accountID).Scan(&nid, &nkey, &ntype)
+		switch {
+		case e == nil:
+			if _, err := tx.Exec(ctx, `UPDATE candidate_account_resumes SET is_default = TRUE WHERE id = $1`, nid); err != nil {
+				return "", fmt.Errorf("candidateauth: promote default: %w", err)
+			}
+			if _, err := tx.Exec(ctx, syncDefaultPointer, accountID, nkey, ntype); err != nil {
+				return "", fmt.Errorf("candidateauth: sync default pointer: %w", err)
+			}
+		case errors.Is(e, pgx.ErrNoRows):
+			// No resumes left: clear the quick-apply pointer.
+			if _, err := tx.Exec(ctx,
+				`UPDATE candidate_accounts SET resume_blob_url = NULL, resume_file_type = NULL, updated_at = NOW() WHERE id = $1`,
+				accountID); err != nil {
+				return "", fmt.Errorf("candidateauth: clear resume pointer: %w", err)
+			}
+		default:
+			return "", fmt.Errorf("candidateauth: promote lookup: %w", e)
+		}
+	}
+	return blobKey, tx.Commit(ctx)
 }
 
 // MarkConsented updates ONLY the account consent snapshot (no ledger row). Used by

@@ -30,7 +30,24 @@ var (
 	// hold a session. The session-resolve path additionally filters these out so
 	// an existing cookie also stops working.
 	ErrAccountSuspended = errors.New("candidateauth: account not active")
+	// ErrResumeLimit is returned when an account already holds MaxResumes CVs and
+	// must delete one before uploading another.
+	ErrResumeLimit = errors.New("candidateauth: resume limit reached")
 )
+
+// MaxResumes caps the per-account resume library (the portal blocks the 6th
+// upload until one is deleted).
+const MaxResumes = 5
+
+// Resume is one entry in a candidate's CV history. The blob key is internal and
+// never serialized; the client identifies a resume by id.
+type Resume struct {
+	ID               uuid.UUID `json:"id"`
+	OriginalFilename string    `json:"original_filename"`
+	FileType         string    `json:"file_type"`
+	IsDefault        bool      `json:"is_default"`
+	CreatedAt        time.Time `json:"created_at"`
+}
 
 // Account is a persistent candidate identity. Any one of email / line_user_id /
 // google_sub may be present; the others fill in as the user links providers.

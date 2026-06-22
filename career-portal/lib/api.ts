@@ -71,4 +71,9 @@ export const api = {
     });
     return unwrap<T>(res);
   },
+  // del sends a DELETE (resume removal).
+  del: async <T>(path: string): Promise<{ data: T; meta?: Meta }> => {
+    const res = await fetch(`${BASE}${path}`, { method: "DELETE", credentials: "include" });
+    return unwrap<T>(res);
+  },
 };
