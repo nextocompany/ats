@@ -45,7 +45,7 @@ func (n restNotifier) Send(ctx context.Context, m Message) error {
 		if n.teamsWebhook == "" {
 			return fmt.Errorf("notify: teams webhook not configured (TEAMS_WEBHOOK_URL empty)")
 		}
-		return sendTeams(ctx, n.http, n.teamsWebhook, m.Body)
+		return sendTeams(ctx, n.http, n.teamsWebhook, m.Subject, m.Body)
 	default:
 		return fmt.Errorf("notify: unknown channel %q", m.Channel)
 	}
