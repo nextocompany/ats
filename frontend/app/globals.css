@@ -14,12 +14,12 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  /* Institutional superfamily shared with the career portal: IBM Plex Sans Thai
-     Looped (body/UI) + Anuphan (display headings). Thai+Latin parity; hierarchy
-     comes from scale, not type personality. */
+  /* Noto Sans Thai for all UI text (Thai + Latin), shared with the career portal.
+     One family for body and headings; hierarchy comes from scale + weight, not
+     type personality. */
   --font-sans: var(--font-body), system-ui, sans-serif;
   --font-mono: ui-monospace, monospace;
-  --font-heading: var(--font-display), var(--font-body), system-ui, sans-serif;
+  --font-heading: var(--font-body), system-ui, sans-serif;
 
   /* Brand + emphasis tokens (the opinionated layer) */
   --color-brand: var(--brand);
@@ -187,8 +187,8 @@
   html {
     @apply font-sans;
   }
-  /* Institutional headings: Anuphan display, balanced wrap, tight tracking, with
-     enough line-height that Thai never clips. */
+  /* Headings: Noto Sans Thai, balanced wrap, tight tracking, with enough
+     line-height that Thai never clips. */
   h1,
   h2,
   h3,
@@ -204,7 +204,7 @@
   }
   /* Display numerals (stats, counts) — shared with careers. */
   .num {
-    font-family: var(--font-display);
+    font-family: var(--font-body);
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum" 1;
   }
