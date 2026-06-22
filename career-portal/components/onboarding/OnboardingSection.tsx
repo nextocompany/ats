@@ -6,6 +6,7 @@
 // no global toaster, so errors render inline (role="alert").
 import { useState } from "react";
 
+import { AccountSection } from "@/components/account/AccountSection";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useMyOnboarding, useUploadOnboardingDoc } from "@/lib/queries";
@@ -29,19 +30,21 @@ export function OnboardingSection() {
   const byType = new Map(status.documents.map((d) => [d.doc_type, d]));
 
   return (
-    <section className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-foreground">{t("title")}</h2>
-        <span className="text-xs font-medium tabular-nums text-muted-foreground">
+    <AccountSection
+      eyebrow="เอกสารเริ่มงาน"
+      title={t("title")}
+      action={
+        <span className="num text-sm font-semibold tabular-nums text-muted-foreground">
           {t("progress", { approved: status.approved_count, required: status.required_count })}
         </span>
-      </div>
-      <div className="flex flex-col gap-3 rounded-xl border border-line bg-card p-6">
+      }
+    >
+      <div className="flex flex-col gap-3">
         {status.required.map((type) => (
           <OnboardingDocRow key={type} docType={type} doc={byType.get(type) ?? null} t={t} />
         ))}
       </div>
-    </section>
+    </AccountSection>
   );
 }
 

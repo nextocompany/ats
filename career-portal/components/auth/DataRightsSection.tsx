@@ -6,7 +6,9 @@
 // in which case the request is queued for staff instead of erasing immediately.
 import { useState } from "react";
 
+import { Eyebrow } from "@/components/ds/Eyebrow";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { api, ApiError } from "@/lib/api";
 
 type EraseResult = { status: "erased" | "held"; message?: string };
@@ -80,96 +82,117 @@ export function DataRightsSection({ onErased }: { onErased: () => void | Promise
   }
 
   return (
-    <section className="flex flex-col gap-4">
-      <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-foreground">
-        สิทธิในข้อมูลส่วนบุคคล (PDPA)
-      </h2>
-
-      <div className="flex flex-col gap-3 rounded-xl border border-line bg-card p-6">
-        <div className="flex flex-col gap-1">
-          <p className="text-sm font-medium text-foreground">ดาวน์โหลดข้อมูลของฉัน</p>
-          <p className="text-sm text-muted-foreground">ขอสำเนาข้อมูลส่วนบุคคลทั้งหมดของคุณเป็นไฟล์ JSON</p>
-        </div>
-        <div>
-          <Button type="button" size="sm" variant="secondary" onClick={onDownload} disabled={downloading}>
-            {downloading ? "กำลังเตรียมไฟล์…" : "ดาวน์โหลดข้อมูล"}
-          </Button>
-        </div>
-        {downloadErr ? (
-          <p role="status" aria-live="polite" className="text-sm text-destructive">
-            {downloadErr}
-          </p>
-        ) : null}
+    <section aria-labelledby="pdpa-heading" className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1.5">
+        <Eyebrow>ความเป็นส่วนตัว</Eyebrow>
+        <h2
+          id="pdpa-heading"
+          className="[font-size:var(--text-h3)] font-semibold leading-tight text-foreground"
+        >
+          สิทธิในข้อมูลส่วนบุคคล (PDPA)
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          คุณสามารถขอสำเนาหรือขอลบข้อมูลส่วนบุคคลของคุณได้ตลอดเวลา
+        </p>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-xl border border-destructive/30 bg-card p-6">
-        <div className="flex flex-col gap-1">
-          <p className="text-sm font-medium text-foreground">ลบข้อมูลของฉัน</p>
-          <p className="text-sm text-muted-foreground">
-            ขอให้ลบบัญชีและข้อมูลส่วนบุคคลของคุณอย่างถาวร การดำเนินการนี้ไม่สามารถย้อนกลับได้
-          </p>
-        </div>
-
-        {held ? (
-          <p role="status" aria-live="polite" className="rounded-lg bg-secondary p-3 text-sm text-foreground/90">
-            {held}
-          </p>
-        ) : !confirming ? (
-          <div>
-            <Button
-              type="button"
-              size="sm"
-              variant="destructive"
-              onClick={() => {
-                setConfirming(true);
-                setEraseErr("");
-                setAcknowledged(false);
-              }}
-            >
-              ขอลบข้อมูลของฉัน
-            </Button>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-3">
-            <label className="flex items-start gap-2 text-sm text-foreground/90">
-              <input
-                type="checkbox"
-                checked={acknowledged}
-                onChange={(e) => setAcknowledged(e.target.checked)}
-                className="mt-0.5 size-4 shrink-0"
-              />
-              <span>ฉันเข้าใจว่าการลบข้อมูลนี้เป็นการถาวรและไม่สามารถย้อนกลับได้</span>
-            </label>
-            <div className="flex items-center gap-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Card>
+          <CardContent className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1">
+              <p className="text-sm font-medium text-foreground">ดาวน์โหลดข้อมูลของฉัน</p>
+              <p className="text-sm text-muted-foreground">ขอสำเนาข้อมูลส่วนบุคคลทั้งหมดของคุณเป็นไฟล์ JSON</p>
+            </div>
+            <div className="mt-auto">
               <Button
                 type="button"
-                size="sm"
-                variant="destructive"
-                onClick={onErase}
-                disabled={!acknowledged || erasing}
+                variant="secondary"
+                className="h-11 w-full sm:w-auto"
+                onClick={onDownload}
+                disabled={downloading}
               >
-                {erasing ? "กำลังดำเนินการ…" : "ยืนยันการลบถาวร"}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={() => {
-                  setConfirming(false);
-                  setEraseErr("");
-                }}
-                disabled={erasing}
-              >
-                ยกเลิก
+                {downloading ? "กำลังเตรียมไฟล์…" : "ดาวน์โหลดข้อมูล"}
               </Button>
             </div>
-          </div>
-        )}
-        {eraseErr ? (
-          <p role="status" aria-live="polite" className="text-sm text-destructive">
-            {eraseErr}
-          </p>
-        ) : null}
+            {downloadErr ? (
+              <p role="status" aria-live="polite" className="text-sm text-destructive">
+                {downloadErr}
+              </p>
+            ) : null}
+          </CardContent>
+        </Card>
+
+        <Card className="border-destructive/30">
+          <CardContent className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1">
+              <p className="text-sm font-medium text-foreground">ลบข้อมูลของฉัน</p>
+              <p className="text-sm text-muted-foreground">
+                ขอให้ลบบัญชีและข้อมูลส่วนบุคคลของคุณอย่างถาวร การดำเนินการนี้ไม่สามารถย้อนกลับได้
+              </p>
+            </div>
+
+            {held ? (
+              <p role="status" aria-live="polite" className="rounded-lg bg-secondary p-3 text-sm text-foreground/90">
+                {held}
+              </p>
+            ) : !confirming ? (
+              <div className="mt-auto">
+                <Button
+                  type="button"
+                  variant="destructive"
+                  className="h-11 w-full sm:w-auto"
+                  onClick={() => {
+                    setConfirming(true);
+                    setEraseErr("");
+                    setAcknowledged(false);
+                  }}
+                >
+                  ขอลบข้อมูลของฉัน
+                </Button>
+              </div>
+            ) : (
+              <div className="mt-auto flex flex-col gap-3">
+                <label className="flex items-start gap-2.5 text-sm text-foreground/90">
+                  <input
+                    type="checkbox"
+                    checked={acknowledged}
+                    onChange={(e) => setAcknowledged(e.target.checked)}
+                    className="mt-0.5 size-5 shrink-0"
+                  />
+                  <span>ฉันเข้าใจว่าการลบข้อมูลนี้เป็นการถาวรและไม่สามารถย้อนกลับได้</span>
+                </label>
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    className="h-11"
+                    onClick={onErase}
+                    disabled={!acknowledged || erasing}
+                  >
+                    {erasing ? "กำลังดำเนินการ…" : "ยืนยันการลบถาวร"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-11"
+                    onClick={() => {
+                      setConfirming(false);
+                      setEraseErr("");
+                    }}
+                    disabled={erasing}
+                  >
+                    ยกเลิก
+                  </Button>
+                </div>
+              </div>
+            )}
+            {eraseErr ? (
+              <p role="status" aria-live="polite" className="text-sm text-destructive">
+                {eraseErr}
+              </p>
+            ) : null}
+          </CardContent>
+        </Card>
       </div>
     </section>
   );
