@@ -56,11 +56,21 @@ type Searcher interface {
 	Search(ctx context.Context, q Query, scope rbac.Scope) ([]Hit, int, error)
 }
 
+// Embedder turns query/document text into dense vectors for semantic search.
+// Defined here (not imported from internal/ai) so search never imports ai; the
+// ai package's concrete embedder satisfies this structurally, wired in via the
+// command mains. A nil Embedder means semantic is off, index and query both
+// degrade gracefully to keyword-only.
+type Embedder interface {
+	Embed(ctx context.Context, texts []string) ([][]float32, error)
+}
+
 // NewSearcher selects the implementation by config (mock Postgres by default —
-// no Azure credentials needed for local/CI).
-func NewSearcher(cfg *config.Config, pool *pgxpool.Pool) Searcher {
+// no Azure credentials needed for local/CI). A non-nil embedder enables hybrid
+// (keyword + vector) ranking on the Azure path; nil keeps it keyword-only.
+func NewSearcher(cfg *config.Config, pool *pgxpool.Pool, embedder Embedder) Searcher {
 	if cfg.UsesAzureSearch() {
-		return newAzureSearcher(cfg)
+		return newAzureSearcher(cfg, embedder)
 	}
 	return newPGSearcher(pool)
 }

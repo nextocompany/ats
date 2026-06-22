@@ -13,17 +13,24 @@ import (
 // subregion + assigned_store_id (the index's RBAC filter fields) and NO scope
 // clause — the index holds every candidate; the QUERY applies the scope filter.
 // Duplicate shadows (is_duplicate_of) are excluded, matching the search query.
+//
+// content is the semantic-search text blob: full name + province + the best
+// application's ai_summary (empty for walk-in/bulk candidates with no AI summary
+// yet, which caps recall but is harmless). The indexer drops it for keyword-only
+// indexes, so projecting it unconditionally is safe.
 const docProjection = `
 	WITH ranked AS (
 		SELECT c.id AS candidate_id, c.full_name,
 		       COALESCE(c.province,'') AS province, COALESCE(c.subregion,'') AS subregion,
 		       a.assigned_store_id, a.status, a.ai_score,
+		       COALESCE(a.ai_summary,'') AS ai_summary,
 		       ROW_NUMBER() OVER (PARTITION BY c.id ORDER BY a.ai_score DESC NULLS LAST) AS rn
 		FROM candidates c
 		JOIN applications a ON a.candidate_id = c.id
 		WHERE c.is_duplicate_of IS NULL %s
 	)
-	SELECT candidate_id, full_name, province, subregion, assigned_store_id, status, ai_score
+	SELECT candidate_id, full_name, province, subregion, assigned_store_id, status, ai_score,
+	       trim(both ' ' from full_name || ' ' || province || ' ' || ai_summary) AS content
 	FROM ranked WHERE rn = 1`
 
 func scanDocs(rows interface {
@@ -37,7 +44,7 @@ func scanDocs(rows interface {
 	for rows.Next() {
 		var d Doc
 		if err := rows.Scan(&d.CandidateID, &d.FullName, &d.Province, &d.Subregion,
-			&d.AssignedStoreID, &d.Status, &d.AIScore); err != nil {
+			&d.AssignedStoreID, &d.Status, &d.AIScore, &d.Content); err != nil {
 			return nil, fmt.Errorf("search: doc scan: %w", err)
 		}
 		out = append(out, d)

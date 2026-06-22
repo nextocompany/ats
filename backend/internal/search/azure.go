@@ -10,11 +10,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/nexto/hr-ats/internal/rbac"
 	"github.com/nexto/hr-ats/pkg/config"
 )
 
 const searchAPIVersion = "2024-07-01"
+
+// vectorContentField is the index field holding candidate embeddings.
+const vectorContentField = "content_vector"
 
 // azureSearcher queries an Azure AI Search index. Index population (pushing
 // candidates → index) is an ops/ingestion concern and out of scope; this is
@@ -24,16 +29,28 @@ type azureSearcher struct {
 	endpoint string
 	key      string
 	index    string
+	embedder Embedder
 	http     *http.Client
 }
 
-func newAzureSearcher(cfg *config.Config) *azureSearcher {
+func newAzureSearcher(cfg *config.Config, embedder Embedder) *azureSearcher {
 	return &azureSearcher{
 		endpoint: strings.TrimRight(cfg.AzureSearchEndpoint, "/"),
 		key:      cfg.AzureSearchKey,
 		index:    cfg.AzureSearchIndex,
+		embedder: embedder,
 		http:     &http.Client{Timeout: 15 * time.Second},
 	}
+}
+
+// vectorQuery is one element of azureSearchRequest.VectorQueries: a raw vector
+// kNN query over content_vector. Azure fuses it with the keyword `search` via
+// Reciprocal Rank Fusion when both are present (hybrid search).
+type vectorQuery struct {
+	Kind   string    `json:"kind"`
+	Vector []float32 `json:"vector"`
+	Fields string    `json:"fields"`
+	K      int       `json:"k"`
 }
 
 type azureSearchRequest struct {
@@ -42,6 +59,12 @@ type azureSearchRequest struct {
 	Top    int    `json:"top"`
 	Skip   int    `json:"skip"`
 	Count  bool   `json:"count"`
+	// VectorQueries + VectorFilterMode are set only for hybrid (semantic) search.
+	// preFilter applies the RBAC scope filter BEFORE the kNN search so scoped users
+	// get their nearest in-scope neighbours, not a company-wide top-k that filtering
+	// then guts. The default is preFilter "for new indexes" only, so pin it.
+	VectorQueries    []vectorQuery `json:"vectorQueries,omitempty"`
+	VectorFilterMode string        `json:"vectorFilterMode,omitempty"`
 }
 
 type azureSearchResponse struct {
@@ -64,6 +87,18 @@ func (s *azureSearcher) Search(ctx context.Context, q Query, scope rbac.Scope) (
 		Top:    q.Limit,
 		Skip:   (q.Page - 1) * q.Limit,
 		Count:  true,
+	}
+	// Hybrid: when an embedder is wired and there is query text, embed it and add
+	// a vector kNN query. Azure RRF-fuses keyword + vector automatically. Embedding
+	// is best-effort: a failure degrades to keyword-only rather than erroring the
+	// whole search.
+	if s.embedder != nil && strings.TrimSpace(q.Text) != "" {
+		if vq, err := s.vectorQueryFor(ctx, q); err != nil {
+			log.Warn().Err(err).Msg("search: query embed failed, falling back to keyword-only")
+		} else {
+			reqBody.VectorQueries = []vectorQuery{vq}
+			reqBody.VectorFilterMode = "preFilter" // scope filter applies before kNN
+		}
 	}
 	raw, err := json.Marshal(reqBody)
 	if err != nil {
@@ -104,6 +139,24 @@ func (s *azureSearcher) Search(ctx context.Context, q Query, scope rbac.Scope) (
 		})
 	}
 	return hits, sr.Count, nil
+}
+
+// vectorQueryFor embeds the query text and builds the kNN vector query. k covers
+// the requested page (top + skip) with a floor so early pages still get a useful
+// candidate pool for fusion.
+func (s *azureSearcher) vectorQueryFor(ctx context.Context, q Query) (vectorQuery, error) {
+	vecs, err := s.embedder.Embed(ctx, []string{q.Text})
+	if err != nil {
+		return vectorQuery{}, err
+	}
+	if len(vecs) == 0 || len(vecs[0]) == 0 {
+		return vectorQuery{}, fmt.Errorf("search: embedder returned no vector")
+	}
+	k := q.Limit + (q.Page-1)*q.Limit
+	if k < 50 {
+		k = 50
+	}
+	return vectorQuery{Kind: "vector", Vector: vecs[0], Fields: vectorContentField, K: k}, nil
 }
 
 // orAll returns "*" (match-all) for an empty query so a blank text still paginates.
