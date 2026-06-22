@@ -96,7 +96,13 @@ export function RequisitionDialog({ mode, open, onClose, requisition }: Props) {
             <span className="text-xs font-medium text-foreground">{t("fieldPosition")}</span>
             <Select value={positionId} onValueChange={(v) => setPositionId(v ?? "")}>
               <SelectTrigger className="w-full">
-                <SelectValue placeholder={t("positionPlaceholder")} />
+                <SelectValue placeholder={t("positionPlaceholder")}>
+                  {(v: string | null) => {
+                    const p = (positions ?? []).find((p) => p.id === v)
+                    if (!p) return t("positionPlaceholder")
+                    return locale === "th" ? p.title_th || p.title_en : p.title_en || p.title_th
+                  }}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {(positions ?? []).map((p) => (
@@ -112,7 +118,11 @@ export function RequisitionDialog({ mode, open, onClose, requisition }: Props) {
             <span className="text-xs font-medium text-foreground">{t("fieldStore")}</span>
             <Select value={storeId} onValueChange={(v) => setStoreId(v ?? "")}>
               <SelectTrigger className="w-full">
-                <SelectValue placeholder={t("storePlaceholder")} />
+                <SelectValue placeholder={t("storePlaceholder")}>
+                  {(v: string | null) =>
+                    (stores ?? []).find((s) => String(s.store_no) === v)?.store_name ?? t("storePlaceholder")
+                  }
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {(stores ?? []).map((s) => (

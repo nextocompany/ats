@@ -46,7 +46,11 @@ func (r *pgRepository) List(ctx context.Context, f Filter, scope rbac.Scope) ([]
 		return fmt.Sprintf("$%d", len(args))
 	}
 
-	var conds []string
+	// Exclude deduplicated candidates: once a CV is merged into a canonical
+	// candidate, its row is orphaned (is_duplicate_of set, no applications) and
+	// must never appear in the HR roster - clicking one opens a ghost profile.
+	// Mirrors the search projection's filter (internal/search/docs.go).
+	conds := []string{"is_duplicate_of IS NULL"}
 	if f.Status != "" {
 		conds = append(conds, "status = "+add(f.Status))
 	}

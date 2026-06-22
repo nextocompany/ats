@@ -64,7 +64,13 @@ export function ReassignControl({ applicationId, app }: { applicationId: string;
       <div className="mt-3 flex flex-col gap-2">
         <Select value={value} onValueChange={assignStore} disabled={reassign.isPending}>
           <SelectTrigger size="sm">
-            <SelectValue placeholder={t("reassignPlaceholder")} />
+            <SelectValue placeholder={t("reassignPlaceholder")}>
+              {(v: string | null) => {
+                const s = (stores ?? []).find((s) => String(s.store_no) === v)
+                if (!s) return t("reassignPlaceholder")
+                return `${s.store_name} · ${s.province}`
+              }}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {(stores ?? []).map((s) => (

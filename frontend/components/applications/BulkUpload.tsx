@@ -63,7 +63,13 @@ export function BulkUpload() {
           <span className="text-xs font-medium text-foreground">{t("position")}</span>
           <Select value={positionId} onValueChange={(v) => setPositionId(v ?? "")}>
             <SelectTrigger className="w-full" aria-label={t("position")}>
-              <SelectValue placeholder={posLoading ? t("loading") : t("positionPlaceholder")} />
+              <SelectValue placeholder={posLoading ? t("loading") : t("positionPlaceholder")}>
+                {(v: string | null) => {
+                  const p = (positions ?? []).find((p) => p.id === v)
+                  if (!p) return posLoading ? t("loading") : t("positionPlaceholder")
+                  return p.title_th || p.title_en
+                }}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {(positions ?? []).map((p) => (
