@@ -131,6 +131,21 @@ func seedPosition(t *testing.T, f fixture, minEdu, minExp int) uuid.UUID {
 	return id
 }
 
+func seedPositionWithWeights(t *testing.T, f fixture, minEdu, minExp int, weightsJSON string) uuid.UUID {
+	t.Helper()
+	var id uuid.UUID
+	mh := `{"min_education_level":` + strconv.Itoa(minEdu) + `,"min_experience_months":` + strconv.Itoa(minExp) + `}`
+	err := f.pool.QueryRow(context.Background(),
+		`INSERT INTO positions (title_th, level, must_have_criteria, keywords, format_types, score_weights)
+		 VALUES ('ทดสอบถ่วงน้ำหนัก','Staff',$1::jsonb, $2, '{}', $3::jsonb) RETURNING id`,
+		mh, []string{"cashier", "POS"}, weightsJSON,
+	).Scan(&id)
+	if err != nil {
+		t.Fatalf("seed weighted position: %v", err)
+	}
+	return id
+}
+
 func seedStoreVacancy(t *testing.T, f fixture, positionID uuid.UUID) {
 	t.Helper()
 	ctx := context.Background()
@@ -203,6 +218,31 @@ func TestPipeline_ScoredAndAssigned(t *testing.T) {
 	}
 	if app.AssignedStoreID == nil || *app.AssignedStoreID != 1 {
 		t.Errorf("expected assigned store 1, got %v", app.AssignedStoreID)
+	}
+}
+
+// TestPipeline_PositionWeightsDriveScore proves the full feature path end-to-end:
+// positions.score_weights -> FindByID -> jd.Weights -> Score -> persisted ai_score.
+// All weight on experience; the mock profile (24mo >= 2x6) maxes the experience cap,
+// so the weighted total is exactly 100 regardless of the other dimensions.
+func TestPipeline_PositionWeightsDriveScore(t *testing.T) {
+	f := setup(t)
+	pos := seedPositionWithWeights(t, f, 1, 6, `{"experience":100,"skills":0,"education":0,"language":0,"location":0}`)
+	seedStoreVacancy(t, f, pos)
+	p := seedCandidateApp(t, f, pos)
+
+	if err := f.processor(ai.NewMockOCR(), ai.NewMockParser()).HandleProcessApplication(context.Background(), task(t, p)); err != nil {
+		t.Fatalf("pipeline error: %v", err)
+	}
+	app, err := f.apps.FindByID(context.Background(), uuid.MustParse(p.ApplicationID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if app.Status != applications.StatusScored {
+		t.Fatalf("expected scored, got %q", app.Status)
+	}
+	if app.AIScore == nil || *app.AIScore != 100 {
+		t.Fatalf("all-experience weights with maxed experience -> ai_score 100, got %v", app.AIScore)
 	}
 }
 

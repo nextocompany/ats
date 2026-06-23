@@ -66,6 +66,36 @@ func TestScore_HappyPath(t *testing.T) {
 	}
 }
 
+// TestScore_CustomWeightsHonored proves jd.Weights flows through Score into the
+// Total: the same profile/JD scored with custom weights differs from the default.
+func TestScore_CustomWeightsHonored(t *testing.T) {
+	s := compositeScorer{llm: mockLLM{}}
+	base := JD{MinEducationLevel: eduDiploma, MinExperienceMonths: 12, Keywords: []string{"cashier", "POS"}}
+
+	def, err := s.Score(context.Background(), qualifiedProfile(), base, 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// All weight on experience; the qualified profile (36mo >= 2x12) maxes the
+	// experience cap (ratio 1.0), so the weighted total must be exactly 100.
+	custom := base
+	custom.Weights = Weights{Experience: 100}
+	got, err := s.Score(context.Background(), qualifiedProfile(), custom, 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Total == def.Total {
+		t.Fatalf("custom weights did not change the total (both %d)", got.Total)
+	}
+	if got.Total != 100 {
+		t.Fatalf("all-experience weight with maxed experience -> 100, got %d", got.Total)
+	}
+	if got.Weights != custom.Weights {
+		t.Fatalf("effective weights not recorded: %+v", got.Weights)
+	}
+}
+
 func TestScore_Clamp(t *testing.T) {
 	s := compositeScorer{llm: bigLLM{}}
 	jd := JD{MinEducationLevel: eduHigh, MinExperienceMonths: 1}
