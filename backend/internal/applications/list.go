@@ -175,3 +175,33 @@ func (r *pgRepository) ListByCandidate(ctx context.Context, candidateID uuid.UUI
 	}
 	return out, rows.Err()
 }
+
+// ListByAccountForPortal returns the candidate-facing application history for a
+// portal account (across all linked candidate rows), newest first. Thai title is
+// preferred (portal UI is Thai); public_token may be empty for legacy rows.
+func (r *pgRepository) ListByAccountForPortal(ctx context.Context, accountID uuid.UUID) ([]PortalApplication, error) {
+	const q = `
+		SELECT COALESCE(ap.public_token,''),
+		       COALESCE(NULLIF(p.title_th,''), p.title_en, '') AS position_title,
+		       ap.status, ap.created_at
+		FROM applications ap
+		JOIN candidates c ON c.id = ap.candidate_id
+		LEFT JOIN positions p ON p.id = ap.position_id
+		WHERE c.account_id = $1
+		ORDER BY ap.created_at DESC`
+	rows, err := r.pool.Query(ctx, q, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("applications: list by account for portal: %w", err)
+	}
+	defer rows.Close()
+
+	var out []PortalApplication
+	for rows.Next() {
+		var a PortalApplication
+		if err := rows.Scan(&a.StatusToken, &a.PositionTitle, &a.Status, &a.AppliedAt); err != nil {
+			return nil, fmt.Errorf("applications: portal history scan: %w", err)
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}

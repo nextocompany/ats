@@ -109,6 +109,17 @@ const (
 	ModeOnline = "online"
 )
 
+// PortalApplication is the candidate-facing row of a member's application
+// history (GET /api/v1/public/me/applications). Intentionally minimal: no AI
+// score / internal fields — only what a candidate may see, plus the opaque
+// status token so the portal can deep-link to /status?token=...
+type PortalApplication struct {
+	StatusToken   string    `json:"status_token"`
+	PositionTitle string    `json:"position_title"`
+	Status        string    `json:"status"`
+	AppliedAt     time.Time `json:"applied_at"`
+}
+
 // Score carries scoring results in a repository-friendly (pre-serialized) form,
 // so this package does not depend on the scoring package.
 type Score struct {

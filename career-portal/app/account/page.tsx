@@ -6,6 +6,7 @@ import { LogOut } from "lucide-react";
 
 import { AccountIdentityHeader, type AccountSummaryFigure } from "@/components/account/AccountIdentityHeader";
 import { AccountSection } from "@/components/account/AccountSection";
+import { ApplicationHistorySection } from "@/components/account/ApplicationHistorySection";
 import { DataRightsSection } from "@/components/auth/DataRightsSection";
 import { ReconsentBanner } from "@/components/auth/ReconsentBanner";
 import { LinkLineButton } from "@/components/auth/LinkLineButton";
@@ -110,6 +111,8 @@ export default function AccountPage() {
             >
               <ProfileForm account={candidate} submitLabel="บันทึกข้อมูล" onSaved={() => undefined} />
             </AccountSection>
+
+            <ApplicationHistorySection />
 
             <AccountSection
               eyebrow="เรซูเม่"

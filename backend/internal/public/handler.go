@@ -349,6 +349,24 @@ func acctProvince(a *candidateauth.Account) string {
 	return ""
 }
 
+// MyApplications handles GET /api/v1/public/me/applications (RequireCandidate):
+// the logged-in member's own application history across every linked candidate
+// row, newest first. Candidate-facing projection only (no AI score / internals).
+func (h *Handler) MyApplications(c *fiber.Ctx) error {
+	acct := candidateauth.CandidateFromCtx(c)
+	if acct == nil {
+		return fiber.NewError(fiber.StatusUnauthorized, "authentication required")
+	}
+	items, err := h.apps.ListByAccountForPortal(c.UserContext(), acct.ID)
+	if err != nil {
+		return err
+	}
+	if items == nil {
+		items = []applications.PortalApplication{}
+	}
+	return httpx.OK(c, items)
+}
+
 // Status handles GET /api/v1/public/status/:token — minimal projection only.
 func (h *Handler) Status(c *fiber.Ctx) error {
 	app, err := h.apps.FindByPublicToken(c.UserContext(), c.Params("token"))
