@@ -152,14 +152,23 @@ func TestUpdate_AllowedWhenOpenLockedWhenClosed(t *testing.T) {
 		t.Fatalf("approve: %v", err)
 	}
 
-	// Editing an OPEN requisition now succeeds (previously ErrBadState).
+	// Editing an OPEN requisition now succeeds (previously ErrBadState). Details
+	// change; identity (position/store) is locked — those edits are silently ignored.
 	hc := 5
-	updated, err := repo.Update(ctx, created.ID, UpdateInput{Headcount: &hc})
+	otherStore := 999999   // does not exist; must be ignored (no FK violation) on open
+	otherPos := uuid.New() // ignored on open
+	updated, err := repo.Update(ctx, created.ID, UpdateInput{Headcount: &hc, StoreID: &otherStore, PositionID: &otherPos})
 	if err != nil {
 		t.Fatalf("update while open should succeed, got: %v", err)
 	}
 	if updated.Headcount != 5 || updated.Status != StatusOpen {
 		t.Fatalf("expected headcount 5 + still open, got hc=%d status=%q", updated.Headcount, updated.Status)
+	}
+	if updated.StoreID == nil || *updated.StoreID != storeNo {
+		t.Fatalf("store must stay locked on open, got %v want %d", updated.StoreID, storeNo)
+	}
+	if updated.PositionID == nil || *updated.PositionID != posID {
+		t.Fatalf("position must stay locked on open, got %v want %s", updated.PositionID, posID)
 	}
 
 	// Close -> locked: further edits are ErrBadState.

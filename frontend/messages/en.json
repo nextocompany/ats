@@ -959,6 +959,7 @@
     "fieldOther": "Other details",
     "otherPlaceholder": "Anything else applicants should know…",
     "jdInternalHint": "These details are saved to the requisition for approval. The public job posting shows the position's standard JD.",
+    "lockIdentityHint": "Position and store are locked once approved. To change them, close this requisition and open a new one.",
     "cancel": "Cancel",
     "createBtn": "Create",
     "saveBtn": "Save",

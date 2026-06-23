@@ -135,11 +135,18 @@ func (r *pgRepository) Update(ctx context.Context, id uuid.UUID, in UpdateInput)
 		args = append(args, val)
 		set = append(set, fmt.Sprintf("%s = $%d", expr, len(args)))
 	}
+	// addPendingOnly changes a column only while the row is still pending; once the
+	// requisition is approved (open) the identity (position/store) is locked, so the
+	// new value is ignored (defensive — the dialog also disables those selects).
+	addPendingOnly := func(col string, val any) {
+		args = append(args, val)
+		set = append(set, fmt.Sprintf("%s = CASE WHEN status = '%s' THEN $%d ELSE %s END", col, StatusPendingApproval, len(args), col))
+	}
 	if in.PositionID != nil {
-		add("position_id", *in.PositionID)
+		addPendingOnly("position_id", *in.PositionID)
 	}
 	if in.StoreID != nil {
-		add("store_id", *in.StoreID)
+		addPendingOnly("store_id", *in.StoreID)
 	}
 	if in.Headcount != nil {
 		add("headcount", *in.Headcount)
