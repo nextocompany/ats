@@ -43,10 +43,39 @@ export default function AccountPage() {
   // Live resume count for the summary figure — reported up by ResumeLibrary so it
   // stays in sync as the member uploads/deletes (null until first load).
   const [resumeCount, setResumeCount] = useState<number | null>(null);
+  // LINE-link result is returned by the OAuth callback as a URL fragment; surface
+  // it as a one-time banner, then strip the hash so a refresh doesn't repeat it.
+  const [lineNotice, setLineNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) router.replace("/login?return=/account");
   }, [isLoading, isAuthenticated, router]);
+
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (!hash || !hash.includes("line_")) return;
+    let notice: { tone: "ok" | "error"; text: string } | null = null;
+    if (hash.includes("line_linked=1")) {
+      notice = { tone: "ok", text: "เชื่อมบัญชี LINE เรียบร้อยแล้ว" };
+      void refresh();
+    } else if (hash.includes("line_error=line_in_use")) {
+      notice = {
+        tone: "error",
+        text: "LINE นี้ถูกผูกกับอีกบัญชีอยู่แล้ว หากเป็นบัญชีของคุณ กรุณาเข้าสู่ระบบด้วย LINE นั้น หรือติดต่อทีมงานหากต้องการรวมบัญชี",
+      };
+    } else if (hash.includes("line_error=not_logged_in")) {
+      notice = { tone: "error", text: "กรุณาเข้าสู่ระบบก่อนเชื่อมบัญชี LINE" };
+    } else if (hash.includes("line_error")) {
+      notice = { tone: "error", text: "เชื่อมบัญชี LINE ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง" };
+    }
+    if (notice) {
+      // Reading the OAuth-callback URL fragment is a client-only external source;
+      // a lazy useState initializer can't be used (window is undefined during SSR).
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLineNotice(notice);
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
+  }, [refresh]);
 
   const summary = useMemo<AccountSummaryFigure[]>(() => {
     if (!candidate) return [];
@@ -98,6 +127,19 @@ export default function AccountPage() {
         />
 
         <ReconsentBanner />
+
+        {lineNotice ? (
+          <div
+            role="status"
+            className={`rounded-xl border px-4 py-3 text-sm ${
+              lineNotice.tone === "ok"
+                ? "border-accent/30 bg-accent-soft text-primary"
+                : "border-destructive/30 bg-destructive/10 text-destructive"
+            }`}
+          >
+            {lineNotice.text}
+          </div>
+        ) : null}
 
         {/* Editorial bento at >=1024: a dominant lead column (profile + resume)
             beside a quieter supporting rail (LINE + onboarding) on a faint muted
