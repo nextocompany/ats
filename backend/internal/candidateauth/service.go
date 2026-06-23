@@ -55,6 +55,29 @@ func NewService(repo Repository, sender email.Sender, blob BlobStore, otpTTL, se
 	return &Service{repo: repo, email: sender, blob: blob, otpTTL: otpTTL, sessionTTL: sessionTTL}
 }
 
+// NewProvisioner returns a Service wired with only the repository, for callers
+// (the worker pipeline) that need silent at-intake account provisioning
+// (EnsureAccountByEmail) without the email/blob/session machinery.
+func NewProvisioner(repo Repository) *Service {
+	return &Service{repo: repo}
+}
+
+// EnsureAccountByEmail silently ensures an (unverified) candidate account exists
+// for rawEmail and returns its id. ok is false (with a nil error) when the email
+// is empty or invalid, so the caller cleanly skips no-email candidates without
+// treating it as a failure. Never sends any notification.
+func (s *Service) EnsureAccountByEmail(ctx context.Context, rawEmail string) (uuid.UUID, bool, error) {
+	email, ok := normalizeEmail(rawEmail)
+	if !ok {
+		return uuid.Nil, false, nil
+	}
+	acct, err := s.repo.FindOrCreateUnverifiedByEmail(ctx, email)
+	if err != nil {
+		return uuid.Nil, false, err
+	}
+	return acct.ID, true, nil
+}
+
 // WithConsentPolicy wires the current-version source for consent stamping and the
 // re-consent prompt, returning the service for chaining.
 func (s *Service) WithConsentPolicy(p ConsentPolicy) *Service {

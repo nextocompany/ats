@@ -28,8 +28,14 @@ type Repository interface {
 	// FindDuplicates returns non-duplicate candidates (excluding excludeID) that
 	// share an exact id_card, phone, or email with the given values.
 	FindDuplicates(ctx context.Context, excludeID uuid.UUID, idCard, phone, email string) ([]Candidate, error)
-	// MarkDuplicateOf records dupID as a duplicate of canonicalID.
+	// MarkDuplicateOf records dupID as a duplicate of canonicalID and reconciles
+	// the owning account (a member-linked dup donates its account to an accountless
+	// canonical).
 	MarkDuplicateOf(ctx context.Context, dupID, canonicalID uuid.UUID) error
+	// SetAccountID links a candidate to an owning portal account, only when it has
+	// no link yet (never overwrites an existing account). Used by silent at-intake
+	// account provisioning (Phase 2).
+	SetAccountID(ctx context.Context, id, accountID uuid.UUID) error
 }
 
 type pgRepository struct {
@@ -70,13 +76,13 @@ func (r *pgRepository) FindByID(ctx context.Context, id uuid.UUID) (*Candidate, 
 	const q = `
 		SELECT id, full_name, COALESCE(phone,''), COALESCE(email,''), COALESCE(id_card,''),
 		       COALESCE(address,''), COALESCE(province,''), COALESCE(subregion,''),
-		       date_of_birth, COALESCE(source_channel,''), status, COALESCE(line_user_id,''), created_at
+		       date_of_birth, COALESCE(source_channel,''), status, COALESCE(line_user_id,''), created_at, account_id
 		FROM candidates WHERE id = $1`
 	var c Candidate
 	err := r.pool.QueryRow(ctx, q, id).Scan(
 		&c.ID, &c.FullName, &c.Phone, &c.Email, &c.IDCard,
 		&c.Address, &c.Province, &c.Subregion, &c.DateOfBirth,
-		&c.SourceChannel, &c.Status, &c.LineUserID, &c.CreatedAt,
+		&c.SourceChannel, &c.Status, &c.LineUserID, &c.CreatedAt, &c.AccountID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("candidates: find by id: %w", err)
@@ -149,9 +155,40 @@ func (r *pgRepository) FindDuplicates(ctx context.Context, excludeID uuid.UUID, 
 }
 
 func (r *pgRepository) MarkDuplicateOf(ctx context.Context, dupID, canonicalID uuid.UUID) error {
-	const q = `UPDATE candidates SET is_duplicate_of = $2, updated_at = NOW() WHERE id = $1`
-	if _, err := r.pool.Exec(ctx, q, dupID, canonicalID); err != nil {
+	// One transaction: flag the duplicate, then donate its account to the canonical
+	// only when the canonical has no account yet. This covers a logged-in member
+	// applying (their new row carries account_id) that auto-merges into an older
+	// accountless walk-in canonical — the canonical inherits the member account so
+	// the unified list attributes apps correctly. COALESCE + WHERE account_id IS
+	// NULL guarantees a canonical that already has a real account is never clobbered.
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("candidates: mark duplicate begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	if _, err := tx.Exec(ctx,
+		`UPDATE candidates SET is_duplicate_of = $2, updated_at = NOW() WHERE id = $1`,
+		dupID, canonicalID); err != nil {
 		return fmt.Errorf("candidates: mark duplicate: %w", err)
+	}
+	if _, err := tx.Exec(ctx,
+		`UPDATE candidates
+		   SET account_id = (SELECT account_id FROM candidates WHERE id = $1), updated_at = NOW()
+		 WHERE id = $2 AND account_id IS NULL`,
+		dupID, canonicalID); err != nil {
+		return fmt.Errorf("candidates: reconcile duplicate account: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("candidates: mark duplicate commit: %w", err)
+	}
+	return nil
+}
+
+func (r *pgRepository) SetAccountID(ctx context.Context, id, accountID uuid.UUID) error {
+	const q = `UPDATE candidates SET account_id = $2, updated_at = NOW() WHERE id = $1 AND account_id IS NULL`
+	if _, err := r.pool.Exec(ctx, q, id, accountID); err != nil {
+		return fmt.Errorf("candidates: set account id: %w", err)
 	}
 	return nil
 }

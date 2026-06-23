@@ -18,6 +18,7 @@ import (
 	"github.com/nexto/hr-ats/internal/ai"
 	"github.com/nexto/hr-ats/internal/applications"
 	"github.com/nexto/hr-ats/internal/branch"
+	"github.com/nexto/hr-ats/internal/candidateauth"
 	"github.com/nexto/hr-ats/internal/candidates"
 	"github.com/nexto/hr-ats/internal/dedup"
 	"github.com/nexto/hr-ats/internal/positions"
@@ -254,6 +255,87 @@ func TestPipeline_DuplicateRepointed(t *testing.T) {
 	}
 	if app.DedupState != dedup.StateAutoMerged {
 		t.Errorf("expected dedup_state auto_merged, got %q", app.DedupState)
+	}
+}
+
+// TestPipeline_ProvisionsAccountForCanonical verifies Phase 2: a fresh intake
+// with a parsed email gets an owning (unverified) candidate_accounts row, with the
+// account stamped on the candidate. The mock parser emits somchai@example.com.
+func TestPipeline_ProvisionsAccountForCanonical(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+	pos := seedPosition(t, f, 1, 6)
+	seedStoreVacancy(t, f, pos)
+	p := seedCandidateApp(t, f, pos)
+
+	proc := f.processor(ai.NewMockOCR(), ai.NewMockParser())
+	proc.SetAccountProvisioner(candidateauth.NewProvisioner(candidateauth.NewRepository(f.pool)))
+	if err := proc.HandleProcessApplication(ctx, task(t, p)); err != nil {
+		t.Fatalf("pipeline error: %v", err)
+	}
+
+	cand, err := f.cand.FindByID(ctx, uuid.MustParse(p.CandidateID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cand.AccountID == nil {
+		t.Fatal("expected the canonical candidate to be linked to a provisioned account")
+	}
+	var email string
+	var verified bool
+	if err := f.pool.QueryRow(ctx,
+		`SELECT email, email_verified FROM candidate_accounts WHERE id = $1`, *cand.AccountID,
+	).Scan(&email, &verified); err != nil {
+		t.Fatalf("load provisioned account: %v", err)
+	}
+	if email != "somchai@example.com" {
+		t.Errorf("expected account keyed by parsed email, got %q", email)
+	}
+	if verified {
+		t.Error("a CV-provisioned account must be unverified")
+	}
+}
+
+// TestPipeline_ProvisionsCanonicalOnlyNotDuplicate is the key correctness guard:
+// when an intake auto-merges onto an existing canonical, only the CANONICAL is
+// provisioned/linked — the duplicate row stays accountless, so provisioning can
+// never mint a second account for one person.
+func TestPipeline_ProvisionsCanonicalOnlyNotDuplicate(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+	pos := seedPosition(t, f, 1, 6)
+	seedStoreVacancy(t, f, pos)
+
+	// Pre-existing accountless canonical sharing the mock parser's phone.
+	canonical, err := f.cand.Create(ctx, candidates.Candidate{
+		FullName: "สมชาย ใจดี", Phone: "0812345678", Status: "available",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	p := seedCandidateApp(t, f, pos)
+	dedupedID := uuid.MustParse(p.CandidateID)
+
+	proc := f.processor(ai.NewMockOCR(), ai.NewMockParser())
+	proc.SetAccountProvisioner(candidateauth.NewProvisioner(candidateauth.NewRepository(f.pool)))
+	if err := proc.HandleProcessApplication(ctx, task(t, p)); err != nil {
+		t.Fatalf("pipeline error: %v", err)
+	}
+
+	canon, err := f.cand.FindByID(ctx, canonical.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if canon.AccountID == nil {
+		t.Fatal("canonical should have been provisioned an account")
+	}
+	dup, err := f.cand.FindByID(ctx, dedupedID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dup.AccountID != nil {
+		t.Errorf("duplicate row must stay accountless, got %v", dup.AccountID)
 	}
 }
 

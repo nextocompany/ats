@@ -48,6 +48,21 @@ type noopCandidateIndexer struct{}
 
 func (noopCandidateIndexer) Index(context.Context, uuid.UUID) error { return nil }
 
+// accountProvisioner silently ensures an owning portal account for an intaken
+// person, keyed by their parsed email (Phase 2 — unify candidates+members). The
+// interface lives here so the pipeline doesn't import candidateauth's full
+// surface. ok is false (nil error) when the email is empty/invalid. Default is a
+// no-op; the worker injects the candidateauth-backed impl via SetAccountProvisioner.
+type accountProvisioner interface {
+	EnsureAccountByEmail(ctx context.Context, rawEmail string) (uuid.UUID, bool, error)
+}
+
+type noopAccountProvisioner struct{}
+
+func (noopAccountProvisioner) EnsureAccountByEmail(context.Context, string) (uuid.UUID, bool, error) {
+	return uuid.Nil, false, nil
+}
+
 // Processor holds the dependencies for the process_application task.
 type Processor struct {
 	ocr        ai.OCR
@@ -60,6 +75,7 @@ type Processor struct {
 	assigner   *branch.Assigner
 	positions  positions.Repository
 	indexer    CandidateIndexer
+	accounts   accountProvisioner
 	hrNotify   hrNotify
 	candNotify candNotify
 }
@@ -88,7 +104,16 @@ func NewProcessor(
 	return &Processor{
 		ocr: o, parser: p, blob: b, candidates: c, apps: a,
 		dedup: d, scorer: s, assigner: asn, positions: pos,
-		indexer: noopCandidateIndexer{},
+		indexer:  noopCandidateIndexer{},
+		accounts: noopAccountProvisioner{},
+	}
+}
+
+// SetAccountProvisioner injects silent at-intake account provisioning (Phase 2).
+// No-op by default; the worker wires the candidateauth-backed implementation.
+func (pr *Processor) SetAccountProvisioner(p accountProvisioner) {
+	if p != nil {
+		pr.accounts = p
 	}
 }
 
@@ -277,6 +302,26 @@ func (pr *Processor) run(ctx context.Context, p queue.ProcessApplicationPayload,
 	if err != nil {
 		return canonicalID, fmt.Errorf("pipeline: load candidate: %w", err)
 	}
+
+	// Step 3b — silently ensure an owning portal account for the CANONICAL
+	// candidate (Phase 2: keep the unified account-keyed Candidates list complete
+	// at inflow, no backfill). Provision the canonical only — never candID — so a
+	// duplicate intake row is never given its own account. Key the account by the
+	// freshly PARSED email (profile.Personal.Email), not cand.Email: on an auto-merge
+	// the parsed email lands on the duplicate row while the older canonical (e.g. an
+	// accountless walk-in) may carry no email, so reading cand.Email would miss it.
+	// Best-effort: a failure must not fail the task (no asynq retry storm); the
+	// person is recovered on the next intake. No notification is ever sent here.
+	if cand.AccountID == nil {
+		if accountID, ok, perr := pr.accounts.EnsureAccountByEmail(ctx, profile.Personal.Email); perr != nil {
+			logger.Warn().Err(perr).Str("canonical", canonicalID.String()).Msg("account provisioning failed (non-fatal)")
+		} else if ok {
+			if serr := pr.candidates.SetAccountID(ctx, canonicalID, accountID); serr != nil {
+				logger.Warn().Err(serr).Str("canonical", canonicalID.String()).Msg("link candidate to account failed (non-fatal)")
+			}
+		}
+	}
+
 	jd := scoring.JD{
 		Title:               pos.TitleTH,
 		MinEducationLevel:   pos.MustHave.MinEducationLevel,
