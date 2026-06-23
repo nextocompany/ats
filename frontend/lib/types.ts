@@ -280,6 +280,18 @@ export interface Position {
   title_en: string;
 }
 
+// PositionDetail is the full position projection (mirrors positions.DetailItem),
+// used to prefill the requisition form with the position's Master JD text.
+export interface PositionDetail {
+  id: string;
+  title_th: string;
+  title_en: string;
+  level: string;
+  responsibilities: string;
+  qualifications: string;
+  benefits: string;
+}
+
 // Requisition is a managed position opening (a row in the vacancies table,
 // source='manual'). Mirrors internal/requisitions.Requisition.
 export interface Requisition {
@@ -297,12 +309,31 @@ export interface Requisition {
   approved_at: string | null;
   created_at: string;
   updated_at: string;
+  // Detailed JD + opening metadata (manual requisitions).
+  responsibilities: string;
+  qualifications: string;
+  benefits: string;
+  other_details: string;
+  employment_type: string; // "" | full_time | part_time | contract | seasonal
+  salary_min: number | null;
+  salary_max: number | null;
+  priority: string; // normal | urgent
+  open_reason: string; // "" | new_headcount | replacement
 }
 
 export interface RequisitionInput {
   position_id?: string;
   store_id?: number;
   headcount?: number;
+  responsibilities?: string;
+  qualifications?: string;
+  benefits?: string;
+  other_details?: string;
+  employment_type?: string;
+  salary_min?: number;
+  salary_max?: number;
+  priority?: string;
+  open_reason?: string;
 }
 
 export interface RequisitionFilter {

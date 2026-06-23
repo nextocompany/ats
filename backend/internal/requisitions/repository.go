@@ -18,7 +18,9 @@ import (
 const reqColumns = `
 	v.id, v.position_id, COALESCE(NULLIF(p.title_en,''), p.title_th, '') AS position_title,
 	v.store_id, COALESCE(s.store_name,'') AS store_name, COALESCE(s.subregion,'') AS subregion,
-	v.headcount, v.status, v.source, v.created_by, v.approved_by, v.approved_at, v.created_at, v.updated_at`
+	v.headcount, v.status, v.source, v.created_by, v.approved_by, v.approved_at, v.created_at, v.updated_at,
+	COALESCE(v.responsibilities,''), COALESCE(v.qualifications,''), COALESCE(v.benefits,''), COALESCE(v.other_details,''),
+	COALESCE(v.employment_type,''), v.salary_min, v.salary_max, COALESCE(v.priority,''), COALESCE(v.open_reason,'')`
 
 const reqFrom = `
 	FROM vacancies v
@@ -40,6 +42,8 @@ func scanRequisition(row pgx.Row) (Requisition, error) {
 		&r.ID, &r.PositionID, &r.PositionTitle,
 		&r.StoreID, &r.StoreName, &r.Subregion,
 		&r.Headcount, &r.Status, &r.Source, &r.CreatedBy, &r.ApprovedBy, &r.ApprovedAt, &r.CreatedAt, &r.UpdatedAt,
+		&r.Responsibilities, &r.Qualifications, &r.Benefits, &r.OtherDetails,
+		&r.EmploymentType, &r.SalaryMin, &r.SalaryMax, &r.Priority, &r.OpenReason,
 	); err != nil {
 		return Requisition{}, err
 	}
@@ -105,11 +109,20 @@ func (r *pgRepository) List(ctx context.Context, f ListFilter, scope rbac.Scope)
 
 func (r *pgRepository) Create(ctx context.Context, in CreateInput, createdBy uuid.UUID) (Requisition, error) {
 	const ins = `
-		INSERT INTO vacancies (position_id, store_id, headcount, status, source, created_by, opened_at, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, NULL, now(), now())
+		INSERT INTO vacancies (
+			position_id, store_id, headcount, status, source, created_by, opened_at, created_at, updated_at,
+			responsibilities, qualifications, benefits, other_details,
+			employment_type, salary_min, salary_max, priority, open_reason)
+		VALUES ($1, $2, $3, $4, $5, $6, NULL, now(), now(),
+			$7, $8, $9, $10,
+			$11, $12, $13, $14, $15)
 		RETURNING id`
 	var id uuid.UUID
-	if err := r.pool.QueryRow(ctx, ins, in.PositionID, in.StoreID, in.Headcount, StatusPendingApproval, SourceManual, createdBy).Scan(&id); err != nil {
+	if err := r.pool.QueryRow(ctx, ins,
+		in.PositionID, in.StoreID, in.Headcount, StatusPendingApproval, SourceManual, createdBy,
+		in.Responsibilities, in.Qualifications, in.Benefits, in.OtherDetails,
+		in.EmploymentType, in.SalaryMin, in.SalaryMax, in.Priority, in.OpenReason,
+	).Scan(&id); err != nil {
 		return Requisition{}, fmt.Errorf("requisitions: create: %w", err)
 	}
 	return r.getByID(ctx, id)
@@ -130,6 +143,33 @@ func (r *pgRepository) Update(ctx context.Context, id uuid.UUID, in UpdateInput)
 	}
 	if in.Headcount != nil {
 		add("headcount", *in.Headcount)
+	}
+	if in.Responsibilities != nil {
+		add("responsibilities", *in.Responsibilities)
+	}
+	if in.Qualifications != nil {
+		add("qualifications", *in.Qualifications)
+	}
+	if in.Benefits != nil {
+		add("benefits", *in.Benefits)
+	}
+	if in.OtherDetails != nil {
+		add("other_details", *in.OtherDetails)
+	}
+	if in.EmploymentType != nil {
+		add("employment_type", *in.EmploymentType)
+	}
+	if in.SalaryMin != nil {
+		add("salary_min", *in.SalaryMin)
+	}
+	if in.SalaryMax != nil {
+		add("salary_max", *in.SalaryMax)
+	}
+	if in.Priority != nil {
+		add("priority", *in.Priority)
+	}
+	if in.OpenReason != nil {
+		add("open_reason", *in.OpenReason)
 	}
 	if len(set) == 0 {
 		return r.getByID(ctx, id) // nothing to change

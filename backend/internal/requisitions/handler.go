@@ -3,6 +3,7 @@ package requisitions
 import (
 	"errors"
 	"strconv"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -86,10 +87,43 @@ func (h *Handler) List(c *fiber.Ctx) error {
 }
 
 type createReq struct {
-	PositionID string `json:"position_id"`
-	StoreID    int    `json:"store_id"`
-	Headcount  int    `json:"headcount"`
+	PositionID       string `json:"position_id"`
+	StoreID          int    `json:"store_id"`
+	Headcount        int    `json:"headcount"`
+	Responsibilities string `json:"responsibilities"`
+	Qualifications   string `json:"qualifications"`
+	Benefits         string `json:"benefits"`
+	OtherDetails     string `json:"other_details"`
+	EmploymentType   string `json:"employment_type"`
+	SalaryMin        *int   `json:"salary_min"`
+	SalaryMax        *int   `json:"salary_max"`
+	Priority         string `json:"priority"`
+	OpenReason       string `json:"open_reason"`
 }
+
+// textTooLong reports whether s exceeds the per-field JD cap (rune-counted for Thai).
+func textTooLong(s string) bool { return len([]rune(s)) > maxJDTextLen }
+
+// validateSalary checks an optional salary range: each bound non-negative, and
+// max >= min when both are present.
+func validateSalary(min, max *int) error {
+	if min != nil && *min < 0 {
+		return errBadField("salary_min must be zero or greater")
+	}
+	if max != nil && *max < 0 {
+		return errBadField("salary_max must be zero or greater")
+	}
+	if min != nil && max != nil && *max < *min {
+		return errBadField("salary_max must be greater than or equal to salary_min")
+	}
+	return nil
+}
+
+// errBadField is a lightweight carrier so validation helpers can report a message
+// the handler maps to a 400.
+type errBadField string
+
+func (e errBadField) Error() string { return string(e) }
 
 func (h *Handler) Create(c *fiber.Ctx) error {
 	u, ok := user(c)
@@ -110,11 +144,51 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 	if req.Headcount < 1 || req.Headcount > maxHeadcount {
 		return httpx.Fail(c, fiber.StatusBadRequest, "headcount must be between 1 and 999")
 	}
+	// Normalise + validate the optional JD / metadata fields.
+	resp := strings.TrimSpace(req.Responsibilities)
+	qual := strings.TrimSpace(req.Qualifications)
+	benefits := strings.TrimSpace(req.Benefits)
+	other := strings.TrimSpace(req.OtherDetails)
+	for _, t := range []string{resp, qual, benefits, other} {
+		if textTooLong(t) {
+			return httpx.Fail(c, fiber.StatusBadRequest, "a job-description field exceeds the maximum length")
+		}
+	}
+	employment := strings.TrimSpace(req.EmploymentType)
+	if employment != "" && !ValidEmployment(employment) {
+		return httpx.Fail(c, fiber.StatusBadRequest, "invalid employment_type")
+	}
+	reason := strings.TrimSpace(req.OpenReason)
+	if reason != "" && !ValidReason(reason) {
+		return httpx.Fail(c, fiber.StatusBadRequest, "invalid open_reason")
+	}
+	priority := strings.TrimSpace(req.Priority)
+	if priority == "" {
+		priority = PriorityNormal
+	} else if !ValidPriority(priority) {
+		return httpx.Fail(c, fiber.StatusBadRequest, "invalid priority")
+	}
+	if err := validateSalary(req.SalaryMin, req.SalaryMax); err != nil {
+		return httpx.Fail(c, fiber.StatusBadRequest, err.Error())
+	}
 	creator, err := uuid.Parse(u.ID)
 	if err != nil {
 		return httpx.Fail(c, fiber.StatusBadRequest, "authenticated user has no internal id")
 	}
-	req2, err := h.repo.Create(c.UserContext(), CreateInput{PositionID: positionID, StoreID: req.StoreID, Headcount: req.Headcount}, creator)
+	req2, err := h.repo.Create(c.UserContext(), CreateInput{
+		PositionID:       positionID,
+		StoreID:          req.StoreID,
+		Headcount:        req.Headcount,
+		Responsibilities: resp,
+		Qualifications:   qual,
+		Benefits:         benefits,
+		OtherDetails:     other,
+		EmploymentType:   employment,
+		SalaryMin:        req.SalaryMin,
+		SalaryMax:        req.SalaryMax,
+		Priority:         priority,
+		OpenReason:       reason,
+	}, creator)
 	if err != nil {
 		return h.writeErr(c, err)
 	}
@@ -122,9 +196,27 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 }
 
 type updateReq struct {
-	PositionID *string `json:"position_id"`
-	StoreID    *int    `json:"store_id"`
-	Headcount  *int    `json:"headcount"`
+	PositionID       *string `json:"position_id"`
+	StoreID          *int    `json:"store_id"`
+	Headcount        *int    `json:"headcount"`
+	Responsibilities *string `json:"responsibilities"`
+	Qualifications   *string `json:"qualifications"`
+	Benefits         *string `json:"benefits"`
+	OtherDetails     *string `json:"other_details"`
+	EmploymentType   *string `json:"employment_type"`
+	SalaryMin        *int    `json:"salary_min"`
+	SalaryMax        *int    `json:"salary_max"`
+	Priority         *string `json:"priority"`
+	OpenReason       *string `json:"open_reason"`
+}
+
+// trimmedPtr returns a pointer to the whitespace-trimmed value, preserving nil.
+func trimmedPtr(s *string) *string {
+	if s == nil {
+		return nil
+	}
+	t := strings.TrimSpace(*s)
+	return &t
 }
 
 func (h *Handler) Update(c *fiber.Ctx) error {
@@ -146,7 +238,19 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return httpx.Fail(c, fiber.StatusBadRequest, "invalid request body")
 	}
-	in := UpdateInput{StoreID: req.StoreID, Headcount: req.Headcount}
+	in := UpdateInput{
+		StoreID:          req.StoreID,
+		Headcount:        req.Headcount,
+		Responsibilities: trimmedPtr(req.Responsibilities),
+		Qualifications:   trimmedPtr(req.Qualifications),
+		Benefits:         trimmedPtr(req.Benefits),
+		OtherDetails:     trimmedPtr(req.OtherDetails),
+		EmploymentType:   trimmedPtr(req.EmploymentType),
+		SalaryMin:        req.SalaryMin,
+		SalaryMax:        req.SalaryMax,
+		Priority:         trimmedPtr(req.Priority),
+		OpenReason:       trimmedPtr(req.OpenReason),
+	}
 	if req.PositionID != nil {
 		pid, perr := uuid.Parse(*req.PositionID)
 		if perr != nil {
@@ -156,6 +260,23 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 	}
 	if req.Headcount != nil && (*req.Headcount < 1 || *req.Headcount > maxHeadcount) {
 		return httpx.Fail(c, fiber.StatusBadRequest, "headcount must be between 1 and 999")
+	}
+	for _, t := range []*string{in.Responsibilities, in.Qualifications, in.Benefits, in.OtherDetails} {
+		if t != nil && textTooLong(*t) {
+			return httpx.Fail(c, fiber.StatusBadRequest, "a job-description field exceeds the maximum length")
+		}
+	}
+	if in.EmploymentType != nil && *in.EmploymentType != "" && !ValidEmployment(*in.EmploymentType) {
+		return httpx.Fail(c, fiber.StatusBadRequest, "invalid employment_type")
+	}
+	if in.OpenReason != nil && *in.OpenReason != "" && !ValidReason(*in.OpenReason) {
+		return httpx.Fail(c, fiber.StatusBadRequest, "invalid open_reason")
+	}
+	if in.Priority != nil && !ValidPriority(*in.Priority) {
+		return httpx.Fail(c, fiber.StatusBadRequest, "invalid priority")
+	}
+	if err := validateSalary(in.SalaryMin, in.SalaryMax); err != nil {
+		return httpx.Fail(c, fiber.StatusBadRequest, err.Error())
 	}
 	updated, err := h.repo.Update(c.UserContext(), id, in)
 	if err != nil {
