@@ -131,6 +131,17 @@ func (f *fakeRepo) FindOrCreateByEmail(_ context.Context, email string) (*Accoun
 	return a, nil
 }
 
+func (f *fakeRepo) FindOrCreateUnverifiedByEmail(_ context.Context, email string) (*Account, error) {
+	if id, ok := f.byEmail[email]; ok {
+		return f.accounts[id], nil // never flip email_verified
+	}
+	a := f.newAccount()
+	a.Email = email
+	a.EmailVerified = false
+	f.byEmail[email] = a.ID
+	return a, nil
+}
+
 func (f *fakeRepo) findOrCreateSub(m map[string]uuid.UUID, sub, name, email string) (*Account, error) {
 	if id, ok := m[sub]; ok {
 		return f.accounts[id], nil
@@ -315,6 +326,61 @@ func newTestService(repo Repository) (*Service, *recordingSender) {
 	rs := &recordingSender{}
 	svc := NewService(repo, rs, newFakeBlob(), 10*time.Minute, 720*time.Hour)
 	return svc, rs
+}
+
+func TestEnsureAccountByEmail(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("creates an unverified account for a new email", func(t *testing.T) {
+		repo := newFakeRepo()
+		svc, _ := newTestService(repo)
+		id, ok, err := svc.EnsureAccountByEmail(ctx, "New@Example.com")
+		if err != nil || !ok {
+			t.Fatalf("ensure: ok=%v err=%v", ok, err)
+		}
+		// Normalized (lowercased) key, account created unverified.
+		acctID, found := repo.byEmail["new@example.com"]
+		if !found || acctID != id {
+			t.Fatalf("expected normalized account for new@example.com, got id=%v found=%v", acctID, found)
+		}
+		if repo.accounts[id].EmailVerified {
+			t.Fatal("a CV-provisioned account must be unverified")
+		}
+	})
+
+	t.Run("is idempotent and never flips an existing verified account", func(t *testing.T) {
+		repo := newFakeRepo()
+		svc, _ := newTestService(repo)
+		// Pre-existing VERIFIED account (e.g. the member logged in via OTP earlier).
+		verified, _ := repo.FindOrCreateByEmail(ctx, "member@example.com")
+		id, ok, err := svc.EnsureAccountByEmail(ctx, "member@example.com")
+		if err != nil || !ok {
+			t.Fatalf("ensure: ok=%v err=%v", ok, err)
+		}
+		if id != verified.ID {
+			t.Fatalf("expected the existing account %v, got %v", verified.ID, id)
+		}
+		if !repo.accounts[id].EmailVerified {
+			t.Fatal("ensure must NOT flip an already-verified account to unverified")
+		}
+	})
+
+	t.Run("skips empty or invalid email without error", func(t *testing.T) {
+		repo := newFakeRepo()
+		svc, _ := newTestService(repo)
+		for _, raw := range []string{"", "   ", "not-an-email"} {
+			id, ok, err := svc.EnsureAccountByEmail(ctx, raw)
+			if err != nil {
+				t.Fatalf("ensure(%q): unexpected error %v", raw, err)
+			}
+			if ok || id != uuid.Nil {
+				t.Fatalf("ensure(%q): expected (Nil,false), got (%v,%v)", raw, id, ok)
+			}
+		}
+		if len(repo.byEmail) != 0 {
+			t.Fatal("no account should be created for an invalid email")
+		}
+	})
 }
 
 func TestStartEmailOTPStoresAndSends(t *testing.T) {

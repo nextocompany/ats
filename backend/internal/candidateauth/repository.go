@@ -21,6 +21,12 @@ type Repository interface {
 	// FindOrCreateByEmail returns the account for a verified email, creating it
 	// (email_verified=true) when absent.
 	FindOrCreateByEmail(ctx context.Context, email string) (*Account, error)
+	// FindOrCreateUnverifiedByEmail returns the account for an email, creating an
+	// UNVERIFIED shell (email_verified=false) when absent. Unlike
+	// FindOrCreateByEmail it never flips an existing account's verified flag — a CV
+	// at intake does not verify the address. Caller must pass a normalized
+	// (lowercased) email. Used by silent at-intake account provisioning (Phase 2).
+	FindOrCreateUnverifiedByEmail(ctx context.Context, email string) (*Account, error)
 	// FindOrCreateByLineSub returns the account for a verified LINE sub. When a
 	// new account is created, name/email seed it; an existing email account is
 	// linked rather than duplicated.
@@ -147,6 +153,29 @@ func (r *pgRepository) FindOrCreateByEmail(ctx context.Context, email string) (*
 	}
 	if err != nil {
 		return nil, fmt.Errorf("candidateauth: create by email: %w", err)
+	}
+	return a, nil
+}
+
+func (r *pgRepository) FindOrCreateUnverifiedByEmail(ctx context.Context, email string) (*Account, error) {
+	// Return an existing account as-is — never flip email_verified (a CV does not
+	// verify the address; matches the Phase-1 backfill shell semantics).
+	if a, err := r.findByColumn(ctx, "email", email); err == nil {
+		return a, nil
+	} else if !errors.Is(err, ErrNotFound) {
+		return nil, err
+	}
+
+	const ins = `
+		INSERT INTO candidate_accounts (email, email_verified)
+		VALUES ($1, FALSE)
+		RETURNING ` + accountColumns
+	a, err := scanAccount(r.pool.QueryRow(ctx, ins, email))
+	if isUnique(err) { // lost a create race (concurrent intake) — read the winner
+		return r.findByColumn(ctx, "email", email)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("candidateauth: ensure unverified by email: %w", err)
 	}
 	return a, nil
 }

@@ -122,6 +122,12 @@ func main() {
 	// pipeline, never fatal.
 	processor.SetIndexer(search.NewCandidateSync(pool, search.NewIndexer(cfg, ai.NewEmbedder(cfg))))
 
+	// Silent at-intake account provisioning (Phase 2: unify candidates+members).
+	// Every intaken person gets an owning portal account keyed by their parsed
+	// email, post-dedup, so the account-keyed Candidates list stays complete with
+	// no backfill. Best-effort; never notifies.
+	processor.SetAccountProvisioner(candidateauth.NewProvisioner(candidateauth.NewRepository(pool)))
+
 	redisOpt, err := queue.RedisOpt(cfg.RedisURL)
 	if err != nil {
 		log.Fatal().Err(err).Msg("queue redis opt failed")
