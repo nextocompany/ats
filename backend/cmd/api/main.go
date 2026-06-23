@@ -342,6 +342,8 @@ func main() {
 	publicHandler := public.NewHandler(intakeSvc, appRepo, positionRepo, lineVerifier, pdpaRepo, caSvc, cfg.SessionCookieName)
 	public.RegisterRoutes(app, publicHandler)
 	app.Post("/api/v1/public/apply/quick", candidateauth.RequireCandidate(caSvc, cfg.SessionCookieName), publicHandler.QuickApply)
+	// Candidate-facing application history (their own, by session account).
+	app.Get("/api/v1/public/me/applications", candidateauth.RequireCandidate(caSvc, cfg.SessionCookieName), publicHandler.MyApplications)
 
 	// Offer management (candidate side): a logged-in member lists their offers and
 	// accepts/declines. Accept best-effort pushes the hire to PeopleSoft. Routes sit

@@ -13,6 +13,7 @@ import type {
   Offer,
   OfferResponseInput,
   OnboardingStatus,
+  PortalApplication,
   PositionDetail,
   PublicPosition,
   QuickApplyResult,
@@ -141,6 +142,16 @@ export function useStatus(token: string) {
       api.get<ApplicationStatus>(`/api/v1/public/status/${encodeURIComponent(token)}`).then((r) => r.data),
     enabled: !!token,
     retry: false,
+  });
+}
+
+// useMyApplications loads the logged-in member's own application history
+// (session-cookie auth). enabled lets the caller defer until auth is known.
+export function useMyApplications(enabled = true) {
+  return useQuery<PortalApplication[]>({
+    queryKey: ["my-applications"],
+    queryFn: () => api.get<PortalApplication[]>("/api/v1/public/me/applications").then((r) => r.data),
+    enabled,
   });
 }
 

@@ -20,6 +20,12 @@ type Repository interface {
 	FindByID(ctx context.Context, id uuid.UUID) (*Application, error)
 	List(ctx context.Context, f ListFilter, scope rbac.Scope) ([]Application, int, error)
 	ListByCandidate(ctx context.Context, candidateID uuid.UUID) ([]Application, error)
+	// ListByAccountForPortal returns the candidate-facing application history for a
+	// portal account, aggregated across every linked candidate row (newest first).
+	// Projection is minimal + non-sensitive (no AI score / internal fields): the
+	// position title, status, applied-at, and the opaque public status token so the
+	// portal can deep-link each row to /status.
+	ListByAccountForPortal(ctx context.Context, accountID uuid.UUID) ([]PortalApplication, error)
 	SetRawFile(ctx context.Context, id uuid.UUID, blobURL string) error
 	SetQueueTaskID(ctx context.Context, id uuid.UUID, taskID string) error
 	SetStatus(ctx context.Context, id uuid.UUID, status string) error

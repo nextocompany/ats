@@ -103,6 +103,15 @@ export interface ApplicationStatus {
   position?: string;
 }
 
+// GET /api/v1/public/me/applications — the logged-in member's application history
+// (one row per position applied to). status_token deep-links to /status.
+export interface PortalApplication {
+  status_token: string;
+  position_title: string;
+  status: string;
+  applied_at: string;
+}
+
 // --- AI pre-interview (slice 2.5) ---
 
 // One message in the interview chat. role mirrors the chat-completion roles.
