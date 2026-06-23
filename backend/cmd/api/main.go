@@ -384,6 +384,9 @@ func main() {
 		interviewRepo, interview.New(cfg),
 		appRepo, positionRepo, candidateRepo, notifier, cfg.PortalBaseURL, cfg.InterviewMaxTurns,
 	)
+	// Item 8.1 — notify store HR (email + Teams when configured) when a candidate
+	// passes the AI pre-interview at or above the actionable score threshold.
+	interviewSvc.SetHRNotifier(applications.NewHRDirectory(pool), cfg.DashboardBaseURL, cfg.TeamsWebhookURL != "", cfg.InterviewHRNotifyThreshold)
 	interviewHandler := interview.NewHandler(interviewSvc, appRepo, cfg.PortalBaseURL)
 	interview.RegisterPublicRoutes(app, interviewHandler)
 
