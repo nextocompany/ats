@@ -37,6 +37,7 @@ import type {
   MemberStats,
   OpenRole,
   Position,
+  PositionDetail,
   Requisition,
   RequisitionFilter,
   RequisitionInput,
@@ -195,6 +196,17 @@ export function usePositions() {
   return useQuery({
     queryKey: ["positions"],
     queryFn: () => api.get<Position[]>("/api/v1/positions").then((r) => r.data),
+  });
+}
+
+// usePosition loads a single position's Master JD text, used to prefill the
+// requisition form when HR selects a position. Disabled until an id is set.
+export function usePosition(id: string, enabled = true) {
+  return useQuery({
+    queryKey: ["position", id],
+    queryFn: () => api.get<PositionDetail>(`/api/v1/positions/${id}`).then((r) => r.data),
+    enabled: enabled && id !== "",
+    staleTime: 5 * 60 * 1000,
   });
 }
 

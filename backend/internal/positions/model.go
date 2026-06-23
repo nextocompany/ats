@@ -28,6 +28,7 @@ type Position struct {
 	FormatTypes      []string  `json:"format_types"`
 	Responsibilities string    `json:"responsibilities"`
 	Qualifications   string    `json:"qualifications"`
+	Benefits         string    `json:"benefits"`
 }
 
 // PublicPosition is the safe projection exposed on the public Career API.
@@ -65,7 +66,7 @@ func (r *pgRepository) FindByID(ctx context.Context, id uuid.UUID) (*Position, e
 		SELECT id, title_th, COALESCE(title_en,''), COALESCE(level,''),
 		       COALESCE(must_have_criteria, '{}'::jsonb),
 		       COALESCE(keywords, '{}'), COALESCE(format_types, '{}'),
-		       COALESCE(responsibilities, ''), COALESCE(qualifications, '')
+		       COALESCE(responsibilities, ''), COALESCE(qualifications, ''), COALESCE(benefits, '')
 		FROM positions WHERE id = $1`
 	var (
 		p           Position
@@ -73,7 +74,7 @@ func (r *pgRepository) FindByID(ctx context.Context, id uuid.UUID) (*Position, e
 	)
 	if err := r.pool.QueryRow(ctx, q, id).Scan(
 		&p.ID, &p.TitleTH, &p.TitleEN, &p.Level, &mustHaveRaw, &p.Keywords, &p.FormatTypes,
-		&p.Responsibilities, &p.Qualifications,
+		&p.Responsibilities, &p.Qualifications, &p.Benefits,
 	); err != nil {
 		return nil, fmt.Errorf("positions: find by id: %w", err)
 	}
@@ -90,7 +91,7 @@ func (r *pgRepository) FindByPSCode(ctx context.Context, code string) (*Position
 		SELECT id, title_th, COALESCE(title_en,''), COALESCE(level,''),
 		       COALESCE(must_have_criteria, '{}'::jsonb),
 		       COALESCE(keywords, '{}'), COALESCE(format_types, '{}'),
-		       COALESCE(responsibilities, ''), COALESCE(qualifications, '')
+		       COALESCE(responsibilities, ''), COALESCE(qualifications, ''), COALESCE(benefits, '')
 		FROM positions WHERE ps_position_code = $1`
 	var (
 		p           Position
@@ -98,7 +99,7 @@ func (r *pgRepository) FindByPSCode(ctx context.Context, code string) (*Position
 	)
 	if err := r.pool.QueryRow(ctx, q, code).Scan(
 		&p.ID, &p.TitleTH, &p.TitleEN, &p.Level, &mustHaveRaw, &p.Keywords, &p.FormatTypes,
-		&p.Responsibilities, &p.Qualifications,
+		&p.Responsibilities, &p.Qualifications, &p.Benefits,
 	); err != nil {
 		return nil, fmt.Errorf("positions: find by ps code: %w", err)
 	}
@@ -115,7 +116,7 @@ func (r *pgRepository) ListAll(ctx context.Context) ([]Position, error) {
 		SELECT id, title_th, COALESCE(title_en,''), COALESCE(level,''),
 		       COALESCE(must_have_criteria, '{}'::jsonb),
 		       COALESCE(keywords, '{}'), COALESCE(format_types, '{}'),
-		       COALESCE(responsibilities, ''), COALESCE(qualifications, '')
+		       COALESCE(responsibilities, ''), COALESCE(qualifications, ''), COALESCE(benefits, '')
 		FROM positions WHERE is_active = TRUE ORDER BY title_th`
 	rows, err := r.pool.Query(ctx, q)
 	if err != nil {
@@ -131,7 +132,7 @@ func (r *pgRepository) ListAll(ctx context.Context) ([]Position, error) {
 		)
 		if err := rows.Scan(
 			&p.ID, &p.TitleTH, &p.TitleEN, &p.Level, &mustHaveRaw, &p.Keywords, &p.FormatTypes,
-			&p.Responsibilities, &p.Qualifications,
+			&p.Responsibilities, &p.Qualifications, &p.Benefits,
 		); err != nil {
 			return nil, fmt.Errorf("positions: scan all: %w", err)
 		}

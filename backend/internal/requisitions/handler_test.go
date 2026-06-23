@@ -38,6 +38,8 @@ type stubRepo struct {
 	approveErr    error
 	created       int
 	approved      int
+	lastCreate    CreateInput
+	lastUpdate    UpdateInput
 }
 
 func (s *stubRepo) List(context.Context, ListFilter, rbac.Scope) ([]Requisition, int, error) {
@@ -45,9 +47,11 @@ func (s *stubRepo) List(context.Context, ListFilter, rbac.Scope) ([]Requisition,
 }
 func (s *stubRepo) Create(_ context.Context, in CreateInput, _ uuid.UUID) (Requisition, error) {
 	s.created++
+	s.lastCreate = in
 	return Requisition{ID: uuid.New(), Status: StatusPendingApproval, Headcount: in.Headcount}, nil
 }
-func (s *stubRepo) Update(_ context.Context, id uuid.UUID, _ UpdateInput) (Requisition, error) {
+func (s *stubRepo) Update(_ context.Context, id uuid.UUID, in UpdateInput) (Requisition, error) {
+	s.lastUpdate = in
 	return Requisition{ID: id}, nil
 }
 func (s *stubRepo) Approve(_ context.Context, id uuid.UUID, _ uuid.UUID) (Requisition, error) {
@@ -128,6 +132,86 @@ func TestCreate_Validation(t *testing.T) {
 				t.Fatalf("create %s: got %d want %d", tc.name, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestCreate_DetailedFieldsValidation(t *testing.T) {
+	pid := uuid.NewString()
+	base := func(extra string) string {
+		return `{"position_id":"` + pid + `","store_id":1,"headcount":2` + extra + `}`
+	}
+	cases := []struct {
+		name string
+		body string
+		want int
+	}{
+		{"full jd", base(`,"responsibilities":"do things","qualifications":"degree","benefits":"insurance","other_details":"note","employment_type":"full_time","salary_min":15000,"salary_max":20000,"priority":"urgent","open_reason":"replacement"`), fiber.StatusCreated},
+		{"bad employment", base(`,"employment_type":"weird"`), fiber.StatusBadRequest},
+		{"bad priority", base(`,"priority":"nope"`), fiber.StatusBadRequest},
+		{"bad reason", base(`,"open_reason":"because"`), fiber.StatusBadRequest},
+		{"salary inverted", base(`,"salary_min":30000,"salary_max":10000`), fiber.StatusBadRequest},
+		{"negative salary", base(`,"salary_min":-1`), fiber.StatusBadRequest},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			fa := appWithRole("hr_manager", &stubRepo{})
+			if got := do(t, fa, fiber.MethodPost, "/api/v1/requisitions/", tc.body); got != tc.want {
+				t.Fatalf("create %s: got %d want %d", tc.name, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestCreate_DefaultsPriorityToNormal(t *testing.T) {
+	repo := &stubRepo{}
+	fa := appWithRole("hr_manager", repo)
+	body := `{"position_id":"` + uuid.NewString() + `","store_id":1,"headcount":1}`
+	if got := do(t, fa, fiber.MethodPost, "/api/v1/requisitions/", body); got != fiber.StatusCreated {
+		t.Fatalf("create: got %d want 201", got)
+	}
+	if repo.lastCreate.Priority != PriorityNormal {
+		t.Fatalf("priority default: got %q want %q", repo.lastCreate.Priority, PriorityNormal)
+	}
+}
+
+func TestCreate_PersistsDetailedFields(t *testing.T) {
+	repo := &stubRepo{}
+	fa := appWithRole("hr_manager", repo)
+	body := `{"position_id":"` + uuid.NewString() + `","store_id":1,"headcount":1,"responsibilities":"  trim me  ","benefits":"health","employment_type":"contract"}`
+	if got := do(t, fa, fiber.MethodPost, "/api/v1/requisitions/", body); got != fiber.StatusCreated {
+		t.Fatalf("create: got %d want 201", got)
+	}
+	if repo.lastCreate.Responsibilities != "trim me" {
+		t.Fatalf("responsibilities trim: got %q", repo.lastCreate.Responsibilities)
+	}
+	if repo.lastCreate.Benefits != "health" || repo.lastCreate.EmploymentType != "contract" {
+		t.Fatalf("fields not captured: %+v", repo.lastCreate)
+	}
+}
+
+func TestUpdate_SparseDetailedField(t *testing.T) {
+	repo := &stubRepo{existsInScope: true}
+	fa := appWithRole("hr_manager", repo)
+	id := uuid.NewString()
+	body := `{"responsibilities":"new resp"}`
+	if got := do(t, fa, fiber.MethodPatch, "/api/v1/requisitions/"+id, body); got != fiber.StatusOK {
+		t.Fatalf("update: got %d want 200", got)
+	}
+	if repo.lastUpdate.Responsibilities == nil || *repo.lastUpdate.Responsibilities != "new resp" {
+		t.Fatalf("responsibilities not set in update: %+v", repo.lastUpdate.Responsibilities)
+	}
+	if repo.lastUpdate.Benefits != nil {
+		t.Fatalf("benefits should stay nil when omitted, got %v", *repo.lastUpdate.Benefits)
+	}
+}
+
+func TestUpdate_BadEmploymentIsBadRequest(t *testing.T) {
+	repo := &stubRepo{existsInScope: true}
+	fa := appWithRole("hr_manager", repo)
+	id := uuid.NewString()
+	body := `{"employment_type":"weird"}`
+	if got := do(t, fa, fiber.MethodPatch, "/api/v1/requisitions/"+id, body); got != fiber.StatusBadRequest {
+		t.Fatalf("update bad employment: got %d want 400", got)
 	}
 }
 

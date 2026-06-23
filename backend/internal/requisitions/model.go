@@ -28,6 +28,45 @@ const (
 // SourceManual marks rows created through this package (vs 'peoplesoft').
 const SourceManual = "manual"
 
+// Employment types, priorities, and open reasons for a requisition. These are
+// app-enforced enums stored in free-form VARCHAR columns (no DB CHECK), validated
+// by the handler. Empty employment_type / open_reason mean "unspecified"; priority
+// always resolves to a value (defaults to PriorityNormal).
+const (
+	EmploymentFullTime = "full_time"
+	EmploymentPartTime = "part_time"
+	EmploymentContract = "contract"
+	EmploymentSeasonal = "seasonal"
+
+	PriorityNormal = "normal"
+	PriorityUrgent = "urgent"
+
+	ReasonNewHeadcount = "new_headcount"
+	ReasonReplacement  = "replacement"
+)
+
+// maxJDTextLen caps each long-text JD field to keep payloads sane.
+const maxJDTextLen = 5000
+
+// ValidEmployment reports whether v is an allowed employment type.
+func ValidEmployment(v string) bool {
+	switch v {
+	case EmploymentFullTime, EmploymentPartTime, EmploymentContract, EmploymentSeasonal:
+		return true
+	}
+	return false
+}
+
+// ValidPriority reports whether v is an allowed priority.
+func ValidPriority(v string) bool {
+	return v == PriorityNormal || v == PriorityUrgent
+}
+
+// ValidReason reports whether v is an allowed open reason.
+func ValidReason(v string) bool {
+	return v == ReasonNewHeadcount || v == ReasonReplacement
+}
+
 // Sentinel errors mapped to HTTP statuses by the handler.
 var (
 	ErrNotFound = errors.New("requisitions: not found")
@@ -50,6 +89,17 @@ type Requisition struct {
 	ApprovedAt    *time.Time `json:"approved_at"`
 	CreatedAt     time.Time  `json:"created_at"`
 	UpdatedAt     time.Time  `json:"updated_at"`
+
+	// Detailed JD + opening metadata (manual requisitions). Stored on the vacancy row.
+	Responsibilities string `json:"responsibilities"`
+	Qualifications   string `json:"qualifications"`
+	Benefits         string `json:"benefits"`
+	OtherDetails     string `json:"other_details"`
+	EmploymentType   string `json:"employment_type"`
+	SalaryMin        *int   `json:"salary_min"`
+	SalaryMax        *int   `json:"salary_max"`
+	Priority         string `json:"priority"`
+	OpenReason       string `json:"open_reason"`
 }
 
 // ListFilter narrows + paginates the requisitions list.
@@ -75,11 +125,22 @@ func (f *ListFilter) normalize() {
 	}
 }
 
-// CreateInput is the payload for opening a new requisition.
+// CreateInput is the payload for opening a new requisition. The JD/metadata fields
+// are optional; the handler defaults Priority to PriorityNormal when empty.
 type CreateInput struct {
 	PositionID uuid.UUID
 	StoreID    int
 	Headcount  int
+
+	Responsibilities string
+	Qualifications   string
+	Benefits         string
+	OtherDetails     string
+	EmploymentType   string
+	SalaryMin        *int
+	SalaryMax        *int
+	Priority         string
+	OpenReason       string
 }
 
 // UpdateInput sparsely edits a pending requisition (nil = unchanged).
@@ -87,6 +148,16 @@ type UpdateInput struct {
 	PositionID *uuid.UUID
 	StoreID    *int
 	Headcount  *int
+
+	Responsibilities *string
+	Qualifications   *string
+	Benefits         *string
+	OtherDetails     *string
+	EmploymentType   *string
+	SalaryMin        *int
+	SalaryMax        *int
+	Priority         *string
+	OpenReason       *string
 }
 
 // Repository is the requisition data-access contract.
