@@ -960,6 +960,7 @@
     "otherPlaceholder": "Anything else applicants should know…",
     "jdInternalHint": "These details are saved to the requisition for approval. The public job posting shows the position's standard JD.",
     "lockIdentityHint": "Position and store are locked once approved. To change them, close this requisition and open a new one.",
+    "psLockHint": "This opening is synced from PeopleSoft. Position, store, and headcount are managed there; you can edit the details below.",
     "cancel": "Cancel",
     "createBtn": "Create",
     "saveBtn": "Save",

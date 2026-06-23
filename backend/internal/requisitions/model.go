@@ -25,8 +25,14 @@ const (
 	StatusCancelled       = "cancelled"
 )
 
-// SourceManual marks rows created through this package (vs 'peoplesoft').
-const SourceManual = "manual"
+// SourceManual marks rows created through this package; SourcePeoplesoft marks rows
+// synced from the external HRIS (internal/vacancies). HR may edit the detail/JD
+// fields of a PS opening (the PS sync never writes those columns), but its
+// position/store/headcount stay PS-owned.
+const (
+	SourceManual     = "manual"
+	SourcePeoplesoft = "peoplesoft"
+)
 
 // Employment types, priorities, and open reasons for a requisition. These are
 // app-enforced enums stored in free-form VARCHAR columns (no DB CHECK), validated

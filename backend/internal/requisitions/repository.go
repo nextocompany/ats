@@ -135,21 +135,28 @@ func (r *pgRepository) Update(ctx context.Context, id uuid.UUID, in UpdateInput)
 		args = append(args, val)
 		set = append(set, fmt.Sprintf("%s = $%d", expr, len(args)))
 	}
-	// addPendingOnly changes a column only while the row is still pending; once the
-	// requisition is approved (open) the identity (position/store) is locked, so the
-	// new value is ignored (defensive — the dialog also disables those selects).
-	addPendingOnly := func(col string, val any) {
+	// Identity (position/store) is editable only on a manual, still-pending row; once
+	// approved (open) or on a PeopleSoft row it is locked. The new value is ignored
+	// via CASE (defensive — the dialog also disables those selects).
+	addManualPending := func(col string, val any) {
 		args = append(args, val)
-		set = append(set, fmt.Sprintf("%s = CASE WHEN status = '%s' THEN $%d ELSE %s END", col, StatusPendingApproval, len(args), col))
+		set = append(set, fmt.Sprintf("%s = CASE WHEN source = '%s' AND status = '%s' THEN $%d ELSE %s END",
+			col, SourceManual, StatusPendingApproval, len(args), col))
+	}
+	// Headcount is PeopleSoft-owned on PS rows (overwritten on the next sync), so it
+	// is editable only on manual rows; on PS rows the new value is ignored.
+	addManualOnly := func(col string, val any) {
+		args = append(args, val)
+		set = append(set, fmt.Sprintf("%s = CASE WHEN source = '%s' THEN $%d ELSE %s END", col, SourceManual, len(args), col))
 	}
 	if in.PositionID != nil {
-		addPendingOnly("position_id", *in.PositionID)
+		addManualPending("position_id", *in.PositionID)
 	}
 	if in.StoreID != nil {
-		addPendingOnly("store_id", *in.StoreID)
+		addManualPending("store_id", *in.StoreID)
 	}
 	if in.Headcount != nil {
-		add("headcount", *in.Headcount)
+		addManualOnly("headcount", *in.Headcount)
 	}
 	if in.Responsibilities != nil {
 		add("responsibilities", *in.Responsibilities)
@@ -183,11 +190,13 @@ func (r *pgRepository) Update(ctx context.Context, id uuid.UUID, in UpdateInput)
 	}
 	set = append(set, "updated_at = now()")
 	args = append(args, id)
-	// Manual requisitions are editable while pending OR open (HR can adjust a live
-	// opening without re-approval); PS rows are immutable here and a closed/cancelled
-	// requisition is locked as a historical record.
-	q := fmt.Sprintf(`UPDATE vacancies SET %s WHERE id = $%d AND source = '%s' AND status IN ('%s','%s')`,
-		strings.Join(set, ", "), len(args), SourceManual, StatusPendingApproval, StatusOpen)
+	// Editable rows: a manual requisition while pending OR open (HR adjusts a live
+	// opening without re-approval), and a PeopleSoft opening while open (detail/JD
+	// fields only — the per-column CASE guards keep PS-owned position/store/headcount
+	// intact, and the PS sync never writes the detail columns). closed/cancelled/filled
+	// are locked as historical records.
+	q := fmt.Sprintf(`UPDATE vacancies SET %s WHERE id = $%d AND source IN ('%s','%s') AND status IN ('%s','%s')`,
+		strings.Join(set, ", "), len(args), SourceManual, SourcePeoplesoft, StatusPendingApproval, StatusOpen)
 	ct, err := r.pool.Exec(ctx, q, args...)
 	if err != nil {
 		return Requisition{}, fmt.Errorf("requisitions: update: %w", err)

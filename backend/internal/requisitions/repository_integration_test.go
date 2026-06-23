@@ -180,3 +180,56 @@ func TestUpdate_AllowedWhenOpenLockedWhenClosed(t *testing.T) {
 		t.Fatalf("update after close should be ErrBadState, got: %v", err)
 	}
 }
+
+// TestUpdate_PeoplesoftDetailsEditableIdentityLocked proves HR can edit the detail
+// fields of a PeopleSoft opening while its PS-owned position/store/headcount stay
+// locked (the PS sync never writes the detail columns).
+func TestUpdate_PeoplesoftDetailsEditableIdentityLocked(t *testing.T) {
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, dsn())
+	if err != nil {
+		t.Fatalf("connect (stack up + migrated?): %v", err)
+	}
+	t.Cleanup(pool.Close)
+	repo := NewRepository(pool)
+
+	posID, storeNo := mkPositionAndStore(t, pool)
+	var reqID uuid.UUID
+	if err := pool.QueryRow(ctx,
+		`INSERT INTO vacancies (ps_vacancy_id, store_id, position_id, headcount, status, source, opened_at, created_at, updated_at)
+		 VALUES ('PS-INT-1', $1, $2, 4, 'open', 'peoplesoft', now(), now(), now()) RETURNING id`,
+		storeNo, posID).Scan(&reqID); err != nil {
+		t.Fatalf("insert PS vacancy: %v", err)
+	}
+	t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `DELETE FROM vacancies WHERE id = $1`, reqID) })
+
+	// Edit details + attempt to change PS-owned fields (must be ignored).
+	benefits := "ประกันกลุ่ม + ค่ากะ"
+	newHc := 99
+	otherStore := 999998
+	otherPos := uuid.New()
+	updated, err := repo.Update(ctx, reqID, UpdateInput{
+		Benefits:   &benefits,
+		Headcount:  &newHc,
+		StoreID:    &otherStore,
+		PositionID: &otherPos,
+	})
+	if err != nil {
+		t.Fatalf("update PS detail should succeed, got: %v", err)
+	}
+	if updated.Benefits != benefits {
+		t.Fatalf("PS detail edit failed: benefits=%q", updated.Benefits)
+	}
+	if updated.Headcount != 4 {
+		t.Fatalf("PS headcount must stay locked, got %d want 4", updated.Headcount)
+	}
+	if updated.StoreID == nil || *updated.StoreID != storeNo {
+		t.Fatalf("PS store must stay locked, got %v want %d", updated.StoreID, storeNo)
+	}
+	if updated.PositionID == nil || *updated.PositionID != posID {
+		t.Fatalf("PS position must stay locked, got %v want %s", updated.PositionID, posID)
+	}
+	if updated.Source != SourcePeoplesoft || updated.Status != StatusOpen {
+		t.Fatalf("PS row source/status drifted: src=%q status=%q", updated.Source, updated.Status)
+	}
+}

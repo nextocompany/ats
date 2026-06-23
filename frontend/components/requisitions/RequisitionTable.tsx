@@ -71,9 +71,10 @@ export function RequisitionTable({
           {requisitions.map((r) => {
             const pending = r.status === "pending_approval";
             const manual = r.source === "manual";
-            // Editable while pending OR open (matches the backend Update guard);
-            // closed/cancelled stay locked as history.
-            const editable = manual && (pending || r.status === "open");
+            // Editable (matches the backend Update guard): a manual row while pending
+            // OR open; a PeopleSoft row while open (detail/JD fields only). closed/
+            // cancelled/filled stay locked.
+            const editable = manual ? pending || r.status === "open" : r.status === "open";
             return (
               <tr key={r.id} className="border-b border-hairline last:border-0">
                 <td className="px-5 py-3 font-medium text-foreground">
