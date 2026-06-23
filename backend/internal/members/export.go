@@ -27,11 +27,14 @@ func (h *Handler) Export(c *fiber.Ctx) error {
 	if !h.authorized(c) {
 		return fiber.NewError(fiber.StatusForbidden, "insufficient role for member management")
 	}
+	// Export stays admin-gated, but honours the admin's own scope so it can't leak
+	// out-of-scope rows a store-scoped admin (hr_manager) can't see in the list.
+	scope, _ := authedScope(c)
 	f, ferr := parseFilter(c)
 	if ferr != nil {
 		return ferr
 	}
-	rows, err := h.repo.ListForExport(c.UserContext(), f, exportRowCap)
+	rows, err := h.repo.ListForExport(c.UserContext(), f, scope, exportRowCap)
 	if err != nil {
 		return err
 	}

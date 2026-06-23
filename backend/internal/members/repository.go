@@ -10,6 +10,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/nexto/hr-ats/internal/rbac"
 )
 
 // Postgres SQLSTATEs we branch on.
@@ -45,13 +47,28 @@ var ErrEmailTaken = errors.New("members: email already in use")
 
 // Repository is the member-admin data-access contract.
 type Repository interface {
-	List(ctx context.Context, f ListFilter) ([]Member, int, error)
+	// List/Stats/ListForExport are scoped by the caller's rbac.Scope: a
+	// store/subregion role sees only accounts owning a linked candidate in its
+	// scope (KindAll sees every account, incl. 0-application ones).
+	List(ctx context.Context, f ListFilter, scope rbac.Scope) ([]Member, int, error)
 	// ListForExport returns up to max rows matching the filter (no pagination,
-	// newest-first) for the CSV export.
-	ListForExport(ctx context.Context, f ListFilter, max int) ([]Member, error)
+	// newest-first) for the CSV export, scoped like List.
+	ListForExport(ctx context.Context, f ListFilter, scope rbac.Scope, max int) ([]Member, error)
+	// GetByID returns one account unscoped (admin CRM/lifecycle paths).
 	GetByID(ctx context.Context, id uuid.UUID) (*Member, error)
+	// GetScopedByID returns one account only when it is visible in the caller's
+	// scope, else ErrNotFound (so a scoped role can't read an out-of-scope person
+	// by guessing an id).
+	GetScopedByID(ctx context.Context, id uuid.UUID, scope rbac.Scope) (*Member, error)
+	// ResolveAccountID maps a per-intake candidate id to its owning account id
+	// (ErrNotFound when the candidate is missing or has no linked account). Lets
+	// the unified detail accept either an account id or a candidate id.
+	ResolveAccountID(ctx context.Context, candidateID uuid.UUID) (uuid.UUID, error)
+	// ListApplicationsByAccount returns the account's applications across every
+	// linked candidate row (per position + funnel status), newest first.
+	ListApplicationsByAccount(ctx context.Context, accountID uuid.UUID) ([]AccountApplication, error)
 	GetResumeBlobURL(ctx context.Context, id uuid.UUID) (string, error)
-	Stats(ctx context.Context) (Stats, error)
+	Stats(ctx context.Context, scope rbac.Scope) (Stats, error)
 
 	// SetStatus moves a member between 'active' and 'suspended'. Suspending also
 	// force-logs-out (deletes the member's sessions). Returns ErrNotFound when the
@@ -118,11 +135,11 @@ func scanMember(row pgx.Row) (*Member, error) {
 	return &m, nil
 }
 
-// buildMemberWhere turns a ListFilter into a parameterised WHERE clause + args.
-// Shared by List (paginated) and ListForExport (capped, no offset) so the filter
-// semantics can't drift between the directory and its CSV export. Callers continue
-// the placeholder numbering from len(args).
-func buildMemberWhere(f ListFilter) (string, []any) {
+// buildMemberWhere turns a ListFilter + caller scope into a parameterised WHERE
+// clause + args. Shared by List (paginated) and ListForExport (capped, no offset)
+// so the filter + scope semantics can't drift between the directory and its CSV
+// export. Callers continue the placeholder numbering from len(args).
+func buildMemberWhere(f ListFilter, scope rbac.Scope) (string, []any) {
 	var args []any
 	add := func(v any) string {
 		args = append(args, v)
@@ -130,6 +147,11 @@ func buildMemberWhere(f ListFilter) (string, []any) {
 	}
 
 	var conds []string
+	// Role scoping first (correlated EXISTS on the linked candidates of alias "a").
+	if sc, scArgs := scope.AccountsClause("a", len(args)+1); sc != "" {
+		conds = append(conds, sc)
+		args = append(args, scArgs...)
+	}
 	if f.Search != "" {
 		// Escape ILIKE metacharacters so a literal % or _ in the search term isn't
 		// treated as a wildcard (over-matching + forces a full scan).
@@ -172,9 +194,9 @@ func buildMemberWhere(f ListFilter) (string, []any) {
 	return where, args
 }
 
-func (r *pgRepository) List(ctx context.Context, f ListFilter) ([]Member, int, error) {
+func (r *pgRepository) List(ctx context.Context, f ListFilter, scope rbac.Scope) ([]Member, int, error) {
 	f.normalize()
-	where, args := buildMemberWhere(f)
+	where, args := buildMemberWhere(f, scope)
 
 	var total int
 	if err := r.pool.QueryRow(ctx, "SELECT COUNT(*) FROM candidate_accounts a"+where, args...).Scan(&total); err != nil {
@@ -209,9 +231,9 @@ func (r *pgRepository) List(ctx context.Context, f ListFilter) ([]Member, int, e
 	return out, total, nil
 }
 
-func (r *pgRepository) ListForExport(ctx context.Context, f ListFilter, max int) ([]Member, error) {
+func (r *pgRepository) ListForExport(ctx context.Context, f ListFilter, scope rbac.Scope, max int) ([]Member, error) {
 	f.normalize() // parity with List, even though pagination fields are unused here
-	where, args := buildMemberWhere(f)
+	where, args := buildMemberWhere(f, scope)
 	args = append(args, max)
 	q := fmt.Sprintf("%s%s ORDER BY a.created_at DESC LIMIT $%d", memberSelect, where, len(args))
 
@@ -243,6 +265,65 @@ func (r *pgRepository) GetByID(ctx context.Context, id uuid.UUID) (*Member, erro
 	return m, nil
 }
 
+func (r *pgRepository) GetScopedByID(ctx context.Context, id uuid.UUID, scope rbac.Scope) (*Member, error) {
+	q := memberSelect + " WHERE a.id = $1"
+	args := []any{id}
+	if sc, scArgs := scope.AccountsClause("a", len(args)+1); sc != "" {
+		q += " AND " + sc
+		args = append(args, scArgs...)
+	}
+	m, err := scanMember(r.pool.QueryRow(ctx, q, args...))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound // missing OR out of the caller's scope (don't leak which)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("members: get scoped by id: %w", err)
+	}
+	return m, nil
+}
+
+func (r *pgRepository) ResolveAccountID(ctx context.Context, candidateID uuid.UUID) (uuid.UUID, error) {
+	var acct *uuid.UUID
+	err := r.pool.QueryRow(ctx, "SELECT account_id FROM candidates WHERE id = $1", candidateID).Scan(&acct)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return uuid.Nil, ErrNotFound
+	}
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("members: resolve account id: %w", err)
+	}
+	if acct == nil {
+		return uuid.Nil, ErrNotFound // accountless candidate (e.g. legacy walk-in, no email)
+	}
+	return *acct, nil
+}
+
+func (r *pgRepository) ListApplicationsByAccount(ctx context.Context, accountID uuid.UUID) ([]AccountApplication, error) {
+	const q = `
+		SELECT ap.id, ap.position_id,
+		       COALESCE(NULLIF(p.title_en,''), p.title_th, '') AS position_title,
+		       ap.status, ap.ai_score, ap.created_at
+		FROM applications ap
+		JOIN candidates c ON c.id = ap.candidate_id
+		LEFT JOIN positions p ON p.id = ap.position_id
+		WHERE c.account_id = $1
+		ORDER BY ap.created_at DESC`
+	rows, err := r.pool.Query(ctx, q, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("members: list applications by account: %w", err)
+	}
+	defer rows.Close()
+
+	var out []AccountApplication
+	for rows.Next() {
+		var a AccountApplication
+		if err := rows.Scan(&a.ID, &a.PositionID, &a.PositionTitle, &a.Status, &a.AIScore, &a.CreatedAt); err != nil {
+			return nil, fmt.Errorf("members: scan account application: %w", err)
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
 func (r *pgRepository) GetResumeBlobURL(ctx context.Context, id uuid.UUID) (string, error) {
 	var url string
 	err := r.pool.QueryRow(ctx, "SELECT COALESCE(resume_blob_url,'') FROM candidate_accounts WHERE id = $1", id).Scan(&url)
@@ -255,26 +336,32 @@ func (r *pgRepository) GetResumeBlobURL(ctx context.Context, id uuid.UUID) (stri
 	return url, nil
 }
 
-func (r *pgRepository) Stats(ctx context.Context) (Stats, error) {
+func (r *pgRepository) Stats(ctx context.Context, scope rbac.Scope) (Stats, error) {
 	var s Stats
 	// Single point-in-time query so the totals stay self-consistent (a concurrent
-	// insert can't make with_applications exceed total).
-	const agg = `
+	// insert can't make with_applications exceed total). Scoped via the same
+	// correlated EXISTS as the list so a store role's stats match its visible rows.
+	var args []any
+	where := ""
+	if sc, scArgs := scope.AccountsClause("a", 1); sc != "" {
+		where = " WHERE " + sc
+		args = scArgs
+	}
+	agg := `
 		SELECT
 			COUNT(*),
-			COUNT(*) FILTER (WHERE status = 'active'),
-			COUNT(*) FILTER (WHERE status = 'suspended'),
-			COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days'),
-			COUNT(*) FILTER (WHERE line_user_id IS NOT NULL),
-			COUNT(*) FILTER (WHERE google_sub IS NOT NULL),
-			COUNT(*) FILTER (WHERE email IS NOT NULL AND email_verified),
-			(SELECT COUNT(DISTINCT ca.id)
-			   FROM candidate_accounts ca
-			   JOIN candidates c ON c.account_id = ca.id
-			   JOIN applications ap ON ap.candidate_id = c.id)
-		FROM candidate_accounts`
+			COUNT(*) FILTER (WHERE a.status = 'active'),
+			COUNT(*) FILTER (WHERE a.status = 'suspended'),
+			COUNT(*) FILTER (WHERE a.created_at >= NOW() - INTERVAL '7 days'),
+			COUNT(*) FILTER (WHERE a.line_user_id IS NOT NULL),
+			COUNT(*) FILTER (WHERE a.google_sub IS NOT NULL),
+			COUNT(*) FILTER (WHERE a.email IS NOT NULL AND a.email_verified),
+			COUNT(*) FILTER (WHERE EXISTS (
+				SELECT 1 FROM candidates c JOIN applications ap ON ap.candidate_id = c.id
+				WHERE c.account_id = a.id))
+		FROM candidate_accounts a` + where
 	var line, google, email int
-	if err := r.pool.QueryRow(ctx, agg).Scan(
+	if err := r.pool.QueryRow(ctx, agg, args...).Scan(
 		&s.Total, &s.Active, &s.Suspended, &s.NewThisWeek, &line, &google, &email, &s.WithApplications,
 	); err != nil {
 		return Stats{}, fmt.Errorf("members: stats: %w", err)

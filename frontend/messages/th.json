@@ -781,6 +781,8 @@
     "eyebrow": "บุคลากร",
     "title": "ผู้สมัคร",
     "meta": "ผู้สมัคร {count} คน · ทุกสาขา",
+    "metaCount": "ผู้สมัคร {count} คน",
+    "appUntitled": "ตำแหน่งงาน",
     "sumOnFile": "ในระบบ",
     "sumActive": "ใช้งานอยู่",
     "sumActiveHint": "ในหน้านี้",

@@ -85,6 +85,25 @@ func (h *Handler) authorized(c *fiber.Ctx) bool {
 	return rbac.Can(u.Role, rbac.PermMembersAdmin)
 }
 
+// authedScope returns the caller's data scope for the unified person list/detail.
+// Those READ endpoints are open to ANY authenticated HR role (the consolidated
+// "Candidates" surface), but each role only sees accounts inside its scope
+// (store/subregion/all). Member admins (super_admin + hr_manager via
+// PermMembersAdmin) own the company-wide member directory, so they stay UNSCOPED
+// here even though hr_manager's default candidate scope is per-store — this
+// preserves the pre-unify Members reach. CRM, lifecycle, export and bulk stay
+// gated on PermMembersAdmin via authorized().
+func authedScope(c *fiber.Ctx) (rbac.Scope, bool) {
+	u, ok := c.Locals(middleware.UserContextKey).(middleware.DevUser)
+	if !ok || u.ID == "" {
+		return rbac.Scope{}, false
+	}
+	if rbac.Can(u.Role, rbac.PermMembersAdmin) {
+		return rbac.AllScope(), true
+	}
+	return rbac.New(u.Role, u.StoreID, u.Subregion), true
+}
+
 // authorizedErase gates the super_admin-only destructive anonymize action.
 func (h *Handler) authorizedErase(c *fiber.Ctx) bool {
 	u, ok := c.Locals(middleware.UserContextKey).(middleware.DevUser)
@@ -115,16 +134,17 @@ func actor(c *fiber.Ctx) string {
 	return u.ID
 }
 
-// List handles GET /api/v1/admin/members — paginated, filtered directory.
+// List handles GET /api/v1/admin/members — paginated, filtered, scoped directory.
 func (h *Handler) List(c *fiber.Ctx) error {
-	if !h.authorized(c) {
-		return fiber.NewError(fiber.StatusForbidden, "insufficient role for member management")
+	scope, ok := authedScope(c)
+	if !ok {
+		return fiber.NewError(fiber.StatusUnauthorized, "authentication required")
 	}
 	f, ferr := parseFilter(c)
 	if ferr != nil {
 		return ferr
 	}
-	items, total, err := h.repo.List(c.UserContext(), f)
+	items, total, err := h.repo.List(c.UserContext(), f, scope)
 	if err != nil {
 		return err
 	}
@@ -138,35 +158,52 @@ func (h *Handler) List(c *fiber.Ctx) error {
 	})
 }
 
-// Stats handles GET /api/v1/admin/members/stats — directory summary.
+// Stats handles GET /api/v1/admin/members/stats — scoped directory summary.
 func (h *Handler) Stats(c *fiber.Ctx) error {
-	if !h.authorized(c) {
-		return fiber.NewError(fiber.StatusForbidden, "insufficient role for member management")
+	scope, ok := authedScope(c)
+	if !ok {
+		return fiber.NewError(fiber.StatusUnauthorized, "authentication required")
 	}
-	s, err := h.repo.Stats(c.UserContext())
+	s, err := h.repo.Stats(c.UserContext(), scope)
 	if err != nil {
 		return err
 	}
 	return httpx.OK(c, s)
 }
 
-// Detail handles GET /api/v1/admin/members/:id — one member.
+// Detail handles GET /api/v1/admin/members/:id — one person (account + the
+// applications across every linked candidate). Open to any authenticated role but
+// scoped: a store/subregion role only sees a person inside its scope. The :id may
+// be an account id or a per-intake candidate id (e.g. from search/inbox links),
+// resolved to the owning account.
 func (h *Handler) Detail(c *fiber.Ctx) error {
-	if !h.authorized(c) {
-		return fiber.NewError(fiber.StatusForbidden, "insufficient role for member management")
+	scope, ok := authedScope(c)
+	if !ok {
+		return fiber.NewError(fiber.StatusUnauthorized, "authentication required")
 	}
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, "invalid member id")
+		return fiber.NewError(fiber.StatusBadRequest, "invalid id")
 	}
-	m, err := h.repo.GetByID(c.UserContext(), id)
+	m, err := h.repo.GetScopedByID(c.UserContext(), id, scope)
 	if errors.Is(err, ErrNotFound) {
-		return fiber.NewError(fiber.StatusNotFound, "member not found")
+		// Fall back: treat :id as a candidate id and resolve to its account.
+		if acct, rerr := h.repo.ResolveAccountID(c.UserContext(), id); rerr == nil {
+			m, err = h.repo.GetScopedByID(c.UserContext(), acct, scope)
+		}
+	}
+	if errors.Is(err, ErrNotFound) {
+		return fiber.NewError(fiber.StatusNotFound, "person not found")
 	}
 	if err != nil {
 		return err
 	}
-	h.audit(c, actionMemberViewDetail, id) // PDPA: record who viewed this member's PII
+	apps, err := h.repo.ListApplicationsByAccount(c.UserContext(), m.ID)
+	if err != nil {
+		return err
+	}
+	m.Applications = apps
+	h.audit(c, actionMemberViewDetail, m.ID) // PDPA: record who viewed this person's PII
 	return httpx.OK(c, m)
 }
 

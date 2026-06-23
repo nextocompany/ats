@@ -71,6 +71,45 @@ func TestCandidatesClause(t *testing.T) {
 	}
 }
 
+func TestAccountsClause(t *testing.T) {
+	store := 7
+
+	// All-scope roles → no clause (every account, incl. 0-application ones).
+	if c, args := New("super_admin", nil, "").AccountsClause("a", 1); c != "" || args != nil {
+		t.Errorf("admin should have no accounts clause, got %q %v", c, args)
+	}
+
+	// Subregion role → correlated EXISTS on candidates.subregion, using the alias.
+	c, args := New("operation_director", nil, "Upper North").AccountsClause("a", 2)
+	if c == "" || len(args) != 1 || args[0] != "Upper North" || !contains(c, "$2") ||
+		!contains(c, "c.account_id = a.id") || !contains(c, "c.subregion") {
+		t.Errorf("subregion accounts clause wrong: %q %v", c, args)
+	}
+
+	// Store role → correlated EXISTS joining applications.assigned_store_id.
+	c, args = New("hr_manager", &store, "").AccountsClause("a", 1)
+	if c == "" || len(args) != 1 || args[0] != store ||
+		!contains(c, "assigned_store_id") || !contains(c, "c.account_id = a.id") {
+		t.Errorf("store accounts clause wrong: %q %v", c, args)
+	}
+
+	// Store role without a store → fail closed (matches nothing).
+	if c, _ := New("hr_staff", nil, "").AccountsClause("a", 1); c != "1=0" {
+		t.Errorf("store-scoped user without store should match no accounts, got %q", c)
+	}
+
+	// AllScope bypasses role: even a store role string yields no clause.
+	if New("hr_staff", &store, "").all != false {
+		t.Fatal("New should not set the all bypass")
+	}
+	if k := AllScope().Kind(); k != KindAll {
+		t.Errorf("AllScope().Kind() = %q, want %q", k, KindAll)
+	}
+	if c, args := AllScope().AccountsClause("a", 1); c != "" || args != nil {
+		t.Errorf("AllScope should produce no accounts clause, got %q %v", c, args)
+	}
+}
+
 func contains(s, sub string) bool {
 	return len(s) >= len(sub) && (indexOf(s, sub) >= 0)
 }

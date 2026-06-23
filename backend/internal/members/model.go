@@ -39,6 +39,22 @@ type Member struct {
 	ActiveSessions int        `json:"active_sessions"`
 	LastLoginAt    *time.Time `json:"last_login_at"` // newest session created_at (login time, not last activity)
 	CreatedAt      time.Time  `json:"created_at"`
+	// Applications is the per-position funnel list, populated only on the detail
+	// read (the unified person page). Nil on list rows (omitempty hides it).
+	Applications []AccountApplication `json:"applications,omitempty"`
+}
+
+// AccountApplication is one row of the unified person detail's applications list:
+// a position the person applied to and that application's current funnel status.
+// Aggregated across every candidate row linked to the account (an account may
+// have multiple per-intake candidate rows), so it mirrors applications_count.
+type AccountApplication struct {
+	ID            uuid.UUID `json:"id"`
+	PositionID    uuid.UUID `json:"position_id"`
+	PositionTitle string    `json:"position_title"`
+	Status        string    `json:"status"`
+	AIScore       *float64  `json:"ai_score"`
+	CreatedAt     time.Time `json:"created_at"`
 }
 
 // Pagination defaults (mirrors internal/applications).
