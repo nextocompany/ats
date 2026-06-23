@@ -38,6 +38,7 @@ import type {
   OpenRole,
   Position,
   PositionDetail,
+  ScoreWeights,
   Requisition,
   RequisitionFilter,
   RequisitionInput,
@@ -199,14 +200,28 @@ export function usePositions() {
   });
 }
 
-// usePosition loads a single position's Master JD text, used to prefill the
-// requisition form when HR selects a position. Disabled until an id is set.
+// usePosition loads a single position's Master JD text + effective score weights,
+// used to prefill the requisition form and to edit per-position scoring weights.
+// Disabled until an id is set.
 export function usePosition(id: string, enabled = true) {
   return useQuery({
     queryKey: ["position", id],
     queryFn: () => api.get<PositionDetail>(`/api/v1/positions/${id}`).then((r) => r.data),
     enabled: enabled && id !== "",
     staleTime: 5 * 60 * 1000,
+  });
+}
+
+// useUpdatePositionWeights saves a position's screening weights (settings.admin).
+// On success it refreshes the cached position detail so the form reflects the save.
+export function useUpdatePositionWeights() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, weights }: { id: string; weights: ScoreWeights }) =>
+      api.put<ScoreWeights>(`/api/v1/positions/${id}/score-weights`, weights).then((r) => r.data),
+    onSuccess: (_data, { id }) => {
+      void qc.invalidateQueries({ queryKey: ["position", id] });
+    },
   });
 }
 

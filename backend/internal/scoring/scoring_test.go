@@ -54,10 +54,45 @@ func TestScore_HappyPath(t *testing.T) {
 	if len(res.Strengths) != 3 {
 		t.Errorf("expected 3 Thai strengths, got %d", len(res.Strengths))
 	}
-	// experience 36 >= 12*2 → 30; education bachelor(3) vs min diploma(2) → +1 → 7;
-	// language thai+eng → 10; skills overlap 2 → 10+2*3=16; location 20 → 83.
-	if res.Total != 83 {
-		t.Errorf("expected total 83, got %d (breakdown %+v)", res.Total, res.Breakdown)
+	// Sub-scores: experience 36 >= 12*2 → 30; education bachelor(3) vs min diploma(2) → +1 → 7;
+	// language thai+eng → 10; skills overlap 2 → 10+2*3=16; location 20.
+	// Weighted by DEFAULT weights {34,22,11,11,22}: 34*(30/30) + 22*(16/20) + 11*(7/10)
+	// + 11*(10/10) + 22*(20/20) = 34 + 17.6 + 7.7 + 11 + 22 = 92.3 → 92.
+	if res.Total != 92 {
+		t.Errorf("expected total 92, got %d (breakdown %+v)", res.Total, res.Breakdown)
+	}
+	if res.Weights != DefaultWeights() {
+		t.Errorf("expected default weights recorded, got %+v", res.Weights)
+	}
+}
+
+// TestScore_CustomWeightsHonored proves jd.Weights flows through Score into the
+// Total: the same profile/JD scored with custom weights differs from the default.
+func TestScore_CustomWeightsHonored(t *testing.T) {
+	s := compositeScorer{llm: mockLLM{}}
+	base := JD{MinEducationLevel: eduDiploma, MinExperienceMonths: 12, Keywords: []string{"cashier", "POS"}}
+
+	def, err := s.Score(context.Background(), qualifiedProfile(), base, 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// All weight on experience; the qualified profile (36mo >= 2x12) maxes the
+	// experience cap (ratio 1.0), so the weighted total must be exactly 100.
+	custom := base
+	custom.Weights = Weights{Experience: 100}
+	got, err := s.Score(context.Background(), qualifiedProfile(), custom, 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Total == def.Total {
+		t.Fatalf("custom weights did not change the total (both %d)", got.Total)
+	}
+	if got.Total != 100 {
+		t.Fatalf("all-experience weight with maxed experience -> 100, got %d", got.Total)
+	}
+	if got.Weights != custom.Weights {
+		t.Fatalf("effective weights not recorded: %+v", got.Weights)
 	}
 }
 

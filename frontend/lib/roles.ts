@@ -121,6 +121,11 @@ export function canAdminPdpa(me: PermHolder): boolean {
   return can(me, PERMS.pdpaAdmin);
 }
 
+// canManageScoring gates the per-position screening-weights settings page.
+export function canManageScoring(me: PermHolder): boolean {
+  return can(me, PERMS.settingsAdmin);
+}
+
 // canSubmitApproval gates opening a hiring-approval request.
 export function canSubmitApproval(me: PermHolder): boolean {
   return can(me, PERMS.approvalSubmit);

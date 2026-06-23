@@ -46,6 +46,9 @@ func (s compositeScorer) Score(ctx context.Context, p ai.Profile, jd JD, locatio
 	locationScore = clamp(locationScore, 0, 20)
 	eduOrd := maxEducation(p)
 	months := totalExperienceMonths(p)
+	// The effective weights (position config, or default when unset/invalid) drive
+	// the Total and are recorded on the Result for explainability.
+	weights := jd.Weights.orDefault()
 
 	bd := Breakdown{
 		Experience: experienceScore(months, jd.MinExperienceMonths),
@@ -61,7 +64,8 @@ func (s compositeScorer) Score(ctx context.Context, p ai.Profile, jd JD, locatio
 		return Result{
 			MustHavePassed: false,
 			Breakdown:      bd,
-			Total:          clamp(bd.Experience+bd.Education+bd.Language+bd.Location, 0, 100),
+			Weights:        weights,
+			Total:          WeightedTotal(bd, weights),
 		}, nil
 	}
 
@@ -74,7 +78,8 @@ func (s compositeScorer) Score(ctx context.Context, p ai.Profile, jd JD, locatio
 	return Result{
 		MustHavePassed:     true,
 		Breakdown:          bd,
-		Total:              clamp(bd.Experience+bd.Skills+bd.Education+bd.Language+bd.Location, 0, 100),
+		Weights:            weights,
+		Total:              WeightedTotal(bd, weights),
 		Strengths:          part.Strengths,
 		RedFlags:           part.RedFlags,
 		SuggestedPositions: part.SuggestedPositions,

@@ -4,10 +4,13 @@ package positions
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/nexto/hr-ats/internal/scoring"
 )
 
 // MustHave is the deterministic gate criteria stored in must_have_criteria.
@@ -29,6 +32,21 @@ type Position struct {
 	Responsibilities string    `json:"responsibilities"`
 	Qualifications   string    `json:"qualifications"`
 	Benefits         string    `json:"benefits"`
+	// ScoreWeights is the per-position screening-weight config, nil when unset
+	// (the scorer then applies scoring.DefaultWeights).
+	ScoreWeights *scoring.Weights `json:"score_weights"`
+}
+
+// parseWeights decodes the score_weights JSONB; nil/empty -> nil (use default).
+func parseWeights(raw []byte) *scoring.Weights {
+	if len(raw) == 0 {
+		return nil
+	}
+	var w scoring.Weights
+	if err := json.Unmarshal(raw, &w); err != nil {
+		return nil
+	}
+	return &w
 }
 
 // PublicPosition is the safe projection exposed on the public Career API.
@@ -50,7 +68,12 @@ type Repository interface {
 	// ListAll returns every active position with its full Master JD text — used by
 	// the cross-position fit analysis to match a candidate against the whole catalogue.
 	ListAll(ctx context.Context) ([]Position, error)
+	// UpdateScoreWeights persists per-position screening weights (settings.admin).
+	UpdateScoreWeights(ctx context.Context, id uuid.UUID, w scoring.Weights) error
 }
+
+// ErrNotFound is returned when a position id does not exist.
+var ErrNotFound = errors.New("positions: not found")
 
 type pgRepository struct {
 	pool *pgxpool.Pool
@@ -66,15 +89,17 @@ func (r *pgRepository) FindByID(ctx context.Context, id uuid.UUID) (*Position, e
 		SELECT id, title_th, COALESCE(title_en,''), COALESCE(level,''),
 		       COALESCE(must_have_criteria, '{}'::jsonb),
 		       COALESCE(keywords, '{}'), COALESCE(format_types, '{}'),
-		       COALESCE(responsibilities, ''), COALESCE(qualifications, ''), COALESCE(benefits, '')
+		       COALESCE(responsibilities, ''), COALESCE(qualifications, ''), COALESCE(benefits, ''),
+		       score_weights
 		FROM positions WHERE id = $1`
 	var (
 		p           Position
 		mustHaveRaw []byte
+		weightsRaw  []byte
 	)
 	if err := r.pool.QueryRow(ctx, q, id).Scan(
 		&p.ID, &p.TitleTH, &p.TitleEN, &p.Level, &mustHaveRaw, &p.Keywords, &p.FormatTypes,
-		&p.Responsibilities, &p.Qualifications, &p.Benefits,
+		&p.Responsibilities, &p.Qualifications, &p.Benefits, &weightsRaw,
 	); err != nil {
 		return nil, fmt.Errorf("positions: find by id: %w", err)
 	}
@@ -83,6 +108,7 @@ func (r *pgRepository) FindByID(ctx context.Context, id uuid.UUID) (*Position, e
 			return nil, fmt.Errorf("positions: parse must_have_criteria: %w", err)
 		}
 	}
+	p.ScoreWeights = parseWeights(weightsRaw)
 	return &p, nil
 }
 
@@ -91,15 +117,17 @@ func (r *pgRepository) FindByPSCode(ctx context.Context, code string) (*Position
 		SELECT id, title_th, COALESCE(title_en,''), COALESCE(level,''),
 		       COALESCE(must_have_criteria, '{}'::jsonb),
 		       COALESCE(keywords, '{}'), COALESCE(format_types, '{}'),
-		       COALESCE(responsibilities, ''), COALESCE(qualifications, ''), COALESCE(benefits, '')
+		       COALESCE(responsibilities, ''), COALESCE(qualifications, ''), COALESCE(benefits, ''),
+		       score_weights
 		FROM positions WHERE ps_position_code = $1`
 	var (
 		p           Position
 		mustHaveRaw []byte
+		weightsRaw  []byte
 	)
 	if err := r.pool.QueryRow(ctx, q, code).Scan(
 		&p.ID, &p.TitleTH, &p.TitleEN, &p.Level, &mustHaveRaw, &p.Keywords, &p.FormatTypes,
-		&p.Responsibilities, &p.Qualifications, &p.Benefits,
+		&p.Responsibilities, &p.Qualifications, &p.Benefits, &weightsRaw,
 	); err != nil {
 		return nil, fmt.Errorf("positions: find by ps code: %w", err)
 	}
@@ -108,6 +136,7 @@ func (r *pgRepository) FindByPSCode(ctx context.Context, code string) (*Position
 			return nil, fmt.Errorf("positions: parse must_have_criteria: %w", err)
 		}
 	}
+	p.ScoreWeights = parseWeights(weightsRaw)
 	return &p, nil
 }
 
@@ -116,7 +145,8 @@ func (r *pgRepository) ListAll(ctx context.Context) ([]Position, error) {
 		SELECT id, title_th, COALESCE(title_en,''), COALESCE(level,''),
 		       COALESCE(must_have_criteria, '{}'::jsonb),
 		       COALESCE(keywords, '{}'), COALESCE(format_types, '{}'),
-		       COALESCE(responsibilities, ''), COALESCE(qualifications, ''), COALESCE(benefits, '')
+		       COALESCE(responsibilities, ''), COALESCE(qualifications, ''), COALESCE(benefits, ''),
+		       score_weights
 		FROM positions WHERE is_active = TRUE ORDER BY title_th`
 	rows, err := r.pool.Query(ctx, q)
 	if err != nil {
@@ -129,10 +159,11 @@ func (r *pgRepository) ListAll(ctx context.Context) ([]Position, error) {
 		var (
 			p           Position
 			mustHaveRaw []byte
+			weightsRaw  []byte
 		)
 		if err := rows.Scan(
 			&p.ID, &p.TitleTH, &p.TitleEN, &p.Level, &mustHaveRaw, &p.Keywords, &p.FormatTypes,
-			&p.Responsibilities, &p.Qualifications, &p.Benefits,
+			&p.Responsibilities, &p.Qualifications, &p.Benefits, &weightsRaw,
 		); err != nil {
 			return nil, fmt.Errorf("positions: scan all: %w", err)
 		}
@@ -141,6 +172,7 @@ func (r *pgRepository) ListAll(ctx context.Context) ([]Position, error) {
 				return nil, fmt.Errorf("positions: parse must_have_criteria: %w", err)
 			}
 		}
+		p.ScoreWeights = parseWeights(weightsRaw)
 		out = append(out, p)
 	}
 	if err := rows.Err(); err != nil {
@@ -175,4 +207,19 @@ func (r *pgRepository) ListPublic(ctx context.Context) ([]PublicPosition, error)
 		return nil, fmt.Errorf("positions: public rows: %w", err)
 	}
 	return out, nil
+}
+
+func (r *pgRepository) UpdateScoreWeights(ctx context.Context, id uuid.UUID, w scoring.Weights) error {
+	raw, err := json.Marshal(w)
+	if err != nil {
+		return fmt.Errorf("positions: marshal score weights: %w", err)
+	}
+	ct, err := r.pool.Exec(ctx, `UPDATE positions SET score_weights = $2::jsonb WHERE id = $1`, id, raw)
+	if err != nil {
+		return fmt.Errorf("positions: update score weights: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
