@@ -203,7 +203,7 @@ func (r *pgRepository) LinkLine(ctx context.Context, accountID uuid.UUID, sub, d
 		WHERE id = $1`
 	_, err := r.pool.Exec(ctx, q, accountID, sub, displayID)
 	if isUnique(err) {
-		return fmt.Errorf("candidateauth: link line: %w (LINE already linked to another account)", err)
+		return ErrLineLinkedToOther // the LINE sub belongs to a different account
 	}
 	if err != nil {
 		return fmt.Errorf("candidateauth: link line: %w", err)

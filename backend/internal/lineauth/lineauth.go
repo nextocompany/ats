@@ -191,6 +191,11 @@ func (h *Handler) finalize(c *fiber.Ctx, ret, mode string, lineUser auth.LineUse
 			return c.Redirect(ret+"#line_error=not_logged_in", fiber.StatusFound)
 		}
 		if err := h.issuer.LinkLine(c.UserContext(), sessTok, lineUser.Subject, ""); err != nil {
+			// Distinguish "this LINE is already on another account" from a generic
+			// failure so the portal can guide the user (merge is a separate flow).
+			if errors.Is(err, candidateauth.ErrLineLinkedToOther) {
+				return c.Redirect(ret+"#line_error=line_in_use", fiber.StatusFound)
+			}
 			log.Warn().Err(err).Msg("lineauth: link line failed")
 			return c.Redirect(ret+"#line_error=link_failed", fiber.StatusFound)
 		}

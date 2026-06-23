@@ -33,6 +33,11 @@ var (
 	// ErrResumeLimit is returned when an account already holds MaxResumes CVs and
 	// must delete one before uploading another.
 	ErrResumeLimit = errors.New("candidateauth: resume limit reached")
+	// ErrLineLinkedToOther is returned when linking a LINE identity that already
+	// belongs to a DIFFERENT account (line_user_id is unique). The portal surfaces
+	// this distinctly so the user knows to log in with that LINE (merging accounts
+	// is a separate, deliberate flow — not done here).
+	ErrLineLinkedToOther = errors.New("candidateauth: line already linked to another account")
 )
 
 // MaxResumes caps the per-account resume library (the portal blocks the 6th
