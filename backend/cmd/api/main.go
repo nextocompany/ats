@@ -348,7 +348,8 @@ func main() {
 
 	// Public Career API + account-first apply. The handler resolves the member from
 	// the session cookie (caSvc); quick-apply (saved resume) is session-gated.
-	publicHandler := public.NewHandler(intakeSvc, appRepo, positionRepo, lineVerifier, pdpaRepo, caSvc, cfg.SessionCookieName)
+	publicHandler := public.NewHandler(intakeSvc, appRepo, positionRepo, lineVerifier, pdpaRepo, caSvc, cfg.SessionCookieName).
+		SetNotifier(notifier, cfg.PortalBaseURL)
 	public.RegisterRoutes(app, publicHandler)
 	app.Post("/api/v1/public/apply/quick", candidateauth.RequireCandidate(caSvc, cfg.SessionCookieName), publicHandler.QuickApply)
 	// Candidate-facing application history (their own, by session account).

@@ -99,9 +99,10 @@ func TestStatusEmailMessage_Gating(t *testing.T) {
 	}{
 		{"notifiable + addr", "a@b.com", "interview", true},
 		{"shortlisted", "a@b.com", "shortlisted", true},
+		{"scored notifiable", "a@b.com", "scored", true},
+		{"rejected notifiable", "a@b.com", "rejected", true},
 		{"empty addr", "", "interview", false},
-		{"rejected not notifiable", "a@b.com", "rejected", false},
-		{"unknown status", "a@b.com", "scored", false},
+		{"unknown status", "a@b.com", "weird", false},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

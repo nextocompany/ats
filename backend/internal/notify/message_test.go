@@ -54,8 +54,9 @@ func TestStatusMessage_Notifiable(t *testing.T) {
 }
 
 func TestStatusMessage_NotNotifiableStatus(t *testing.T) {
-	// Statuses we deliberately do NOT push (incl. rejected) → empty Message.
-	for _, status := range []string{"pending", "parsed", "scored", "rejected", "weird"} {
+	// Internal-only states with no candidate-facing copy → empty Message.
+	// (scored/rejected/ai_interview/... ARE notifiable as of item 3.)
+	for _, status := range []string{"pending", "parsed", "failed", "weird"} {
 		m := StatusMessage("U-line-123", "สมชาย", status, "https://x")
 		if m.Recipient != "" {
 			t.Errorf("status %q should not notify, got recipient %q", status, m.Recipient)
