@@ -19,7 +19,28 @@
     "admin": "Admin",
     "requisitions": "Requisitions",
     "pdpa": "PDPA / DPO",
+    "scoring": "Scoring weights",
     "privacy": "Privacy"
+  },
+  "scoring": {
+    "eyebrow": "Settings",
+    "title": "Screening weights",
+    "meta": "Set how much each screening dimension matters, per position. The AI screening score is weighted by these.",
+    "restricted": "You need the settings.admin permission to manage scoring weights.",
+    "selectPosition": "Position",
+    "positionPlaceholder": "Select a position…",
+    "pickPositionFirst": "Select a position to configure its screening weights.",
+    "dim_experience": "Experience",
+    "dim_skills": "Skills",
+    "dim_education": "Education",
+    "dim_language": "Language",
+    "dim_location": "Location",
+    "total": "Total",
+    "mustEqual100": "Weights must sum to 100.",
+    "resetDefault": "Reset to default",
+    "save": "Save weights",
+    "savedToast": "Screening weights saved",
+    "saveFailed": "Could not save weights"
   },
   "shortlist": {
     "eyebrow": "Line manager",

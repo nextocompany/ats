@@ -280,8 +280,20 @@ export interface Position {
   title_en: string;
 }
 
+// ScoreWeights are the per-position screening-dimension importance percentages
+// (mirrors scoring.Weights). They sum to 100.
+export interface ScoreWeights {
+  experience: number;
+  skills: number;
+  education: number;
+  language: number;
+  location: number;
+}
+
 // PositionDetail is the full position projection (mirrors positions.DetailItem),
-// used to prefill the requisition form with the position's Master JD text.
+// used to prefill the requisition form with the position's Master JD text and to
+// edit per-position screening weights. score_weights is always the EFFECTIVE set
+// (stored config, or the backend default when unset).
 export interface PositionDetail {
   id: string;
   title_th: string;
@@ -290,6 +302,7 @@ export interface PositionDetail {
   responsibilities: string;
   qualifications: string;
   benefits: string;
+  score_weights: ScoreWeights;
 }
 
 // Requisition is a managed position opening (a row in the vacancies table,

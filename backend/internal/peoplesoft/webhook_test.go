@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/nexto/hr-ats/internal/positions"
+	"github.com/nexto/hr-ats/internal/scoring"
 	"github.com/nexto/hr-ats/internal/vacancies"
 	"github.com/nexto/hr-ats/pkg/httpx"
 )
@@ -44,6 +45,9 @@ func (f fakePos) FindByPSCode(_ context.Context, code string) (*positions.Positi
 }
 func (fakePos) ListPublic(context.Context) ([]positions.PublicPosition, error) { return nil, nil }
 func (fakePos) ListAll(context.Context) ([]positions.Position, error)          { return nil, nil }
+func (fakePos) UpdateScoreWeights(context.Context, uuid.UUID, scoring.Weights) error {
+	return nil
+}
 
 type fakeReengage struct {
 	called  int

@@ -330,6 +330,10 @@ func (pr *Processor) run(ctx context.Context, p queue.ProcessApplicationPayload,
 		Responsibilities:    pos.Responsibilities,
 		Qualifications:      pos.Qualifications,
 	}
+	// Per-position screening weights (nil -> scorer applies DefaultWeights).
+	if pos.ScoreWeights != nil {
+		jd.Weights = *pos.ScoreWeights
+	}
 
 	// Step 4 — Score (location signal first so it folds into the total).
 	locationScore, err := pr.assigner.LocationScore(ctx, cand.Province, positionID)
@@ -472,7 +476,12 @@ func (pr *Processor) notifyCandidateStatus(ctx context.Context, cand *candidates
 
 // persistScore maps a scoring.Result into the repository's pre-serialized Score.
 func (pr *Processor) persistScore(ctx context.Context, appID uuid.UUID, status string, result scoring.Result) error {
-	breakdownJSON, err := json.Marshal(result.Breakdown)
+	// Persist the raw per-dimension sub-scores plus the effective weights, so the
+	// stored breakdown explains how the weighted Total was reached.
+	breakdownJSON, err := json.Marshal(struct {
+		scoring.Breakdown
+		Weights scoring.Weights `json:"weights"`
+	}{result.Breakdown, result.Weights})
 	if err != nil {
 		return fmt.Errorf("pipeline: marshal breakdown: %w", err)
 	}

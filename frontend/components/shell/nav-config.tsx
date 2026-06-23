@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   Lock,
   Settings,
+  SlidersHorizontal,
   type LucideIcon,
 } from "lucide-react";
 
@@ -21,6 +22,7 @@ import {
   canAdminPdpa,
   canBulkUpload,
   canManageRequisitions,
+  canManageScoring,
   canViewExecutive,
   canViewReports,
   isLineManager,
@@ -75,6 +77,10 @@ export const PDPA_NAV: NavItem = { href: "/pdpa", label: "PDPA", key: "pdpa", ic
 // Admin is super_admin-only — appended via navForRole, never in the base NAV.
 export const ADMIN_NAV: NavItem = { href: "/admin", label: "Admin", key: "admin", icon: Settings };
 
+// Scoring weights — per-position screening-weight config, gated via canManageScoring
+// (settings.admin), mirroring the backend allowlist.
+export const SCORING_NAV: NavItem = { href: "/scoring", label: "Scoring", key: "scoring", icon: SlidersHorizontal };
+
 // Privacy is the internal privacy-notice + DPO-contact reference, open to every
 // authenticated user. It is a SECONDARY (footer) link, not part of the primary
 // Workspace nav, so it is in ALL_NAV (for breadcrumb resolution) but not navForRole.
@@ -91,12 +97,13 @@ export function navForRole(me?: Me): NavItem[] {
   if (canBulkUpload(me)) items.push(BULK_NAV);
   if (canManageRequisitions(me)) items.push(REQUISITIONS_NAV);
   if (canAdminPdpa(me)) items.push(PDPA_NAV);
+  if (canManageScoring(me)) items.push(SCORING_NAV);
   if (isSuperAdmin(me)) items.push(ADMIN_NAV);
   return items;
 }
 
 // ALL_NAV is every possible item, for pathname→item lookups (e.g. header title).
-export const ALL_NAV: NavItem[] = [...NAV, REPORTS_NAV, EXECUTIVE_NAV, SHORTLIST_NAV, APPROVALS_NAV, BULK_NAV, REQUISITIONS_NAV, PDPA_NAV, ADMIN_NAV, PRIVACY_NAV];
+export const ALL_NAV: NavItem[] = [...NAV, REPORTS_NAV, EXECUTIVE_NAV, SHORTLIST_NAV, APPROVALS_NAV, BULK_NAV, REQUISITIONS_NAV, PDPA_NAV, SCORING_NAV, ADMIN_NAV, PRIVACY_NAV];
 
 // Brand lockup — text-only institutional wordmark, no monogram tile or dot mark.
 // "CP AXTRA" tracked uppercase over an "ATS Console" line (HSBC/JPM register),

@@ -19,6 +19,10 @@ type JD struct {
 	Keywords            []string
 	Responsibilities    string
 	Qualifications      string
+	// Weights are the per-position screening-dimension importances. The pipeline
+	// fills these from positions.score_weights (or DefaultWeights when unset).
+	// A zero-value Weights is treated as default by WeightedTotal.
+	Weights Weights
 }
 
 // promptText renders the JD as a compact block for the LLM user prompt. Falls

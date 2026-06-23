@@ -54,10 +54,15 @@ func TestScore_HappyPath(t *testing.T) {
 	if len(res.Strengths) != 3 {
 		t.Errorf("expected 3 Thai strengths, got %d", len(res.Strengths))
 	}
-	// experience 36 >= 12*2 → 30; education bachelor(3) vs min diploma(2) → +1 → 7;
-	// language thai+eng → 10; skills overlap 2 → 10+2*3=16; location 20 → 83.
-	if res.Total != 83 {
-		t.Errorf("expected total 83, got %d (breakdown %+v)", res.Total, res.Breakdown)
+	// Sub-scores: experience 36 >= 12*2 → 30; education bachelor(3) vs min diploma(2) → +1 → 7;
+	// language thai+eng → 10; skills overlap 2 → 10+2*3=16; location 20.
+	// Weighted by DEFAULT weights {34,22,11,11,22}: 34*(30/30) + 22*(16/20) + 11*(7/10)
+	// + 11*(10/10) + 22*(20/20) = 34 + 17.6 + 7.7 + 11 + 22 = 92.3 → 92.
+	if res.Total != 92 {
+		t.Errorf("expected total 92, got %d (breakdown %+v)", res.Total, res.Breakdown)
+	}
+	if res.Weights != DefaultWeights() {
+		t.Errorf("expected default weights recorded, got %+v", res.Weights)
 	}
 }
 

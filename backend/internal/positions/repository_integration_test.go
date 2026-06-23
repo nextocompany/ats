@@ -9,6 +9,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/nexto/hr-ats/internal/scoring"
 )
 
 func dsn() string {
@@ -48,5 +50,50 @@ func TestFindByID_RoundTripsBenefits(t *testing.T) {
 	}
 	if got.Benefits != "สวัสดิการกลาง" {
 		t.Fatalf("benefits round-trip failed: got %q", got.Benefits)
+	}
+}
+
+// TestUpdateScoreWeights_RoundTrip proves the score_weights column persists and
+// reads back, and that an unset position reports nil (scorer then uses defaults).
+func TestUpdateScoreWeights_RoundTrip(t *testing.T) {
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, dsn())
+	if err != nil {
+		t.Fatalf("connect (stack up + migrated to 000041?): %v", err)
+	}
+	t.Cleanup(pool.Close)
+	repo := NewRepository(pool)
+
+	var posID uuid.UUID
+	if err := pool.QueryRow(ctx,
+		`INSERT INTO positions (title_th) VALUES ($1) RETURNING id`, "ตำแหน่งถ่วงน้ำหนัก").Scan(&posID); err != nil {
+		t.Fatalf("insert position: %v", err)
+	}
+	t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `DELETE FROM positions WHERE id = $1`, posID) })
+
+	// Unset -> nil.
+	got, err := repo.FindByID(ctx, posID)
+	if err != nil {
+		t.Fatalf("find (pre): %v", err)
+	}
+	if got.ScoreWeights != nil {
+		t.Fatalf("expected nil weights before set, got %+v", got.ScoreWeights)
+	}
+
+	w := scoring.Weights{Experience: 40, Skills: 20, Education: 10, Language: 10, Location: 20}
+	if err := repo.UpdateScoreWeights(ctx, posID, w); err != nil {
+		t.Fatalf("update weights: %v", err)
+	}
+	got, err = repo.FindByID(ctx, posID)
+	if err != nil {
+		t.Fatalf("find (post): %v", err)
+	}
+	if got.ScoreWeights == nil || *got.ScoreWeights != w {
+		t.Fatalf("weights round-trip failed: got %+v want %+v", got.ScoreWeights, w)
+	}
+
+	// Updating a missing id -> ErrNotFound.
+	if err := repo.UpdateScoreWeights(ctx, uuid.New(), w); err != ErrNotFound {
+		t.Fatalf("expected ErrNotFound for missing id, got %v", err)
 	}
 }

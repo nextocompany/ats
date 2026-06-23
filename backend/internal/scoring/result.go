@@ -18,6 +18,7 @@ type Result struct {
 	MustHavePassed     bool      `json:"must_have_passed"`
 	Total              int       `json:"total"`
 	Breakdown          Breakdown `json:"breakdown"`
+	Weights            Weights   `json:"weights"`   // effective per-position weights applied to Total
 	Strengths          []string  `json:"strengths"` // genuine positives only, 0-4 Thai bullets (gaps go to RedFlags)
 	RedFlags           []string  `json:"red_flags"`
 	SuggestedPositions []string  `json:"suggested_positions"`
