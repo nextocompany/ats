@@ -83,12 +83,16 @@ export interface OnboardingStatus {
   complete: boolean;
 }
 
-// GET /api/v1/public/positions/:id — public detail projection.
+// GET /api/v1/public/positions/:id — public detail projection. The JD text is the
+// position catalog's role-generic Master JD (shown when present, see JobDetailClient).
 export interface PositionDetail {
   id: string;
   title_th: string;
   title_en: string;
   level: string;
+  responsibilities: string;
+  qualifications: string;
+  benefits: string;
 }
 
 // POST /api/v1/public/apply — returns the opaque status token (201).

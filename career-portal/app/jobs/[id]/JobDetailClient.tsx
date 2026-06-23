@@ -14,8 +14,14 @@ import { cn } from "@/lib/utils";
 export function JobDetailClient({ id }: { id: string }) {
   const t = useTranslations("jobs");
   const { data: position, isLoading, isError } = usePublicPosition(id);
-  // The public API exposes only title/level, so role content is intentionally
-  // generic, reassuring copy (no fabricated job-specific requirements).
+  // The position catalog's role-generic Master JD is shown when present; when a
+  // position has no JD text we fall back to the generic reassuring copy below
+  // (no fabricated job-specific requirements).
+  const hasJd = Boolean(
+    position?.responsibilities?.trim() ||
+      position?.qualifications?.trim() ||
+      position?.benefits?.trim(),
+  );
   const offer = t.raw("offer") as string[];
   const steps = t.raw("steps") as string[];
 
@@ -56,10 +62,45 @@ export function JobDetailClient({ id }: { id: string }) {
               ) : null}
             </header>
 
-            <section className="flex flex-col gap-3">
-              <h2 className="[font-size:var(--text-h3)] font-semibold text-foreground">{t("aboutHeading")}</h2>
-              <p className="leading-relaxed text-foreground/80">{t("about")}</p>
-            </section>
+            {hasJd ? (
+              <>
+                {position.responsibilities?.trim() ? (
+                  <section className="flex flex-col gap-3">
+                    <h2 className="[font-size:var(--text-h3)] font-semibold text-foreground">
+                      {t("responsibilitiesHeading")}
+                    </h2>
+                    <p className="whitespace-pre-line leading-relaxed text-foreground/80">
+                      {position.responsibilities}
+                    </p>
+                  </section>
+                ) : null}
+                {position.qualifications?.trim() ? (
+                  <section className="flex flex-col gap-3">
+                    <h2 className="[font-size:var(--text-h3)] font-semibold text-foreground">
+                      {t("qualificationsHeading")}
+                    </h2>
+                    <p className="whitespace-pre-line leading-relaxed text-foreground/80">
+                      {position.qualifications}
+                    </p>
+                  </section>
+                ) : null}
+                {position.benefits?.trim() ? (
+                  <section className="flex flex-col gap-3">
+                    <h2 className="[font-size:var(--text-h3)] font-semibold text-foreground">
+                      {t("benefitsHeading")}
+                    </h2>
+                    <p className="whitespace-pre-line leading-relaxed text-foreground/80">
+                      {position.benefits}
+                    </p>
+                  </section>
+                ) : null}
+              </>
+            ) : (
+              <section className="flex flex-col gap-3">
+                <h2 className="[font-size:var(--text-h3)] font-semibold text-foreground">{t("aboutHeading")}</h2>
+                <p className="leading-relaxed text-foreground/80">{t("about")}</p>
+              </section>
+            )}
 
             <section className="flex flex-col gap-4">
               <h2 className="[font-size:var(--text-h3)] font-semibold text-foreground">{t("offerHeading")}</h2>
