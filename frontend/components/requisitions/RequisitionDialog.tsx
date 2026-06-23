@@ -93,6 +93,9 @@ export function RequisitionDialog({ mode, open, onClose, requisition }: Props) {
   const activeError = errMessage(create.error) || errMessage(update.error);
   const heads = Number(headcount);
   const canSubmit = positionId !== "" && storeId !== "" && heads >= 1 && !busy;
+  // Once approved (open), position + store are locked — only the details are editable
+  // (matches the backend Update guard). Pending requisitions remain fully editable.
+  const lockIdentity = mode === "edit" && requisition?.status === "open";
 
   function close() {
     create.reset();
@@ -151,7 +154,7 @@ export function RequisitionDialog({ mode, open, onClose, requisition }: Props) {
           <div className="max-h-[65vh] space-y-4 overflow-y-auto pr-1">
             <label className="block space-y-1.5">
               <span className="text-xs font-medium text-foreground">{t("fieldPosition")}</span>
-              <Select value={positionId} onValueChange={(v) => setPositionId(v ?? "")}>
+              <Select value={positionId} onValueChange={(v) => setPositionId(v ?? "")} disabled={lockIdentity}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder={t("positionPlaceholder")}>
                     {(v: string | null) => {
@@ -173,7 +176,7 @@ export function RequisitionDialog({ mode, open, onClose, requisition }: Props) {
 
             <label className="block space-y-1.5">
               <span className="text-xs font-medium text-foreground">{t("fieldStore")}</span>
-              <Select value={storeId} onValueChange={(v) => setStoreId(v ?? "")}>
+              <Select value={storeId} onValueChange={(v) => setStoreId(v ?? "")} disabled={lockIdentity}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder={t("storePlaceholder")}>
                     {(v: string | null) =>
@@ -190,6 +193,8 @@ export function RequisitionDialog({ mode, open, onClose, requisition }: Props) {
                 </SelectContent>
               </Select>
             </label>
+
+            {lockIdentity && <p className="text-xs text-muted-foreground">{t("lockIdentityHint")}</p>}
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <label className="block space-y-1.5">

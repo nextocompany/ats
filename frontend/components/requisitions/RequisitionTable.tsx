@@ -71,6 +71,9 @@ export function RequisitionTable({
           {requisitions.map((r) => {
             const pending = r.status === "pending_approval";
             const manual = r.source === "manual";
+            // Editable while pending OR open (matches the backend Update guard);
+            // closed/cancelled stay locked as history.
+            const editable = manual && (pending || r.status === "open");
             return (
               <tr key={r.id} className="border-b border-hairline last:border-0">
                 <td className="px-5 py-3 font-medium text-foreground">
@@ -88,7 +91,7 @@ export function RequisitionTable({
                 </td>
                 <td className="px-5 py-3 text-right">
                   <div className="flex justify-end gap-2">
-                    {manual && pending && (
+                    {editable && (
                       <Button variant="ghost" size="sm" onClick={() => onEdit(r)} disabled={busy}>
                         {t("edit")}
                       </Button>
