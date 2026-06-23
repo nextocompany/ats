@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-const MAX_FILES = 50;
+const MAX_FILES = 30;
 const ACCEPT = ".pdf,.docx,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg";
 
 export function BulkUpload() {

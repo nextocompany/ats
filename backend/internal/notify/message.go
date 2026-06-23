@@ -132,6 +132,47 @@ func InvalidResumeEmailMessage(emailAddr, fullName, portalBaseURL string) Messag
 	}
 }
 
+// NameMismatchMessage builds a candidate-facing LINE notification when the name
+// parsed from the uploaded resume does not match the account holder's name.
+// Gentle + recoverable (the match can be imperfect): asks them to re-upload their
+// own CV. Zero Message (skipped) when there is no LINE handle.
+func NameMismatchMessage(lineUserID, fullName, portalBaseURL string) Message {
+	if lineUserID == "" {
+		return Message{}
+	}
+	return Message{
+		Channel:   ChannelLINE,
+		Recipient: lineUserID,
+		Subject:   "กรุณาอัปโหลดเรซูเม่ของคุณเอง",
+		Body:      nameMismatchBody(fullName, portalBaseURL),
+	}
+}
+
+// NameMismatchEmailMessage is the email equivalent of NameMismatchMessage,
+// reusing the same body so the two channels never drift.
+func NameMismatchEmailMessage(emailAddr, fullName, portalBaseURL string) Message {
+	if emailAddr == "" {
+		return Message{}
+	}
+	return Message{
+		Channel:   ChannelEmail,
+		Recipient: emailAddr,
+		Subject:   "กรุณาอัปโหลดเรซูเม่ของคุณเอง",
+		Body:      nameMismatchBody(fullName, portalBaseURL),
+	}
+}
+
+func nameMismatchBody(fullName, portalBaseURL string) string {
+	greeting := "สวัสดีค่ะ"
+	if fullName != "" {
+		greeting = "สวัสดีคุณ" + fullName
+	}
+	return greeting +
+		" ชื่อในไฟล์เรซูเม่ที่อัปโหลดดูเหมือนจะไม่ตรงกับชื่อบัญชีของคุณ จึงยังไม่สามารถพิจารณาใบสมัครได้ " +
+		"กรุณาตรวจสอบและอัปโหลดเรซูเม่ของคุณเองอีกครั้ง" +
+		fmt.Sprintf(" ที่ %s/status", portalBaseURL)
+}
+
 func invalidResumeBody(fullName, portalBaseURL string) string {
 	greeting := "สวัสดีค่ะ"
 	if fullName != "" {

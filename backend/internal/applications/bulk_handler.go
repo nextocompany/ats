@@ -15,9 +15,15 @@ import (
 	"github.com/nexto/hr-ats/pkg/httpx"
 )
 
-// maxBulkFiles caps a single bulk-upload request. Each file is still bounded by
-// maxResumeBytes (10MB); the cap keeps one request's total body bounded.
-const maxBulkFiles = 50
+// maxBulkFiles caps a single bulk-upload request to 30 CVs. Each file is bounded
+// by maxBulkResumeBytes (a generous 25MB — larger than any real CV, so size is
+// effectively unconstrained for users, while a single pathological file still
+// can't exhaust the container's memory).
+const maxBulkFiles = 30
+
+// maxBulkResumeBytes is the per-file ceiling for bulk upload (separate from the
+// 10MB single-apply limit). 25MB comfortably covers scanned / image-heavy CVs.
+const maxBulkResumeBytes = 25 * 1024 * 1024
 
 // bulkIntaker is the narrow slice of the intake Service the bulk handler needs.
 // *Service satisfies it; tests inject a fake.
@@ -79,7 +85,7 @@ func (h *BulkHandler) BulkIntake(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, "at least one resume file is required")
 	}
 	if len(files) > maxBulkFiles {
-		return fiber.NewError(fiber.StatusBadRequest, "too many files in one request (max 50)")
+		return fiber.NewError(fiber.StatusBadRequest, "too many files in one request (max 30)")
 	}
 	sourceChannel := c.FormValue("source_channel")
 	if sourceChannel == "" {
@@ -94,8 +100,8 @@ func (h *BulkHandler) BulkIntake(c *fiber.Ctx) error {
 			result.Failed = append(result.Failed, bulkFailure{fh.Filename, "unsupported file type (allowed: pdf, docx, jpeg, png)"})
 			continue
 		}
-		if fh.Size > maxResumeBytes {
-			result.Failed = append(result.Failed, bulkFailure{fh.Filename, "file exceeds 10MB limit"})
+		if fh.Size > maxBulkResumeBytes {
+			result.Failed = append(result.Failed, bulkFailure{fh.Filename, "file exceeds 25MB limit"})
 			continue
 		}
 		data, oerr := readMultipartFile(fh)

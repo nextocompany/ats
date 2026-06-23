@@ -20,7 +20,7 @@ export function InterviewChat({ token }: InterviewChatProps) {
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const seeded = useRef(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
 
   // Seed local state once from the server. The local conversation stays
   // authoritative after seeding (it carries optimistic sends).
@@ -36,8 +36,12 @@ export function InterviewChat({ token }: InterviewChatProps) {
   // session was finished elsewhere) — derived, so no extra effect-driven setState.
   const isDone = done || Boolean(data?.done);
 
+  // Keep the latest message in view by scrolling ONLY the chat list, never the
+  // page (a window-level scrollIntoView made the whole screen jump to the bottom
+  // after every reply). The list is its own scroll area.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = listRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }, [turns, respond.isPending]);
 
   if (isLoading) {
@@ -84,7 +88,12 @@ export function InterviewChat({ token }: InterviewChatProps) {
       </header>
 
       <div className="space-y-4 rounded-xl border border-line bg-card p-4 sm:p-6">
-        <ul className="space-y-4" aria-live="polite" aria-label="บทสนทนาสัมภาษณ์">
+        <ul
+          ref={listRef}
+          className="max-h-[55vh] space-y-4 overflow-y-auto overscroll-contain pr-1"
+          aria-live="polite"
+          aria-label="บทสนทนาสัมภาษณ์"
+        >
           {turns.map((t, i) => (
             <li key={`${i}-${t.role}`} className={t.role === "user" ? "flex justify-end" : "flex justify-start"}>
               <div
@@ -106,7 +115,6 @@ export function InterviewChat({ token }: InterviewChatProps) {
             </li>
           )}
         </ul>
-        <div ref={bottomRef} />
       </div>
 
       {error && (

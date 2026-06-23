@@ -283,6 +283,7 @@
     "hired": "Hired",
     "rejected": "Not selected",
     "invalid_resume": "Not a resume",
+    "name_mismatch": "Name mismatch",
     "failed": "Could not process",
     "review": "Under review",
     "in_review": "Under review",
@@ -862,7 +863,7 @@
   "bulk": {
     "intake": "Bulk intake",
     "title": "Bulk CV upload",
-    "help": "Pick a position, then choose up to {max} CV files (PDF, DOCX, JPG, PNG, ≤10MB each). Screening runs automatically.",
+    "help": "Pick a position, then choose up to {max} CV files (PDF, DOCX, JPG, PNG, ≤25MB each). Screening runs automatically.",
     "position": "Position",
     "loading": "Loading…",
     "positionPlaceholder": "Select a position…",

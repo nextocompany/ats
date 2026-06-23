@@ -20,6 +20,7 @@ const (
 	StatusParsed        = "parsed"         // S1: OCR + parse done
 	StatusFailed        = "failed"         // pipeline error (transient; asynq may retry)
 	StatusInvalidResume = "invalid_resume" // uploaded file is not a resume/CV (recoverable: candidate re-uploads)
+	StatusNameMismatch  = "name_mismatch"  // resume name differs from the account holder (recoverable: re-upload own CV)
 	StatusScored        = "scored"         // S2: passed gate, scored + assigned == "screened"
 	StatusRejected      = "rejected"       // failed must-have gate, or HR reject (with reason)
 	StatusHired         = "hired"          // legacy terminal (superseded by StatusOffer)
