@@ -2,9 +2,11 @@ package candidates
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/nexto/hr-ats/internal/activity"
@@ -16,6 +18,10 @@ import (
 type Repository interface {
 	Create(ctx context.Context, c Candidate) (Candidate, error)
 	FindByID(ctx context.Context, id uuid.UUID) (*Candidate, error)
+	// GetAccountName returns the registered full_name of the candidate's owning
+	// portal account. hasAccount is false for accountless intakes (bulk/webhook),
+	// which have no registered name to compare against.
+	GetAccountName(ctx context.Context, candidateID uuid.UUID) (name string, hasAccount bool, err error)
 	List(ctx context.Context, f Filter, scope rbac.Scope) ([]Candidate, int, error)
 	Timeline(ctx context.Context, id uuid.UUID) ([]activity.Entry, error)
 	UpdateProfileFields(ctx context.Context, id uuid.UUID, f ProfileFields) error
@@ -76,6 +82,21 @@ func (r *pgRepository) FindByID(ctx context.Context, id uuid.UUID) (*Candidate, 
 		return nil, fmt.Errorf("candidates: find by id: %w", err)
 	}
 	return &c, nil
+}
+
+func (r *pgRepository) GetAccountName(ctx context.Context, candidateID uuid.UUID) (string, bool, error) {
+	const q = `SELECT COALESCE(a.full_name,'')
+		FROM candidates c JOIN candidate_accounts a ON a.id = c.account_id
+		WHERE c.id = $1`
+	var name string
+	err := r.pool.QueryRow(ctx, q, candidateID).Scan(&name)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", false, nil // accountless candidate (no portal account)
+	}
+	if err != nil {
+		return "", false, fmt.Errorf("candidates: get account name: %w", err)
+	}
+	return name, true, nil
 }
 
 // UpdateProfileFields applies parsed values, overwriting only non-empty inputs

@@ -283,6 +283,7 @@
     "hired": "Hired",
     "rejected": "Not selected",
     "invalid_resume": "Not a resume",
+    "name_mismatch": "Name mismatch",
     "failed": "Could not process",
     "review": "Under review",
     "in_review": "Under review",

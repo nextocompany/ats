@@ -204,6 +204,24 @@ func (pr *Processor) run(ctx context.Context, p queue.ProcessApplicationPayload,
 		return canonicalID, nil
 	}
 
+	// Step 2b — name-mismatch gate (portal applies only). If the resume's name is
+	// clearly a different person from the account holder, treat it like
+	// invalid_resume: recoverable, warn the candidate, return nil (no retry). The
+	// match is deliberately lenient (NameLooselyMatches) so Thai name variants /
+	// nicknames / OCR slips never falsely reject a real applicant. Skipped for
+	// accountless intakes (bulk/webhook) — no registered name to compare. Runs
+	// BEFORE UpdateProfileFields overwrites the candidate's name with the parsed one.
+	if acctName, hasAccount, nerr := pr.candidates.GetAccountName(ctx, candID); nerr != nil {
+		log.Warn().Err(nerr).Str("candidate", candID.String()).Msg("name-mismatch gate: account name lookup failed (skipping check)")
+	} else if hasAccount && acctName != "" && profile.Personal.Name != "" && !dedup.NameLooselyMatches(acctName, profile.Personal.Name) {
+		if serr := pr.apps.SetStatus(ctx, appID, applications.StatusNameMismatch); serr != nil {
+			return canonicalID, fmt.Errorf("pipeline: set name_mismatch: %w", serr)
+		}
+		pr.notifyNameMismatch(ctx, appID, candID)
+		logger.Info().Str("account", acctName).Str("resume", profile.Personal.Name).Msg("resume name does not match account - flagged name_mismatch")
+		return canonicalID, nil
+	}
+
 	if err := profile.Validate(); err != nil {
 		return canonicalID, fmt.Errorf("pipeline: invalid profile: %w", err)
 	}
@@ -356,6 +374,30 @@ func (pr *Processor) notifyInvalidResume(ctx context.Context, appID, candID uuid
 	if em := notify.InvalidResumeEmailMessage(cand.Email, cand.FullName, d.portalBaseURL); em.Recipient != "" {
 		if err := d.notifier.Send(ctx, em); err != nil {
 			log.Warn().Err(err).Str("application", appID.String()).Msg("invalid-resume notify: email send failed (non-fatal)")
+		}
+	}
+}
+
+// notifyNameMismatch warns the candidate (LINE + email, best-effort) that the
+// resume name does not match their account. Mirrors notifyInvalidResume.
+func (pr *Processor) notifyNameMismatch(ctx context.Context, appID, candID uuid.UUID) {
+	d := pr.candNotify
+	if d.notifier == nil {
+		return
+	}
+	cand, err := pr.candidates.FindByID(ctx, candID)
+	if err != nil {
+		log.Warn().Err(err).Str("candidate", candID.String()).Msg("name-mismatch notify: load candidate failed")
+		return
+	}
+	if msg := notify.NameMismatchMessage(cand.LineUserID, cand.FullName, d.portalBaseURL); msg.Recipient != "" {
+		if err := d.notifier.Send(ctx, msg); err != nil {
+			log.Warn().Err(err).Str("application", appID.String()).Msg("name-mismatch notify: line send failed (non-fatal)")
+		}
+	}
+	if em := notify.NameMismatchEmailMessage(cand.Email, cand.FullName, d.portalBaseURL); em.Recipient != "" {
+		if err := d.notifier.Send(ctx, em); err != nil {
+			log.Warn().Err(err).Str("application", appID.String()).Msg("name-mismatch notify: email send failed (non-fatal)")
 		}
 	}
 }
