@@ -55,6 +55,24 @@ type Service struct {
 	notifier      notify.Notifier
 	portalBaseURL string
 	maxTurns      int
+	// HR-notify-on-pass (item 8.1) — set via SetHRNotifier, optional. When unset
+	// the completion flow simply skips the HR alert.
+	hr               applications.HRDirectory
+	dashboardBaseURL string
+	teamsEnabled     bool
+	hrThreshold      int
+}
+
+// SetHRNotifier wires the store-HR notification that fires when a candidate
+// completes the AI pre-interview with a score at or above threshold. Optional —
+// the api wires it; tests and the worker may leave it unset (then completion just
+// advances the funnel without notifying HR). Mirrors the SetNotifier setters used
+// across the applications handlers.
+func (s *Service) SetHRNotifier(hr applications.HRDirectory, dashboardBaseURL string, teamsEnabled bool, threshold int) {
+	s.hr = hr
+	s.dashboardBaseURL = dashboardBaseURL
+	s.teamsEnabled = teamsEnabled
+	s.hrThreshold = threshold
 }
 
 // NewService wires the interview service.
@@ -228,7 +246,52 @@ func (s *Service) Respond(ctx context.Context, token, answer string) (*Session, 
 	// Interview / Reject for HR. Best-effort and idempotent: only advance if the
 	// application is still in ai_interview (don't clobber a later manual state).
 	s.advanceToInterviewed(ctx, session.ApplicationID)
+	// Item 8.1 — alert store HR when the candidate cleared the actionable bar, so a
+	// strong pre-interview pass surfaces without HR polling the inbox. Best-effort.
+	s.notifyHRPassed(ctx, session.ApplicationID, ic, ev)
 	return session, nil
+}
+
+// notifyHRPassed emails store HR (and Teams, when enabled) that a candidate
+// completed the AI pre-interview with an actionable score. Gated on
+// score >= hrThreshold. No-op when the notifier/HR directory is unset (worker,
+// tests) or the candidate is unassigned (talent pool has no store HR). Best-effort:
+// a notify failure never fails the candidate's final answer.
+func (s *Service) notifyHRPassed(ctx context.Context, applicationID uuid.UUID, ic InterviewContext, ev Evaluation) {
+	if s.notifier == nil || s.hr == nil {
+		return
+	}
+	// The evaluator returns an integer-valued 0-100 score (azure.go prompt); the
+	// int() truncation here is deliberate and matches that contract.
+	if int(ev.Score) < s.hrThreshold {
+		return // below the actionable bar — no HR alert (advanceToInterviewed still ran)
+	}
+	app, err := s.apps.FindByID(ctx, applicationID)
+	if err != nil {
+		log.Warn().Err(err).Str("application", applicationID.String()).Msg("interview pass notify: load application failed (non-fatal)")
+		return
+	}
+	if app.AssignedStoreID == nil {
+		// Talent-pool / unassigned candidate: no store HR to reach. Log so the no-op
+		// is visible in prod rather than silently swallowed.
+		log.Info().Str("application", applicationID.String()).Int("score", int(ev.Score)).Msg("interview pass: candidate unassigned, no store HR to notify")
+		return
+	}
+	emails, err := s.hr.EmailsForStore(ctx, app.AssignedStoreID)
+	if err != nil {
+		log.Warn().Err(err).Str("application", applicationID.String()).Msg("interview pass notify: resolve HR emails failed (non-fatal)")
+		return
+	}
+	if len(emails) == 0 && !s.teamsEnabled {
+		return
+	}
+	dashURL := s.dashboardBaseURL + "/applications/" + applicationID.String()
+	msgs := notify.AIInterviewPassedHR(emails, s.teamsEnabled, ic.CandidateName, ic.PositionTitle, ev.Recommendation, int(ev.Score), dashURL)
+	for _, m := range msgs {
+		if err := s.notifier.Send(ctx, m); err != nil {
+			log.Warn().Err(err).Str("application", applicationID.String()).Str("channel", m.Channel).Msg("interview pass notify: send failed (non-fatal)")
+		}
+	}
 }
 
 // advanceToInterviewed moves the application to ai_interviewed on AI-interview

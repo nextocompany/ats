@@ -18,6 +18,35 @@ func NewScoredHR(toEmails []string, teamsEnabled bool, candName, positionTitle s
 	return hrMessages(toEmails, teamsEnabled, subject, body)
 }
 
+// AIInterviewPassedHR notifies store HR that a candidate completed the AI
+// pre-interview with an actionable score (>= threshold). recommendation is the
+// evaluator's verdict (e.g. "strong_recommend"); dashURL deep-links the application.
+func AIInterviewPassedHR(toEmails []string, teamsEnabled bool, candName, positionTitle, recommendation string, score int, dashURL string) []Message {
+	subject := "ผู้สมัครผ่านการสัมภาษณ์ AI เบื้องต้น"
+	body := fmt.Sprintf(
+		"มีผู้สมัครทำการสัมภาษณ์ AI เบื้องต้นเสร็จและได้คะแนนถึงเกณฑ์ที่ควรพิจารณา\nผู้สมัคร: %s\nตำแหน่ง: %s\nคะแนนสัมภาษณ์ AI: %d/100\nคำแนะนำ: %s\nดูรายละเอียด: %s",
+		fallback(candName, "ผู้สมัคร"), fallback(positionTitle, "-"), score, recommendationLabel(recommendation), dashURL,
+	)
+	return hrMessages(toEmails, teamsEnabled, subject, body)
+}
+
+// recommendationLabel renders the AI interview recommendation enum in Thai. An
+// unknown value falls back to "-" so a prompt drift never leaks a raw token.
+func recommendationLabel(rec string) string {
+	switch rec {
+	case "strong_recommend":
+		return "แนะนำอย่างยิ่ง"
+	case "recommend":
+		return "แนะนำ"
+	case "neutral":
+		return "ปานกลาง"
+	case "caution":
+		return "ควรพิจารณาอย่างระมัดระวัง"
+	default:
+		return "-"
+	}
+}
+
 // FeedbackRecordedHR notifies store HR that an interviewer recorded interview
 // feedback for a candidate.
 func FeedbackRecordedHR(toEmails []string, teamsEnabled bool, candName, positionTitle, interviewer, recommendation, dashURL string) []Message {

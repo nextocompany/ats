@@ -52,6 +52,12 @@ type Config struct {
 	// (slice 2.5). The interviewer reuses the Azure OpenAI deployment above.
 	InterviewMaxTurns int
 
+	// InterviewHRNotifyThreshold is the AI pre-interview score (0-100) at or above
+	// which store HR is notified that a candidate passed and is worth acting on.
+	// Defaults to 75 — the same "Strong fit" cutoff the HR inbox already shows
+	// (frontend ScoreBadge), so the alert never contradicts the on-screen label.
+	InterviewHRNotifyThreshold int
+
 	// AISearchProvider selects candidate search: "mock" (Postgres trigram, default)
 	// or "azure" (Azure AI Search query). Required Azure fields gate on "azure".
 	AISearchProvider    string
@@ -268,7 +274,8 @@ func Load() (*Config, error) {
 		GeminiAPIKey: os.Getenv("GEMINI_API_KEY"),
 		GeminiModel:  getenv("GEMINI_MODEL", "gemini-2.0-flash"),
 
-		InterviewMaxTurns: getenvInt("INTERVIEW_MAX_TURNS", 6),
+		InterviewMaxTurns:          getenvInt("INTERVIEW_MAX_TURNS", 6),
+		InterviewHRNotifyThreshold: getenvInt("INTERVIEW_HR_NOTIFY_THRESHOLD", 75),
 
 		AuthProvider:          getenv("AUTH_PROVIDER", "mock"),
 		AzureADTenantID:       os.Getenv("AZURE_AD_TENANT_ID"),
