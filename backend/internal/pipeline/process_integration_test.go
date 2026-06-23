@@ -334,3 +334,25 @@ func TestPipeline_ParseFailureMarksFailed(t *testing.T) {
 		t.Errorf("expected failed, got %q", app.Status)
 	}
 }
+
+// A non-resume upload (parser reports is_resume=false) is a recoverable terminal
+// outcome: status invalid_resume, and the task returns NIL (no asynq retry) — unlike
+// a transient parse failure which errors + marks failed (test above).
+func TestPipeline_NonResumeFlagsInvalidResume(t *testing.T) {
+	f := setup(t)
+	pos := seedPosition(t, f, 0, 0)
+	p := seedCandidateApp(t, f, pos)
+
+	proc := f.processor(fakeOCR{conf: 0.95}, fakeParser{profile: ai.Profile{IsResume: false}})
+	if err := proc.HandleProcessApplication(context.Background(), task(t, p)); err != nil {
+		t.Fatalf("non-resume must not return an error (no retry), got %v", err)
+	}
+
+	app, err := f.apps.FindByID(context.Background(), uuid.MustParse(p.ApplicationID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if app.Status != applications.StatusInvalidResume {
+		t.Errorf("expected invalid_resume, got %q", app.Status)
+	}
+}

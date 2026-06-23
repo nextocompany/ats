@@ -50,6 +50,28 @@ type Profile struct {
 	Skills          []string     `json:"skills"`
 	Languages       []Language   `json:"languages"`
 	DesiredPosition string       `json:"desired_position"`
+	// IsResume reports whether the source document is actually a resume/CV. The
+	// parser sets it false ONLY when the document is clearly something else (an
+	// invoice, a photo, an unrelated file). It defaults to TRUE when the LLM omits
+	// the key (UnmarshalJSON below) so a borderline/poorly-OCR'd real CV is never
+	// falsely flagged — false positives tell a real person their resume is wrong.
+	IsResume bool `json:"is_resume"`
+}
+
+// UnmarshalJSON defaults IsResume to true when the "is_resume" key is absent or
+// null (bias toward "is a resume"). The nested Personal/Experience/Education
+// custom unmarshals still apply via the alias.
+func (p *Profile) UnmarshalJSON(b []byte) error {
+	type alias Profile
+	aux := struct {
+		IsResume *bool `json:"is_resume"`
+		*alias
+	}{alias: (*alias)(p)}
+	if err := json.Unmarshal(b, &aux); err != nil {
+		return err
+	}
+	p.IsResume = aux.IsResume == nil || *aux.IsResume
+	return nil
 }
 
 // looseInt coerces a JSON value an LLM may emit as a number, a quoted string

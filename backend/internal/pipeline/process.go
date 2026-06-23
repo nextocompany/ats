@@ -61,6 +61,7 @@ type Processor struct {
 	positions  positions.Repository
 	indexer    CandidateIndexer
 	hrNotify   hrNotify
+	candNotify candNotify
 }
 
 // hrNotify bundles the optional HR-notification deps (best-effort, nil = no-op).
@@ -69,6 +70,13 @@ type hrNotify struct {
 	hr               applications.HRDirectory
 	dashboardBaseURL string
 	teamsEnabled     bool
+}
+
+// candNotify bundles the optional candidate-notification deps (best-effort, nil =
+// no-op). Used to warn a candidate when their uploaded file is not a resume.
+type candNotify struct {
+	notifier      notify.Notifier
+	portalBaseURL string
 }
 
 // NewProcessor wires the pipeline processor.
@@ -96,6 +104,13 @@ func (pr *Processor) SetIndexer(idx CandidateIndexer) {
 // scored + assigned to a store. No-op when notifier/hr are nil (tests/CI).
 func (pr *Processor) SetNotifier(n notify.Notifier, hr applications.HRDirectory, dashboardBaseURL string, teamsEnabled bool) {
 	pr.hrNotify = hrNotify{notifier: n, hr: hr, dashboardBaseURL: dashboardBaseURL, teamsEnabled: teamsEnabled}
+}
+
+// SetCandidateNotifier injects best-effort candidate notifications (LINE + email)
+// fired when an uploaded file is detected as not a resume. No-op when the notifier
+// is nil (tests/CI) or the candidate has no contact handle (e.g. bulk uploads).
+func (pr *Processor) SetCandidateNotifier(n notify.Notifier, portalBaseURL string) {
+	pr.candNotify = candNotify{notifier: n, portalBaseURL: portalBaseURL}
 }
 
 // HandleProcessApplication runs the full pipeline for one application. Returning
@@ -174,6 +189,21 @@ func (pr *Processor) run(ctx context.Context, p queue.ProcessApplicationPayload,
 	if err != nil {
 		return canonicalID, fmt.Errorf("pipeline: parse: %w", err)
 	}
+
+	// Step 2a — not-a-resume gate. When the parser reports the document is not a
+	// resume/CV, this is a terminal-but-recoverable outcome, NOT a transient
+	// failure: mark the application invalid_resume, warn the candidate (best-effort),
+	// and return nil so asynq does NOT retry (retrying a non-resume is pointless).
+	// The candidate re-uploads a real CV to proceed.
+	if !profile.IsResume {
+		if serr := pr.apps.SetStatus(ctx, appID, applications.StatusInvalidResume); serr != nil {
+			return canonicalID, fmt.Errorf("pipeline: set invalid_resume: %w", serr)
+		}
+		pr.notifyInvalidResume(ctx, appID, candID)
+		logger.Info().Msg("uploaded file is not a resume - flagged invalid_resume")
+		return canonicalID, nil
+	}
+
 	if err := profile.Validate(); err != nil {
 		return canonicalID, fmt.Errorf("pipeline: invalid profile: %w", err)
 	}
@@ -300,6 +330,32 @@ func (pr *Processor) notifyScored(ctx context.Context, appID uuid.UUID, candName
 	for _, m := range msgs {
 		if err := d.notifier.Send(ctx, m); err != nil {
 			log.Warn().Err(err).Str("application", appID.String()).Msg("scored notify: send failed (non-fatal)")
+		}
+	}
+}
+
+// notifyInvalidResume warns the candidate (LINE + email, best-effort) that the
+// file they uploaded is not a resume. Uses candID (dedup has not run yet, so there
+// is no canonical). No-op when the notifier is unset or the candidate has no contact
+// handle (bulk/walk-in uploads) — those surface to HR via the invalid_resume status.
+func (pr *Processor) notifyInvalidResume(ctx context.Context, appID, candID uuid.UUID) {
+	d := pr.candNotify
+	if d.notifier == nil {
+		return
+	}
+	cand, err := pr.candidates.FindByID(ctx, candID)
+	if err != nil {
+		log.Warn().Err(err).Str("candidate", candID.String()).Msg("invalid-resume notify: load candidate failed")
+		return
+	}
+	if msg := notify.InvalidResumeMessage(cand.LineUserID, cand.FullName, d.portalBaseURL); msg.Recipient != "" {
+		if err := d.notifier.Send(ctx, msg); err != nil {
+			log.Warn().Err(err).Str("application", appID.String()).Msg("invalid-resume notify: line send failed (non-fatal)")
+		}
+	}
+	if em := notify.InvalidResumeEmailMessage(cand.Email, cand.FullName, d.portalBaseURL); em.Recipient != "" {
+		if err := d.notifier.Send(ctx, em); err != nil {
+			log.Warn().Err(err).Str("application", appID.String()).Msg("invalid-resume notify: email send failed (non-fatal)")
 		}
 	}
 }

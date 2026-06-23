@@ -137,7 +137,7 @@ export function Pill({
 
 // Map a free-text candidate/application status onto a semantic tone.
 const POSITIVE = new Set(["available", "active", "hired", "offer", "shortlisted", "interview", "interviewed", "onboarded", "pass", "passed"]);
-const NEGATIVE = new Set(["rejected", "dropped", "withdrawn", "inactive", "failed", "fail"]);
+const NEGATIVE = new Set(["rejected", "dropped", "withdrawn", "inactive", "failed", "fail", "invalid_resume"]);
 const PENDING = new Set(["pending", "scored", "parsed", "ai_interview", "ai_interviewed", "review", "waiting", "in_review"]);
 
 export function toneForStatus(status: string): PillTone {

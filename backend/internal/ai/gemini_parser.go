@@ -12,7 +12,10 @@ const geminiParserSystemPrompt = `You are a Thai/English CV parser. Extract the 
 	`unknown): {"personal":{"name","phone","email","address","age","id_card"},` +
 	`"experience":[{"company","position","duration_months","description"}],` +
 	`"education":[{"degree","major","institution","year"}],"skills":[],` +
-	`"languages":[{"language","level"}],"desired_position"}. Respond with JSON only.`
+	`"languages":[{"language","level"}],"desired_position","is_resume"}. ` +
+	`Set "is_resume" to true if the document is a resume/CV, or false ONLY when it is clearly NOT a ` +
+	`resume (e.g. an invoice, receipt, ID card/photo, or an unrelated document). When uncertain, set true. ` +
+	`Respond with JSON only.`
 
 // geminiParser turns OCR text into a structured Profile via the Gemini REST API
 // using JSON response mode.
@@ -49,8 +52,8 @@ func (p geminiParser) Parse(ctx context.Context, text, positionContext string) (
 	if err := json.Unmarshal([]byte(content), &profile); err != nil {
 		return Profile{}, fmt.Errorf("ai: gemini content not valid profile json: %w", err)
 	}
-	if err := profile.Validate(); err != nil {
-		return Profile{}, err
-	}
+	// Validation is the pipeline's responsibility: a non-resume (is_resume=false,
+	// empty name) must reach the caller as a successful parse, not be swallowed here
+	// as an error (indistinguishable from a transient LLM failure).
 	return profile, nil
 }

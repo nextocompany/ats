@@ -132,6 +132,11 @@ func main() {
 	// Teams). No-op unless NOTIFY/EMAIL/Teams are configured.
 	processor.SetNotifier(notifier, applications.NewHRDirectory(pool), cfg.DashboardBaseURL, cfg.TeamsWebhookURL != "")
 
+	// Candidate notification when an uploaded file is not a resume (best-effort,
+	// LINE + email). No-op unless NOTIFY/EMAIL are configured, or the candidate has
+	// no contact handle (bulk uploads surface to HR via the invalid_resume status).
+	processor.SetCandidateNotifier(notifier, cfg.PortalBaseURL)
+
 	// Re-engagement (Sprint 5a): notify talent-pool / prior candidates on vacancy open.
 	reengageSvc := reengage.NewService(
 		reengage.NewRepository(pool),

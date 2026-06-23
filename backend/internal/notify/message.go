@@ -101,6 +101,48 @@ func DocumentReviewedEmailMessage(emailAddr, fullName, docType string, approved 
 	}
 }
 
+// InvalidResumeMessage builds a candidate-facing LINE notification when an
+// uploaded file is detected as not being a resume/CV. Gentle + recoverable: the
+// detection can be wrong, so the copy says "อาจไม่ใช่" and points to re-upload.
+// Returns a zero Message (skipped by callers) when the candidate has no LINE handle.
+func InvalidResumeMessage(lineUserID, fullName, portalBaseURL string) Message {
+	if lineUserID == "" {
+		return Message{}
+	}
+	return Message{
+		Channel:   ChannelLINE,
+		Recipient: lineUserID,
+		Subject:   "กรุณาอัปโหลดเรซูเม่อีกครั้ง",
+		Body:      invalidResumeBody(fullName, portalBaseURL),
+	}
+}
+
+// InvalidResumeEmailMessage is the email equivalent of InvalidResumeMessage,
+// reusing the same body so the LINE and email copy never drift. Returns a zero
+// Message when the address is empty.
+func InvalidResumeEmailMessage(emailAddr, fullName, portalBaseURL string) Message {
+	if emailAddr == "" {
+		return Message{}
+	}
+	return Message{
+		Channel:   ChannelEmail,
+		Recipient: emailAddr,
+		Subject:   "กรุณาอัปโหลดเรซูเม่อีกครั้ง",
+		Body:      invalidResumeBody(fullName, portalBaseURL),
+	}
+}
+
+func invalidResumeBody(fullName, portalBaseURL string) string {
+	greeting := "สวัสดีค่ะ"
+	if fullName != "" {
+		greeting = "สวัสดีคุณ" + fullName
+	}
+	return greeting +
+		" ไฟล์ที่คุณอัปโหลดอาจไม่ใช่เรซูเม่/CV จึงยังไม่สามารถพิจารณาใบสมัครของคุณได้ " +
+		"กรุณาตรวจสอบและอัปโหลดไฟล์เรซูเม่ของคุณอีกครั้ง" +
+		fmt.Sprintf(" ที่ %s/status", portalBaseURL)
+}
+
 func documentReviewedBody(fullName, docType string, approved bool, reason, portalBaseURL string) string {
 	greeting := "สวัสดีค่ะ"
 	if fullName != "" {

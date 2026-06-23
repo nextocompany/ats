@@ -18,7 +18,10 @@ const cvParserSystemPrompt = `You are a Thai/English CV parser. Extract the cand
 	`unknown): {"personal":{"name","phone","email","address","age","id_card"},` +
 	`"experience":[{"company","position","duration_months","description"}],` +
 	`"education":[{"degree","major","institution","year"}],"skills":[],` +
-	`"languages":[{"language","level"}],"desired_position"}. Respond with JSON only.`
+	`"languages":[{"language","level"}],"desired_position","is_resume"}. ` +
+	`Set "is_resume" to true if the document is a resume/CV, or false ONLY when it is clearly NOT a ` +
+	`resume (e.g. an invoice, receipt, ID card/photo, or an unrelated document). When uncertain, set true. ` +
+	`Respond with JSON only.`
 
 // azureParser calls Azure OpenAI (GPT-4o) chat completions over REST.
 type azureParser struct {
@@ -107,8 +110,8 @@ func (a azureParser) Parse(ctx context.Context, text, positionContext string) (P
 	if err := json.Unmarshal([]byte(cr.Choices[0].Message.Content), &profile); err != nil {
 		return Profile{}, fmt.Errorf("ai: openai content not valid profile json: %w", err)
 	}
-	if err := profile.Validate(); err != nil {
-		return Profile{}, err
-	}
+	// Validation is the pipeline's responsibility: a non-resume (is_resume=false,
+	// empty name) must reach the caller as a successful parse, not be swallowed here
+	// as an error (which would be indistinguishable from a transient LLM failure).
 	return profile, nil
 }

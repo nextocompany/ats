@@ -5,6 +5,31 @@ import (
 	"testing"
 )
 
+func TestInvalidResumeMessage(t *testing.T) {
+	// No handle → skipped (empty Recipient), so bulk uploads no-op.
+	if m := InvalidResumeMessage("", "สมชาย", "https://x"); m.Recipient != "" {
+		t.Errorf("no LINE handle should skip, got %q", m.Recipient)
+	}
+	if m := InvalidResumeEmailMessage("", "สมชาย", "https://x"); m.Recipient != "" {
+		t.Errorf("no email should skip, got %q", m.Recipient)
+	}
+	// With a handle → gentle, recoverable copy pointing to re-upload.
+	m := InvalidResumeMessage("U-1", "สมชาย", "https://careers.example.com")
+	if m.Recipient != "U-1" || m.Channel != ChannelLINE {
+		t.Fatalf("unexpected message: %+v", m)
+	}
+	if !strings.Contains(m.Body, "อาจไม่ใช่เรซูเม่") {
+		t.Errorf("body should be gentle (อาจไม่ใช่), got %q", m.Body)
+	}
+	if !strings.Contains(m.Body, "/status") {
+		t.Errorf("body should link to /status, got %q", m.Body)
+	}
+	em := InvalidResumeEmailMessage("a@b.com", "สมชาย", "https://careers.example.com")
+	if em.Channel != ChannelEmail || em.Body != m.Body {
+		t.Errorf("email body must match LINE body (no drift): %q vs %q", em.Body, m.Body)
+	}
+}
+
 func TestStatusMessage_Notifiable(t *testing.T) {
 	// hired/offer carry their own deep links (/account, /offers) — asserted
 	// separately; these two link to /status.
