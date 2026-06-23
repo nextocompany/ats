@@ -862,7 +862,7 @@
   "bulk": {
     "intake": "Bulk intake",
     "title": "Bulk CV upload",
-    "help": "Pick a position, then choose up to {max} CV files (PDF, DOCX, JPG, PNG, ≤10MB each). Screening runs automatically.",
+    "help": "Pick a position, then choose up to {max} CV files (PDF, DOCX, JPG, PNG, ≤25MB each). Screening runs automatically.",
     "position": "Position",
     "loading": "Loading…",
     "positionPlaceholder": "Select a position…",

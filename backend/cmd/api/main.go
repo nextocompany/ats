@@ -69,7 +69,12 @@ import (
 const (
 	rbacCacheTTL     = 60 * time.Second // dynamic-RBAC matrix refresh interval per replica
 	shutdownTimeout  = 10 * time.Second
-	maxBodyBytes     = 12 * 1024 * 1024 // headroom over the 10MB resume limit
+	// maxBodyBytes is a generous backstop, not the real policy gate: a bulk upload
+	// of up to 30 CVs must fit (the old 12MB cap rejected even a handful with 413).
+	// Paired with StreamRequestBody=true so large multipart bodies stream to the
+	// ephemeral disk instead of buffering in RAM (the box has only 1Gi); the bulk
+	// handler reads files one at a time, so peak memory stays ~one file.
+	maxBodyBytes     = 256 * 1024 * 1024
 	publicRateWindow = time.Minute      // rate-limit window for /api/v1/public/* (Max from config)
 )
 
@@ -160,6 +165,10 @@ func main() {
 		ErrorHandler:          httpx.ErrorHandler,
 		DisableStartupMessage: true,
 		BodyLimit:             maxBodyBytes,
+		// Stream large request bodies (bulk CV uploads) to a temp file instead of
+		// buffering the whole multipart payload in memory — keeps a 30-CV batch
+		// within the 1Gi container.
+		StreamRequestBody: true,
 		// Retained as a safe default for any fiber c.IP() callers. The rate limiters
 		// do NOT use c.IP() — they key via middleware.RealClientIP (right-most
 		// non-trusted X-Forwarded-For entry), which is spoof-resistant whereas
