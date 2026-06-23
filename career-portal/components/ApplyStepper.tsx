@@ -73,6 +73,15 @@ export function ApplyStepper({ positionId, positionTitle, account, prefill }: Ap
   const pending = quick.isPending || apply.isPending;
   const errorMessage = quick.error?.message || apply.error?.message || null;
 
+  // Phone is always required; email is too — a LINE-only account often has no
+  // email, so the form forces it (prefilled from the account/LINE when present).
+  const fullNameOk = fullName.trim().length > 0;
+  const phoneOk = phone.trim().length > 0;
+  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  // The saved-profile (quick) path can only run when the account already carries a
+  // complete contact set; otherwise the candidate is sent to the form to fill it.
+  const profileComplete = fullNameOk && phoneOk && emailOk;
+
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const picked = e.target.files?.[0] ?? null;
     if (!picked) {
@@ -86,7 +95,7 @@ export function ApplyStepper({ positionId, positionTitle, account, prefill }: Ap
   }
 
   function submitQuick() {
-    if (!consentOk) return;
+    if (!consentOk || !profileComplete) return;
     quick.mutate(
       { positionId, consentGiven: consent },
       { onSuccess: (d) => setStatusToken(d.status_token) },
@@ -94,13 +103,13 @@ export function ApplyStepper({ positionId, positionTitle, account, prefill }: Ap
   }
 
   function submitForm() {
-    if (fullName.trim().length === 0 || !file || fileError || !consentOk) return;
+    if (!fullNameOk || !phoneOk || !emailOk || !file || fileError || !consentOk) return;
     apply.mutate(
       {
         positionId,
         fullName: fullName.trim(),
-        phone: phone.trim() || undefined,
-        email: email.trim() || undefined,
+        phone: phone.trim(),
+        email: email.trim(),
         province: province.trim() || undefined,
         consentVersion: CONSENT_VERSION,
         resume: file,
@@ -168,7 +177,11 @@ export function ApplyStepper({ positionId, positionTitle, account, prefill }: Ap
             </div>
             <div className="flex justify-between gap-3">
               <dt className="text-muted-foreground">เบอร์โทรศัพท์</dt>
-              <dd className="font-medium">{phone || "-"}</dd>
+              <dd className={phoneOk ? "font-medium" : "font-medium text-destructive"}>{phone || "ยังไม่ได้กรอก"}</dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-muted-foreground">อีเมล</dt>
+              <dd className={emailOk ? "font-medium" : "font-medium text-destructive"}>{email || "ยังไม่ได้กรอก"}</dd>
             </div>
             <div className="flex justify-between gap-3">
               <dt className="text-muted-foreground">เรซูเม่</dt>
@@ -186,13 +199,19 @@ export function ApplyStepper({ positionId, positionTitle, account, prefill }: Ap
             </p>
           ) : null}
 
-          {account.has_resume ? (
+          {!profileComplete ? (
+            <p className="rounded-lg bg-secondary px-3 py-2 text-sm text-muted-foreground">
+              กรุณากรอกเบอร์โทรศัพท์และอีเมลให้ครบก่อนสมัคร
+            </p>
+          ) : null}
+
+          {account.has_resume && profileComplete ? (
             <Button type="button" size="tap" onClick={submitQuick} disabled={pending || !consentOk} className="w-full">
               {quick.isPending ? "กำลังส่ง…" : "สมัครด้วยเรซูเม่ที่บันทึกไว้"}
             </Button>
           ) : null}
           <Button type="button" size="tap" variant="outline" onClick={() => setMode("edit")} className="w-full">
-            {account.has_resume ? "แก้ไขข้อมูล / อัปโหลดเรซูเม่ใหม่" : "กรอกข้อมูล / อัปโหลดเรซูเม่"}
+            {account.has_resume && profileComplete ? "แก้ไขข้อมูล / อัปโหลดเรซูเม่ใหม่" : "กรอกข้อมูล / อัปโหลดเรซูเม่"}
           </Button>
         </div>
       ) : (
@@ -205,12 +224,18 @@ export function ApplyStepper({ positionId, positionTitle, account, prefill }: Ap
               <Input id="full_name" value={fullName} onChange={(e) => setFullName(e.target.value)} autoComplete="name" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="phone">เบอร์โทรศัพท์</Label>
-              <Input id="phone" type="tel" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" />
+              <Label htmlFor="phone">
+                เบอร์โทรศัพท์ <span className="text-destructive">*</span>
+              </Label>
+              <Input id="phone" type="tel" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" aria-invalid={phone.length > 0 && !phoneOk} />
+              {phone.length > 0 && !phoneOk ? <p className="text-sm text-destructive">กรุณากรอกเบอร์โทรศัพท์</p> : null}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">อีเมล</Label>
-              <Input id="email" type="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
+              <Label htmlFor="email">
+                อีเมล <span className="text-destructive">*</span>
+              </Label>
+              <Input id="email" type="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" aria-invalid={email.length > 0 && !emailOk} />
+              {email.length > 0 && !emailOk ? <p className="text-sm text-destructive">กรุณากรอกอีเมลให้ถูกต้อง</p> : null}
             </div>
             <div className="space-y-2">
               <Label htmlFor="province">จังหวัด</Label>
@@ -250,7 +275,7 @@ export function ApplyStepper({ positionId, positionTitle, account, prefill }: Ap
               type="button"
               size="tap"
               onClick={submitForm}
-              disabled={fullName.trim().length === 0 || !file || !!fileError || pending || !consentOk}
+              disabled={!fullNameOk || !phoneOk || !emailOk || !file || !!fileError || pending || !consentOk}
               className="flex-1"
             >
               {apply.isPending ? "กำลังส่ง…" : "ส่งใบสมัคร"}

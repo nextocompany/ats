@@ -7,6 +7,8 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"io"
+	"net/mail"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -170,6 +172,17 @@ func (h *Handler) Apply(c *fiber.Ctx) error {
 	if name == "" {
 		return fiber.NewError(fiber.StatusBadRequest, "full_name is required")
 	}
+	// Phone and email are both required at apply: an email-OTP account already
+	// carries an email so only phone is new, but a LINE-only account often has
+	// neither, so the form must supply them (prefilled from LINE when available).
+	phone := strings.TrimSpace(formOr(c, "phone", acctPhone(acct)))
+	if phone == "" {
+		return fiber.NewError(fiber.StatusBadRequest, "phone is required")
+	}
+	email := strings.TrimSpace(formOr(c, "email", acctEmail(acct)))
+	if !validEmail(email) {
+		return fiber.NewError(fiber.StatusBadRequest, "a valid email is required")
+	}
 	// PDPA consent is mandatory and must be REAL — never fabricated. A guest ticks
 	// the box; a member must have actually consented at signup (don't assume).
 	consentVersion := c.FormValue("consent_version")
@@ -210,8 +223,8 @@ func (h *Handler) Apply(c *fiber.Ctx) error {
 
 	result, err := h.intake.Intake(c.UserContext(), applications.IntakeInput{
 		CandidateName: name,
-		Phone:         formOr(c, "phone", acctPhone(acct)),
-		Email:         formOr(c, "email", acctEmail(acct)),
+		Phone:         phone,
+		Email:         email,
 		IDCard:        c.FormValue("id_card"),
 		Province:      formOr(c, "province", acctProvince(acct)),
 		SourceChannel: "career_portal",
@@ -266,6 +279,14 @@ func (h *Handler) QuickApply(c *fiber.Ctx) error {
 		if err := h.accounts.MarkConsented(c.UserContext(), acct.ID, consentVersion); err != nil {
 			log.Warn().Err(err).Str("account_id", acct.ID.String()).Msg("failed to persist member PDPA consent")
 		}
+	}
+	// Quick-apply reuses the saved profile, so it must already hold phone + email
+	// (the frontend hides this path until the profile is complete; enforce here too).
+	if strings.TrimSpace(acct.Phone) == "" {
+		return fiber.NewError(fiber.StatusBadRequest, "phone is required — please complete your profile")
+	}
+	if !validEmail(acct.Email) {
+		return fiber.NewError(fiber.StatusBadRequest, "a valid email is required — please complete your profile")
 	}
 	meta, ok := fileTypeToContent[acct.ResumeFileType]
 	if !ok {
@@ -328,6 +349,16 @@ func formOr(c *fiber.Ctx, key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// validEmail reports whether s is a non-empty, syntactically valid email address.
+func validEmail(s string) bool {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return false
+	}
+	_, err := mail.ParseAddress(s)
+	return err == nil
 }
 
 func acctPhone(a *candidateauth.Account) string {
