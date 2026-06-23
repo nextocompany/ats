@@ -64,6 +64,9 @@ const fitSystemPrompt = `You are an HR talent-placement assistant for a Thai ret
 	`{"overall_fit":"strong|moderate|weak|none","summary":"2-3 Thai sentences","strengths":["Thai bullet points"],` +
 	`"concerns":["Thai bullet points"],"recommended":[{"position_id":"<an id copied EXACTLY from the catalogue>","title":"<Thai title>","fit_score":<0-100 int>,"reasons":["Thai bullet points grounded in the position's responsibilities/qualifications"]}],` +
 	`"no_match_reason":"Thai sentence"}. ` +
+	`"strengths": list ONLY genuine positives the candidate actually HAS — each item must be something they possess, never something they lack. ` +
+	`Return an empty array [] if there are none, and NEVER phrase a gap, a missing skill, or a weakness as a strength. ` +
+	`"concerns": put every gap, missing qualification, mismatch, or weakness here instead. ` +
 	`Rank recommended best-first. Only use position_id values that appear in the catalogue. ` +
 	`If the candidate fits NO position, set "overall_fit":"none", "recommended":[], and explain why in "no_match_reason" (otherwise leave it empty). ` +
 	`Ground every judgement in the screening result, the interview, and the specific responsibilities/qualifications. Respond with JSON only.`

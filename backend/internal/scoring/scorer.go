@@ -10,7 +10,7 @@ import (
 // LLMPart is the qualitative contribution from the language model.
 type LLMPart struct {
 	SkillsScore        int      // 0–20
-	Strengths          []string // 3 Thai bullets
+	Strengths          []string // genuine positives only, 0-4 Thai bullets (gaps go to RedFlags)
 	RedFlags           []string
 	SuggestedPositions []string
 }
