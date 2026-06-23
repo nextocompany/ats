@@ -9,6 +9,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/nexto/hr-ats/internal/notify"
+	"github.com/nexto/hr-ats/pkg/emailtmpl"
 )
 
 // exportSignedTTL must exceed the schedule interval so a delivered link stays
@@ -97,11 +98,17 @@ func (s *ExportService) deliver(ctx context.Context, period, csvURL string) bool
 	}
 	ok := true
 	for _, to := range s.recipients {
+		doc := emailtmpl.Doc{
+			Title:      "รายงานการสรรหา " + period,
+			Paragraphs: []string{"รายงานการสรรหาประจำงวดพร้อมให้ดาวน์โหลดแล้ว"},
+			CTA:        &emailtmpl.CTA{Label: "ดาวน์โหลดรายงาน (CSV)", URL: link},
+		}
 		msg := notify.Message{
 			Channel:   notify.ChannelEmail,
 			Recipient: to,
 			Subject:   "รายงานการสรรหา " + period,
-			Body:      "ดาวน์โหลดรายงาน (CSV): " + link,
+			Body:      doc.PlainText(),
+			HTML:      emailtmpl.Render(doc),
 		}
 		if err := s.notifier.Send(ctx, msg); err != nil {
 			log.Warn().Err(err).Str("to", to).Msg("reports: export delivery failed")

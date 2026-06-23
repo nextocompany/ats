@@ -137,7 +137,7 @@ func (h *OfferHandler) Send(c *fiber.Ctx) error {
 		return err
 	}
 	// Best-effort candidate notification (the application stays at status offer;
-	// the offer case was added to notify.statusBody).
+	// the offer case was added to notify.statusDoc).
 	h.notify.notifyStatusChange(c.UserContext(), h.apps, id, StatusOffer)
 	return httpx.OK(c, offer)
 }

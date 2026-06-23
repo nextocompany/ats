@@ -9,6 +9,7 @@ import (
 
 	"github.com/nexto/hr-ats/internal/activity"
 	"github.com/nexto/hr-ats/internal/notify"
+	"github.com/nexto/hr-ats/pkg/emailtmpl"
 )
 
 // Service finds matching candidates for a position and notifies them about the
@@ -53,14 +54,18 @@ func (s *Service) Reengage(ctx context.Context, positionID uuid.UUID) (int, erro
 			continue // already contacted for this position
 		}
 
+		doc := emailtmpl.Doc{
+			Title:      "มีตำแหน่งงานใหม่ที่เหมาะกับคุณ",
+			Greeting:   emailtmpl.Greeting(t.FullName),
+			Paragraphs: []string{"มีตำแหน่งงานใหม่ที่เปิดรับและเหมาะกับคุณ สมัครได้เลย"},
+			CTA:        &emailtmpl.CTA{Label: "ดูตำแหน่งงาน", URL: fmt.Sprintf("%s/jobs/%s", s.portalBaseURL, positionID)},
+		}
 		msg := notify.Message{
 			Channel:   channel,
 			Recipient: recipient,
 			Subject:   "มีตำแหน่งงานใหม่ที่เหมาะกับคุณ",
-			Body: fmt.Sprintf(
-				"สวัสดีคุณ%s มีตำแหน่งงานใหม่ที่เปิดรับ สมัครได้ที่ %s/jobs/%s",
-				t.FullName, s.portalBaseURL, positionID,
-			),
+			Body:      doc.PlainText(),
+			HTML:      emailtmpl.Render(doc),
 		}
 		if err := s.notifier.Send(ctx, msg); err != nil {
 			// Contact row already recorded (at-most-once); log and move on.

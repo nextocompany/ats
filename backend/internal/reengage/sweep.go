@@ -10,6 +10,7 @@ import (
 
 	"github.com/nexto/hr-ats/internal/activity"
 	"github.com/nexto/hr-ats/internal/notify"
+	"github.com/nexto/hr-ats/pkg/emailtmpl"
 	"github.com/nexto/hr-ats/pkg/queue"
 )
 
@@ -44,14 +45,18 @@ func (s *Service) SweepTimeBased(ctx context.Context, months int) (int, error) {
 			continue // already nudged for this trigger
 		}
 
+		doc := emailtmpl.Doc{
+			Title:      "CP Axtra ยังเปิดรับสมัครงานอยู่",
+			Greeting:   emailtmpl.Greeting(t.FullName),
+			Paragraphs: []string{"เรายังมีตำแหน่งงานใหม่ ๆ ที่เปิดรับอยู่ กลับมาดูและสมัครได้เลย"},
+			CTA:        &emailtmpl.CTA{Label: "ดูตำแหน่งงานทั้งหมด", URL: s.portalBaseURL + "/jobs"},
+		}
 		msg := notify.Message{
 			Channel:   channel,
 			Recipient: recipient,
 			Subject:   "CP Axtra ยังเปิดรับสมัครงานอยู่",
-			Body: fmt.Sprintf(
-				"สวัสดีคุณ%s เรายังมีตำแหน่งงานใหม่ ๆ ที่เปิดรับอยู่ กลับมาดูและสมัครได้ที่ %s/jobs",
-				t.FullName, s.portalBaseURL,
-			),
+			Body:      doc.PlainText(),
+			HTML:      emailtmpl.Render(doc),
 		}
 		if err := s.notifier.Send(ctx, msg); err != nil {
 			log.Warn().Err(err).Str("candidate_id", t.CandidateID.String()).Msg("reengage: time-based notify failed")

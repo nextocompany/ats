@@ -23,6 +23,7 @@ type Message struct {
 	Recipient string // LINE user id or email address (unused for Teams)
 	Subject   string
 	Body      string
+	HTML      string // optional branded HTML body for ChannelEmail; ignored for LINE/Teams
 }
 
 // Notifier sends outbound notifications.

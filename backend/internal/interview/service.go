@@ -361,12 +361,17 @@ func (s *Service) notifyInvite(ctx context.Context, applicationID uuid.UUID, tok
 		log.Warn().Err(err).Str("candidate", app.CandidateID.String()).Msg("interview invite: load candidate failed")
 		return
 	}
-	msg := notify.InterviewInviteMessage(cand.LineUserID, cand.FullName, s.portalBaseURL, token)
-	if msg.Recipient == "" {
-		return // candidate has no LINE handle — HR shares the link manually
+	// LINE and email are independent best-effort channels: a candidate who applied
+	// with only one of the two must still receive the invite.
+	if msg := notify.InterviewInviteMessage(cand.LineUserID, cand.FullName, s.portalBaseURL, token); msg.Recipient != "" {
+		if err := s.notifier.Send(ctx, msg); err != nil {
+			log.Warn().Err(err).Str("application", applicationID.String()).Msg("interview invite: line send failed (non-fatal)")
+		}
 	}
-	if err := s.notifier.Send(ctx, msg); err != nil {
-		log.Warn().Err(err).Str("application", applicationID.String()).Msg("interview invite: send failed (non-fatal)")
+	if em := notify.InterviewInviteEmailMessage(cand.Email, cand.FullName, s.portalBaseURL, token); em.Recipient != "" {
+		if err := s.notifier.Send(ctx, em); err != nil {
+			log.Warn().Err(err).Str("application", applicationID.String()).Msg("interview invite: email send failed (non-fatal)")
+		}
 	}
 }
 
