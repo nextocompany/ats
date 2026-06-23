@@ -128,3 +128,46 @@ func TestCreate_RoundTripsDetailedFields(t *testing.T) {
 		t.Fatalf("expected nil salary, got min=%v max=%v", noSalary.SalaryMin, noSalary.SalaryMax)
 	}
 }
+
+// TestUpdate_AllowedWhenOpenLockedWhenClosed proves a manual requisition stays
+// editable after approval (status 'open') and becomes locked once closed.
+func TestUpdate_AllowedWhenOpenLockedWhenClosed(t *testing.T) {
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, dsn())
+	if err != nil {
+		t.Fatalf("connect (stack up + migrated?): %v", err)
+	}
+	t.Cleanup(pool.Close)
+	repo := NewRepository(pool)
+
+	posID, storeNo := mkPositionAndStore(t, pool)
+	created, err := repo.Create(ctx, CreateInput{PositionID: posID, StoreID: storeNo, Headcount: 1, Priority: PriorityNormal}, uuid.New())
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `DELETE FROM vacancies WHERE id = $1`, created.ID) })
+
+	// Approve -> open.
+	if _, err := repo.Approve(ctx, created.ID, uuid.New()); err != nil {
+		t.Fatalf("approve: %v", err)
+	}
+
+	// Editing an OPEN requisition now succeeds (previously ErrBadState).
+	hc := 5
+	updated, err := repo.Update(ctx, created.ID, UpdateInput{Headcount: &hc})
+	if err != nil {
+		t.Fatalf("update while open should succeed, got: %v", err)
+	}
+	if updated.Headcount != 5 || updated.Status != StatusOpen {
+		t.Fatalf("expected headcount 5 + still open, got hc=%d status=%q", updated.Headcount, updated.Status)
+	}
+
+	// Close -> locked: further edits are ErrBadState.
+	if _, err := repo.Close(ctx, created.ID); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+	hc2 := 9
+	if _, err := repo.Update(ctx, created.ID, UpdateInput{Headcount: &hc2}); err != ErrBadState {
+		t.Fatalf("update after close should be ErrBadState, got: %v", err)
+	}
+}

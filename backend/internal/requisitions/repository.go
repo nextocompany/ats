@@ -176,10 +176,11 @@ func (r *pgRepository) Update(ctx context.Context, id uuid.UUID, in UpdateInput)
 	}
 	set = append(set, "updated_at = now()")
 	args = append(args, id)
-	// Only manual, still-pending requisitions are editable; PS rows are immutable
-	// here and an open/closed requisition is locked.
-	q := fmt.Sprintf(`UPDATE vacancies SET %s WHERE id = $%d AND source = '%s' AND status = '%s'`,
-		strings.Join(set, ", "), len(args), SourceManual, StatusPendingApproval)
+	// Manual requisitions are editable while pending OR open (HR can adjust a live
+	// opening without re-approval); PS rows are immutable here and a closed/cancelled
+	// requisition is locked as a historical record.
+	q := fmt.Sprintf(`UPDATE vacancies SET %s WHERE id = $%d AND source = '%s' AND status IN ('%s','%s')`,
+		strings.Join(set, ", "), len(args), SourceManual, StatusPendingApproval, StatusOpen)
 	ct, err := r.pool.Exec(ctx, q, args...)
 	if err != nil {
 		return Requisition{}, fmt.Errorf("requisitions: update: %w", err)
