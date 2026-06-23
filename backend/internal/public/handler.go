@@ -18,6 +18,7 @@ import (
 	"github.com/nexto/hr-ats/internal/auth"
 	"github.com/nexto/hr-ats/internal/candidateauth"
 	"github.com/nexto/hr-ats/internal/middleware"
+	"github.com/nexto/hr-ats/internal/notify"
 	"github.com/nexto/hr-ats/internal/pdpa"
 	"github.com/nexto/hr-ats/internal/positions"
 	"github.com/nexto/hr-ats/pkg/httpx"
@@ -77,6 +78,38 @@ type Handler struct {
 	consent           ConsentRecorder
 	accounts          AccountResolver
 	sessionCookieName string
+	notifier          notify.Notifier // optional: apply-received candidate notify
+	portalBaseURL     string
+}
+
+// SetNotifier wires the candidate "application received" notification (best-effort
+// LINE + email on a successful apply). Optional — nil leaves apply silent.
+func (h *Handler) SetNotifier(n notify.Notifier, portalBaseURL string) *Handler {
+	h.notifier = n
+	h.portalBaseURL = portalBaseURL
+	return h
+}
+
+// notifyApplicationReceived tells the candidate (LINE + email, best-effort) that
+// their application for a position was received. No-op when the notifier is unset.
+func (h *Handler) notifyApplicationReceived(ctx context.Context, lineUserID, emailAddr, fullName string, positionID uuid.UUID) {
+	if h.notifier == nil {
+		return
+	}
+	title := ""
+	if p, err := h.pos.FindByID(ctx, positionID); err == nil {
+		title = p.TitleTH
+	}
+	if msg := notify.ApplicationReceivedMessage(lineUserID, fullName, title, h.portalBaseURL); msg.Recipient != "" {
+		if err := h.notifier.Send(ctx, msg); err != nil {
+			log.Warn().Err(err).Msg("apply-received notify: line send failed (non-fatal)")
+		}
+	}
+	if em := notify.ApplicationReceivedEmailMessage(emailAddr, fullName, title, h.portalBaseURL); em.Recipient != "" {
+		if err := h.notifier.Send(ctx, em); err != nil {
+			log.Warn().Err(err).Msg("apply-received notify: email send failed (non-fatal)")
+		}
+	}
 }
 
 // NewHandler builds the public handler. accounts/sessionCookieName enable account-
@@ -239,6 +272,7 @@ func (h *Handler) Apply(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
+	h.notifyApplicationReceived(c.UserContext(), lineUserID, email, name, positionID)
 	return h.finalizeApplication(c, result, consentVersion, accountID)
 }
 
@@ -314,6 +348,7 @@ func (h *Handler) QuickApply(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
+	h.notifyApplicationReceived(c.UserContext(), acct.LineUserID, acct.Email, acct.FullName, positionID)
 	return h.finalizeApplication(c, result, consentVersion, &id)
 }
 

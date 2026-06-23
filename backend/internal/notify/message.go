@@ -132,6 +132,48 @@ func InvalidResumeEmailMessage(emailAddr, fullName, portalBaseURL string) Messag
 	}
 }
 
+// ApplicationReceivedMessage is sent right after a successful apply: it confirms
+// which position the candidate applied to and the current status. position is the
+// human-readable title (may be empty). Zero Message when there is no LINE handle.
+func ApplicationReceivedMessage(lineUserID, fullName, position, portalBaseURL string) Message {
+	if lineUserID == "" {
+		return Message{}
+	}
+	return Message{
+		Channel:   ChannelLINE,
+		Recipient: lineUserID,
+		Subject:   "ได้รับใบสมัครของคุณแล้ว",
+		Body:      applicationReceivedBody(fullName, position, portalBaseURL),
+	}
+}
+
+// ApplicationReceivedEmailMessage is the email equivalent, sharing the body.
+func ApplicationReceivedEmailMessage(emailAddr, fullName, position, portalBaseURL string) Message {
+	if emailAddr == "" {
+		return Message{}
+	}
+	return Message{
+		Channel:   ChannelEmail,
+		Recipient: emailAddr,
+		Subject:   "ได้รับใบสมัครของคุณแล้ว",
+		Body:      applicationReceivedBody(fullName, position, portalBaseURL),
+	}
+}
+
+func applicationReceivedBody(fullName, position, portalBaseURL string) string {
+	greeting := "สวัสดีค่ะ"
+	if fullName != "" {
+		greeting = "สวัสดีคุณ" + fullName
+	}
+	pos := position
+	if pos == "" {
+		pos = "ที่คุณสมัคร"
+	}
+	return greeting +
+		fmt.Sprintf(" เราได้รับใบสมัครงานตำแหน่ง \"%s\" ของคุณเรียบร้อยแล้ว สถานะปัจจุบัน: รอการตรวจสอบ", pos) +
+		fmt.Sprintf(" ติดตามสถานะใบสมัครได้ที่ %s/status", portalBaseURL)
+}
+
 // NameMismatchMessage builds a candidate-facing LINE notification when the name
 // parsed from the uploaded resume does not match the account holder's name.
 // Gentle + recoverable (the match can be imperfect): asks them to re-upload their
@@ -204,15 +246,30 @@ func statusBody(fullName, status, portalBaseURL string) (string, bool) {
 	}
 	link := fmt.Sprintf(" ตรวจสอบสถานะได้ที่ %s/status", portalBaseURL)
 	switch status {
+	case "scored":
+		return greeting + " ใบสมัครของคุณผ่านการคัดกรองเบื้องต้นเรียบร้อยแล้ว และอยู่ระหว่างการพิจารณาของทีม HR" + link, true
+	case "ai_interview":
+		return greeting + " คุณได้รับเชิญให้ทำแบบสัมภาษณ์เบื้องต้นกับผู้ช่วย AI กรุณาทำให้เสร็จเพื่อเข้าสู่ขั้นตอนถัดไป" + link, true
+	case "ai_interviewed":
+		return greeting + " เราได้รับแบบสัมภาษณ์เบื้องต้นของคุณแล้ว ทีมงานกำลังพิจารณาผล" + link, true
 	case "shortlisted":
-		return greeting + " ใบสมัครของคุณผ่านการคัดกรองเบื้องต้นและเข้าสู่รอบพิจารณา ทีม HR จะติดต่อกลับ" + link, true
+		return greeting + " ใบสมัครของคุณเข้าสู่รอบพิจารณาคัดเลือก ทีม HR จะติดต่อกลับ" + link, true
 	case "interview":
 		return greeting + " คุณได้รับเชิญเข้าสัมภาษณ์ ทีมงานจะติดต่อเพื่อนัดหมายเร็ว ๆ นี้" + link, true
+	case "interviewed":
+		return greeting + " การสัมภาษณ์ของคุณเสร็จสิ้นแล้ว ทีมงานกำลังพิจารณาผลและจะแจ้งให้ทราบ" + link, true
+	case "pending_approval":
+		return greeting + " ใบสมัครของคุณอยู่ระหว่างขั้นตอนการอนุมัติการจ้างภายใน เราจะแจ้งผลให้ทราบเร็ว ๆ นี้" + link, true
 	case "offer":
 		return greeting + fmt.Sprintf(" คุณได้รับข้อเสนอการจ้างงาน! เข้าสู่ระบบเพื่อดูรายละเอียดและตอบรับได้ที่ %s/offers", portalBaseURL), true
 	case "hired":
 		return greeting + fmt.Sprintf(" ยินดีด้วย! คุณได้รับการคัดเลือก กรุณาอัปโหลดเอกสารเริ่มงานของคุณที่ %s/account ทีม HR จะติดต่อกลับเรื่องวันเริ่มงาน", portalBaseURL), true
+	case "rejected":
+		return greeting + " ขอบคุณที่ให้ความสนใจร่วมงานกับเรา ใบสมัครของคุณยังไม่ผ่านการพิจารณาในรอบนี้ เราจะเก็บข้อมูลไว้พิจารณาในโอกาสต่อไป" + link, true
 	default:
+		// pending / parsed / failed and other internal-only states are not
+		// candidate-facing here (apply sends its own "received" message; the
+		// invalid_resume / name_mismatch gates send their own).
 		return "", false
 	}
 }

@@ -301,6 +301,7 @@ func (pr *Processor) run(ctx context.Context, p queue.ProcessApplicationPayload,
 		if err := pr.persistScore(ctx, appID, applications.StatusRejected, result); err != nil {
 			return canonicalID, err
 		}
+		pr.notifyCandidateStatus(ctx, cand, applications.StatusRejected)
 		logger.Info().Int("score", result.Total).Msg("auto-rejected (must-have gate)")
 		return canonicalID, nil
 	}
@@ -316,6 +317,7 @@ func (pr *Processor) run(ctx context.Context, p queue.ProcessApplicationPayload,
 	if err := pr.persistScore(ctx, appID, applications.StatusScored, result); err != nil {
 		return canonicalID, err
 	}
+	pr.notifyCandidateStatus(ctx, cand, applications.StatusScored)
 
 	logger.Info().
 		Int("score", result.Total).
@@ -398,6 +400,27 @@ func (pr *Processor) notifyNameMismatch(ctx context.Context, appID, candID uuid.
 	if em := notify.NameMismatchEmailMessage(cand.Email, cand.FullName, d.portalBaseURL); em.Recipient != "" {
 		if err := d.notifier.Send(ctx, em); err != nil {
 			log.Warn().Err(err).Str("application", appID.String()).Msg("name-mismatch notify: email send failed (non-fatal)")
+		}
+	}
+}
+
+// notifyCandidateStatus sends the candidate a best-effort status update (LINE +
+// email) for a pipeline auto-transition (scored / auto-rejected), so they hear
+// about every meaningful change. No-op when the notifier is unset, the status has
+// no candidate-facing copy, or the candidate has no contact handle.
+func (pr *Processor) notifyCandidateStatus(ctx context.Context, cand *candidates.Candidate, status string) {
+	d := pr.candNotify
+	if d.notifier == nil || cand == nil {
+		return
+	}
+	if msg := notify.StatusMessage(cand.LineUserID, cand.FullName, status, d.portalBaseURL); msg.Recipient != "" {
+		if err := d.notifier.Send(ctx, msg); err != nil {
+			log.Warn().Err(err).Str("status", status).Msg("candidate status notify: line send failed (non-fatal)")
+		}
+	}
+	if em := notify.StatusEmailMessage(cand.Email, cand.FullName, status, d.portalBaseURL); em.Recipient != "" {
+		if err := d.notifier.Send(ctx, em); err != nil {
+			log.Warn().Err(err).Str("status", status).Msg("candidate status notify: email send failed (non-fatal)")
 		}
 	}
 }

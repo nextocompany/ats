@@ -89,10 +89,25 @@ func TestNotifyStatusChange_SkipsNonNotifiableStatus(t *testing.T) {
 	d := deps(rn, &candidates.Candidate{LineUserID: "U-1"})
 	apps := stubApps{app: &Application{CandidateID: uuid.New()}}
 
-	d.notifyStatusChange(context.Background(), apps, uuid.New(), StatusScored)
+	// 'parsed' is an internal pipeline step with no candidate-facing copy.
+	d.notifyStatusChange(context.Background(), apps, uuid.New(), StatusParsed)
 
 	if len(rn.sent) != 0 {
-		t.Errorf("scored is not candidate-notifiable, got %d sends", len(rn.sent))
+		t.Errorf("parsed is not candidate-notifiable, got %d sends", len(rn.sent))
+	}
+}
+
+// 'scored' became candidate-notifiable (item 3: notify on every meaningful status)
+// — the auto-screening outcome now reaches the candidate.
+func TestNotifyStatusChange_SendsForScored(t *testing.T) {
+	rn := &recNotifier{}
+	d := deps(rn, &candidates.Candidate{LineUserID: "U-1"})
+	apps := stubApps{app: &Application{CandidateID: uuid.New()}}
+
+	d.notifyStatusChange(context.Background(), apps, uuid.New(), StatusScored)
+
+	if len(rn.sent) == 0 {
+		t.Error("scored should now notify the candidate, got 0 sends")
 	}
 }
 
