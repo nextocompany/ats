@@ -96,6 +96,10 @@ export function RequisitionDialog({ mode, open, onClose, requisition }: Props) {
   // Once approved (open), position + store are locked — only the details are editable
   // (matches the backend Update guard). Pending requisitions remain fully editable.
   const lockIdentity = mode === "edit" && requisition?.status === "open";
+  // PeopleSoft openings: position/store/headcount are PS-owned (synced) — HR may edit
+  // only the detail/JD fields. Headcount is locked here (position/store via lockIdentity).
+  const isPeoplesoft = mode === "edit" && !!requisition?.source && requisition.source !== "manual";
+  const lockHeadcount = isPeoplesoft;
 
   function close() {
     create.reset();
@@ -194,7 +198,11 @@ export function RequisitionDialog({ mode, open, onClose, requisition }: Props) {
               </Select>
             </label>
 
-            {lockIdentity && <p className="text-xs text-muted-foreground">{t("lockIdentityHint")}</p>}
+            {isPeoplesoft ? (
+              <p className="text-xs text-muted-foreground">{t("psLockHint")}</p>
+            ) : lockIdentity ? (
+              <p className="text-xs text-muted-foreground">{t("lockIdentityHint")}</p>
+            ) : null}
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <label className="block space-y-1.5">
@@ -205,6 +213,7 @@ export function RequisitionDialog({ mode, open, onClose, requisition }: Props) {
                   max={999}
                   value={headcount}
                   onChange={(e) => setHeadcount(e.target.value)}
+                  disabled={lockHeadcount}
                 />
               </label>
 
