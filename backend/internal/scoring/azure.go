@@ -18,9 +18,13 @@ const openAIAPIVersion = "2024-08-01-preview"
 
 const scoringSystemPrompt = `You are an HR screening assistant for Thai retail. Given a candidate profile ` +
 	`and a job description (responsibilities + qualifications), return a strict JSON object: {"skills_score":<0-20 int>,` +
-	`"strengths":["3 short Thai bullet points"],"red_flags":["..."],"suggested_positions":["..."]}. ` +
+	`"strengths":["short Thai bullet points"],"red_flags":["short Thai bullet points"],"suggested_positions":["..."]}. ` +
 	`Score skills_score on how well the candidate's skills and experience match the job description. ` +
-	`Ground strengths and red_flags in the specific responsibilities and qualifications. ` +
+	`"strengths": list ONLY genuine, positive qualifications the candidate actually HAS that fit this job, grounded in the ` +
+	`responsibilities and qualifications. Each item must describe something the candidate possesses, never something they lack. ` +
+	`Return 0 to 4 items, and an empty array [] if the candidate has no real strength for this job. Do NOT pad to a fixed count, ` +
+	`and do NOT phrase a missing skill, a gap, a lack of experience, or any weakness as a strength. ` +
+	`"red_flags": put every gap, missing qualification, mismatch, or concern here instead (Thai bullet points; empty array if none). ` +
 	`Respond with JSON only.`
 
 // azureLLM evaluates the qualitative scoring part via Azure OpenAI.
