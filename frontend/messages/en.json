@@ -781,6 +781,8 @@
     "eyebrow": "People",
     "title": "Candidates",
     "meta": "{count, plural, one {# candidate} other {# candidates}} on file · all stores",
+    "metaCount": "{count, plural, one {# candidate} other {# candidates}}",
+    "appUntitled": "Position",
     "sumOnFile": "On file",
     "sumActive": "Active",
     "sumActiveHint": "on this page",

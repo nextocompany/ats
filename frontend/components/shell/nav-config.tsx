@@ -2,7 +2,6 @@ import {
   LayoutDashboard,
   Inbox,
   Users,
-  UserCog,
   UploadCloud,
   Search,
   BarChart3,
@@ -25,7 +24,6 @@ import {
   canViewExecutive,
   canViewReports,
   isLineManager,
-  isMemberAdmin,
   isSuperAdmin,
 } from "@/lib/roles";
 import type { Me } from "@/lib/types";
@@ -70,9 +68,6 @@ export const APPROVALS_NAV: NavItem = { href: "/approvals", label: "Approvals", 
 // canManageRequisitions mirroring the backend allowlist.
 export const REQUISITIONS_NAV: NavItem = { href: "/requisitions", label: "Requisitions", key: "requisitions", icon: ClipboardList };
 
-// Members is super_admin + hr_manager — career-portal member management.
-export const MEMBERS_NAV: NavItem = { href: "/members", label: "Members", key: "members", icon: UserCog };
-
 // PDPA is the DPO/PDPA console (DSAR queue, consent lookup, compliance overview):
 // gated via canAdminPdpa (pdpa.admin), mirroring the backend allowlist.
 export const PDPA_NAV: NavItem = { href: "/pdpa", label: "PDPA", key: "pdpa", icon: ShieldCheck };
@@ -95,14 +90,13 @@ export function navForRole(me?: Me): NavItem[] {
   if (canAccessApprovals(me)) items.push(APPROVALS_NAV);
   if (canBulkUpload(me)) items.push(BULK_NAV);
   if (canManageRequisitions(me)) items.push(REQUISITIONS_NAV);
-  if (isMemberAdmin(me)) items.push(MEMBERS_NAV);
   if (canAdminPdpa(me)) items.push(PDPA_NAV);
   if (isSuperAdmin(me)) items.push(ADMIN_NAV);
   return items;
 }
 
 // ALL_NAV is every possible item, for pathname→item lookups (e.g. header title).
-export const ALL_NAV: NavItem[] = [...NAV, REPORTS_NAV, EXECUTIVE_NAV, SHORTLIST_NAV, APPROVALS_NAV, BULK_NAV, REQUISITIONS_NAV, MEMBERS_NAV, PDPA_NAV, ADMIN_NAV, PRIVACY_NAV];
+export const ALL_NAV: NavItem[] = [...NAV, REPORTS_NAV, EXECUTIVE_NAV, SHORTLIST_NAV, APPROVALS_NAV, BULK_NAV, REQUISITIONS_NAV, PDPA_NAV, ADMIN_NAV, PRIVACY_NAV];
 
 // Brand lockup — text-only institutional wordmark, no monogram tile or dot mark.
 // "CP AXTRA" tracked uppercase over an "ATS Console" line (HSBC/JPM register),

@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/nexto/hr-ats/internal/middleware"
+	"github.com/nexto/hr-ats/internal/rbac"
 	"github.com/nexto/hr-ats/pkg/httpx"
 )
 
@@ -31,9 +32,10 @@ type stubRepo struct {
 	lastAnonID   uuid.UUID // id passed to Anonymize
 	lastTag      string    // tag passed to AddTag/RemoveTag
 	forceLogouts int       // ForceLogout call count
+	resolveFrom  uuid.UUID // a candidate id that ResolveAccountID maps to member.ID
 }
 
-func (s *stubRepo) List(context.Context, ListFilter) ([]Member, int, error) {
+func (s *stubRepo) List(context.Context, ListFilter, rbac.Scope) ([]Member, int, error) {
 	if s.member == nil {
 		return nil, 0, nil
 	}
@@ -45,10 +47,27 @@ func (s *stubRepo) GetByID(_ context.Context, id uuid.UUID) (*Member, error) {
 	}
 	return nil, ErrNotFound
 }
+func (s *stubRepo) GetScopedByID(_ context.Context, id uuid.UUID, _ rbac.Scope) (*Member, error) {
+	if s.member != nil && s.member.ID == id {
+		return s.member, nil
+	}
+	return nil, ErrNotFound
+}
+func (s *stubRepo) ResolveAccountID(_ context.Context, candidateID uuid.UUID) (uuid.UUID, error) {
+	// When resolveFrom matches the looked-up id, map it to the member's account id
+	// (simulates a per-intake candidate id linking to its owning account).
+	if s.member != nil && s.resolveFrom != uuid.Nil && s.resolveFrom == candidateID {
+		return s.member.ID, nil
+	}
+	return uuid.Nil, ErrNotFound
+}
+func (s *stubRepo) ListApplicationsByAccount(context.Context, uuid.UUID) ([]AccountApplication, error) {
+	return nil, nil
+}
 func (s *stubRepo) GetResumeBlobURL(context.Context, uuid.UUID) (string, error) {
 	return s.resumeURL, s.resumeErr
 }
-func (s *stubRepo) Stats(context.Context) (Stats, error) { return Stats{}, nil }
+func (s *stubRepo) Stats(context.Context, rbac.Scope) (Stats, error) { return Stats{}, nil }
 
 func (s *stubRepo) SetStatus(_ context.Context, _ uuid.UUID, status string, _ *uuid.UUID) error {
 	s.lastStatus = status
@@ -63,7 +82,7 @@ func (s *stubRepo) Anonymize(_ context.Context, id uuid.UUID) (string, error) {
 	s.lastAnonID = id
 	return s.resumeURL, s.anonymizeErr
 }
-func (s *stubRepo) ListForExport(context.Context, ListFilter, int) ([]Member, error) {
+func (s *stubRepo) ListForExport(context.Context, ListFilter, rbac.Scope, int) ([]Member, error) {
 	if s.member == nil {
 		return nil, nil
 	}
@@ -132,10 +151,21 @@ func status(t *testing.T, fa *fiber.App, method, path string) int {
 	return resp.StatusCode
 }
 
-func TestList_ForbiddenForNonAdminRole(t *testing.T) {
+// The unified person list is open to any authenticated role (scoped server-side),
+// so a store role reads it — it is no longer admin-only.
+func TestList_AllowedForNonAdminRole(t *testing.T) {
 	fa := appWithRole("hr_staff", &stubRepo{})
-	if code := status(t, fa, fiber.MethodGet, "/api/v1/admin/members"); code != fiber.StatusForbidden {
-		t.Fatalf("hr_staff should get 403, got %d", code)
+	if code := status(t, fa, fiber.MethodGet, "/api/v1/admin/members"); code != fiber.StatusOK {
+		t.Fatalf("hr_staff should read the scoped list (200), got %d", code)
+	}
+}
+
+// With no auth context at all the read fails closed (401).
+func TestList_UnauthenticatedRejected(t *testing.T) {
+	fa := fiber.New(fiber.Config{ErrorHandler: httpx.ErrorHandler})
+	RegisterDashboardRoutes(fa, NewHandler(&stubRepo{}, nil, stubSigner{}, nil))
+	if code := status(t, fa, fiber.MethodGet, "/api/v1/admin/members"); code != fiber.StatusUnauthorized {
+		t.Fatalf("unauthenticated list should 401, got %d", code)
 	}
 }
 
@@ -175,10 +205,26 @@ func TestDetail_OK(t *testing.T) {
 	}
 }
 
-func TestStats_ForbiddenForNonAdmin(t *testing.T) {
+// Stats is relaxed alongside the list (scoped aggregate, no PII), so a store role
+// reads it too.
+// A per-intake candidate id (e.g. a search/inbox link) resolves to its owning
+// account and returns that person's detail.
+func TestDetail_ResolvesCandidateIDToAccount(t *testing.T) {
+	acct := uuid.New()
+	cand := uuid.New()
+	fa := appWithRole("super_admin", &stubRepo{
+		member:      &Member{ID: acct, FullName: "สมหญิง", Status: StatusActive},
+		resolveFrom: cand,
+	})
+	if code := status(t, fa, fiber.MethodGet, "/api/v1/admin/members/"+cand.String()); code != fiber.StatusOK {
+		t.Fatalf("candidate id should resolve to account detail (200), got %d", code)
+	}
+}
+
+func TestStats_AllowedForNonAdmin(t *testing.T) {
 	fa := appWithRole("hr_staff", &stubRepo{})
-	if code := status(t, fa, fiber.MethodGet, "/api/v1/admin/members/stats"); code != fiber.StatusForbidden {
-		t.Fatalf("expected 403, got %d", code)
+	if code := status(t, fa, fiber.MethodGet, "/api/v1/admin/members/stats"); code != fiber.StatusOK {
+		t.Fatalf("expected 200, got %d", code)
 	}
 }
 

@@ -652,6 +652,20 @@ export interface Member {
   active_sessions: number;
   last_login_at: string | null;
   created_at: string;
+  // Populated only on the person detail (the unified Candidates detail): one row
+  // per position the person applied to, across all linked candidate rows.
+  applications?: AccountApplication[];
+}
+
+// AccountApplication mirrors the Go members.AccountApplication — a per-position
+// funnel row shown in the unified person detail, linking to /applications/[id].
+export interface AccountApplication {
+  id: string;
+  position_id: string;
+  position_title: string;
+  status: string;
+  ai_score: number | null;
+  created_at: string;
 }
 
 export interface MemberFilter {
