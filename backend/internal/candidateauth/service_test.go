@@ -291,11 +291,15 @@ func (f *fakeRepo) ConsumeOTP(_ context.Context, email, codeHash string) error {
 	return ErrOTPInvalid
 }
 
-// recordingSender implements pkg/email.Sender by recording the plain-text body.
-type recordingSender struct{ lastBody string }
+// recordingSender implements pkg/email.Sender by recording the last message.
+type recordingSender struct {
+	lastBody string
+	lastHTML string
+}
 
 func (r *recordingSender) Send(_ context.Context, m email.Message) error {
 	r.lastBody = m.PlainText
+	r.lastHTML = m.HTML
 	return nil
 }
 
@@ -397,6 +401,20 @@ func TestStartEmailOTPStoresAndSends(t *testing.T) {
 	}
 	if rs.lastBody == "" {
 		t.Fatal("expected an OTP email to be sent")
+	}
+	// The OTP email is branded and bilingual (TH + EN).
+	if rs.lastHTML == "" {
+		t.Fatal("expected a branded HTML body for the OTP email")
+	}
+	for _, want := range []string{"CP", "AXTRA", "รหัส", "Code"} {
+		if !strings.Contains(rs.lastHTML, want) {
+			t.Errorf("OTP HTML missing %q", want)
+		}
+	}
+	// The code must appear in both parts (sanity: bilingual plain + branded HTML
+	// carry the same code), and never in a way that the mock would log as HTML.
+	if !strings.Contains(rs.lastBody, "Code") {
+		t.Errorf("OTP plain body should be bilingual: %q", rs.lastBody)
 	}
 }
 

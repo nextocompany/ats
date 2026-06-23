@@ -11,6 +11,7 @@ import (
 
 	"github.com/nexto/hr-ats/pkg/config"
 	"github.com/nexto/hr-ats/pkg/email"
+	"github.com/nexto/hr-ats/pkg/emailtmpl"
 )
 
 const linePushURL = "https://api.line.me/v2/bot/message/push"
@@ -40,7 +41,14 @@ func (n restNotifier) Send(ctx context.Context, m Message) error {
 	case ChannelLINE:
 		return n.sendLINE(ctx, m)
 	case ChannelEmail:
-		return n.email.Send(ctx, email.Message{To: m.Recipient, Subject: m.Subject, PlainText: m.Body})
+		// Always send a branded HTML part alongside the plain body (multipart). A
+		// builder may supply its own HTML; otherwise wrap the plain body in the
+		// branded shell so even un-upgraded emails are on-brand.
+		html := m.HTML
+		if html == "" {
+			html = emailtmpl.RenderPlain(m.Body)
+		}
+		return n.email.Send(ctx, email.Message{To: m.Recipient, Subject: m.Subject, PlainText: m.Body, HTML: html})
 	case ChannelTeams:
 		if n.teamsWebhook == "" {
 			return fmt.Errorf("notify: teams webhook not configured (TEAMS_WEBHOOK_URL empty)")

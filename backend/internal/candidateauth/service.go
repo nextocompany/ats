@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/nexto/hr-ats/pkg/email"
+	"github.com/nexto/hr-ats/pkg/emailtmpl"
 )
 
 // BlobStore is the subset of pkg/blob the service needs (resume save + read +
@@ -131,10 +132,20 @@ func (s *Service) StartEmailOTP(ctx context.Context, rawEmail string) error {
 		return err
 	}
 	mins := int(s.otpTTL.Minutes())
+	// Branded, bilingual (TH/EN). The code lives in a detail row and is never put
+	// in the subject; the mock sender logs only PlainText (and only in development),
+	// never HTML, so a misconfigured prod cannot leak the code.
+	doc := emailtmpl.Doc{
+		Title:      "รหัสยืนยันการเข้าสู่ระบบ / Your login code",
+		Paragraphs: []string{"ใช้รหัสด้านล่างเพื่อเข้าสู่ระบบ", "Use the code below to sign in."},
+		Details:    []emailtmpl.DetailRow{{Label: "รหัสยืนยัน / Code", Value: code}},
+		Outro:      fmt.Sprintf("รหัสหมดอายุใน %d นาที / expires in %d minutes", mins, mins),
+	}
 	msg := email.Message{
 		To:        addr,
 		Subject:   "รหัสยืนยันการเข้าสู่ระบบ / Your login code",
-		PlainText: fmt.Sprintf("รหัสยืนยันของคุณคือ %s (หมดอายุใน %d นาที)\n\nYour verification code is %s (expires in %d minutes).", code, mins, code, mins),
+		PlainText: doc.PlainText(),
+		HTML:      emailtmpl.Render(doc),
 	}
 	if err := s.email.Send(ctx, msg); err != nil {
 		return fmt.Errorf("candidateauth: send otp: %w", err)
