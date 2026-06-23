@@ -137,8 +137,13 @@ func (h *Handler) GetPosition(c *fiber.Ctx) error {
 	if err != nil {
 		return fiber.NewError(fiber.StatusNotFound, "position not found")
 	}
+	// Role-generic Master JD (responsibilities/qualifications/benefits) is safe to
+	// expose on the public posting; opening-specific/internal fields never are.
 	return httpx.OK(c, fiber.Map{
 		"id": p.ID, "title_th": p.TitleTH, "title_en": p.TitleEN, "level": p.Level,
+		"responsibilities": p.Responsibilities,
+		"qualifications":   p.Qualifications,
+		"benefits":         p.Benefits,
 	})
 }
 
