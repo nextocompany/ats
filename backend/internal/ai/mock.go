@@ -3,7 +3,13 @@ package ai
 import (
 	"context"
 	"fmt"
+	"strings"
 )
+
+// MockNonResumeMarker, when present in the OCR text passed to the mock parser,
+// makes it return a non-resume profile (is_resume=false). Lets dev/CI exercise
+// the invalid-resume path deterministically without a real LLM.
+const MockNonResumeMarker = "__NOT_A_RESUME__"
 
 // mockOCR returns deterministic output so local runs and CI are reproducible.
 type mockOCR struct{}
@@ -28,6 +34,11 @@ type mockParser struct{}
 func NewMockParser() Parser { return mockParser{} }
 
 func (mockParser) Parse(_ context.Context, text, _ string) (Profile, error) {
+	// Non-resume path: a document that isn't a CV parses successfully but with
+	// is_resume=false and no identity (mirrors a real LLM on an invoice/photo).
+	if strings.Contains(text, MockNonResumeMarker) {
+		return Profile{IsResume: false}, nil
+	}
 	return Profile{
 		Personal: Personal{
 			Name:    "สมชาย ใจดี",
@@ -46,5 +57,7 @@ func (mockParser) Parse(_ context.Context, text, _ string) (Profile, error) {
 		Skills:          []string{"cashier", "customer service", "POS"},
 		Languages:       []Language{{Language: "Thai", Level: "native"}, {Language: "English", Level: "basic"}},
 		DesiredPosition: "Cashier",
+		// Explicit: a struct literal does NOT run UnmarshalJSON's default-true.
+		IsResume: true,
 	}, nil
 }

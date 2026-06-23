@@ -16,12 +16,13 @@ import (
 // "Screened". The funnel terminal action is now "offer" (the Offer Package itself
 // is a future feature); StatusHired is retained for backward compatibility.
 const (
-	StatusPending  = "pending"  // S1: created, awaiting pipeline
-	StatusParsed   = "parsed"   // S1: OCR + parse done
-	StatusFailed   = "failed"   // pipeline error
-	StatusScored   = "scored"   // S2: passed gate, scored + assigned == "screened"
-	StatusRejected = "rejected" // failed must-have gate, or HR reject (with reason)
-	StatusHired    = "hired"    // legacy terminal (superseded by StatusOffer)
+	StatusPending       = "pending"        // S1: created, awaiting pipeline
+	StatusParsed        = "parsed"         // S1: OCR + parse done
+	StatusFailed        = "failed"         // pipeline error (transient; asynq may retry)
+	StatusInvalidResume = "invalid_resume" // uploaded file is not a resume/CV (recoverable: candidate re-uploads)
+	StatusScored        = "scored"         // S2: passed gate, scored + assigned == "screened"
+	StatusRejected      = "rejected"       // failed must-have gate, or HR reject (with reason)
+	StatusHired         = "hired"          // legacy terminal (superseded by StatusOffer)
 
 	// HR funnel statuses (manual transitions, gated by transitions.go).
 	StatusAIInterview     = "ai_interview"     // AI pre-interview invited / in progress

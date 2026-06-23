@@ -282,6 +282,7 @@
     "offer": "Offer",
     "hired": "Hired",
     "rejected": "Not selected",
+    "invalid_resume": "Not a resume",
     "failed": "Could not process",
     "review": "Under review",
     "in_review": "Under review",
