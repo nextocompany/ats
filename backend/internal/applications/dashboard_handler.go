@@ -43,6 +43,7 @@ func (noopReindexer) Index(context.Context, uuid.UUID) error { return nil }
 
 // DashboardHandler serves the HR inbox read/bulk/resume endpoints.
 type DashboardHandler struct {
+	lockGuard
 	apps       Repository
 	signer     ResumeSigner
 	activity   ActivityWriter
@@ -201,7 +202,7 @@ func (h *DashboardHandler) Bulk(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, "unsupported action")
 	}
 
-	var updated, failed int
+	var updated, failed, skippedLocked int
 	for _, raw := range req.IDs {
 		id, err := uuid.Parse(raw)
 		if err != nil {
@@ -212,6 +213,12 @@ func (h *DashboardHandler) Bulk(c *fiber.Ctx) error {
 		app, ferr := h.apps.FindByID(c.UserContext(), id)
 		if ferr != nil || !CanTransition(app.Status, target) {
 			failed++
+			continue
+		}
+		// Processing lock: skip candidates another operator is actively handling,
+		// rather than failing the whole batch over one contended record.
+		if _, locked := h.lockedByOther(c, app.CandidateID); locked {
+			skippedLocked++
 			continue
 		}
 		if target == StatusRejected {
@@ -235,7 +242,7 @@ func (h *DashboardHandler) Bulk(c *fiber.Ctx) error {
 		}
 		updated++
 	}
-	return httpx.OK(c, fiber.Map{"updated": updated, "failed": failed, "status": target})
+	return httpx.OK(c, fiber.Map{"updated": updated, "failed": failed, "skipped_locked": skippedLocked, "status": target})
 }
 
 // Resume handles GET /api/v1/applications/:id/resume → short-lived signed URL.

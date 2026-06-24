@@ -44,6 +44,7 @@ type UserResolver interface {
 // appointment, and for an online interview creates a Teams meeting + calendar
 // invite via the calendar provider.
 type ScheduleHandler struct {
+	lockGuard
 	apps       Repository
 	cal        calendar.Provider
 	cands      candidateReader
@@ -160,6 +161,9 @@ func (h *ScheduleHandler) Schedule(c *fiber.Ctx) error {
 	app, err := h.apps.FindByID(c.UserContext(), id)
 	if err != nil {
 		return err
+	}
+	if ok, lerr := h.guardLock(c, app.CandidateID); !ok {
+		return lerr
 	}
 	// First round: a legal transition into interview (ai_interviewed/shortlisted).
 	// Additional rounds: already at interview/interviewed — book the next round

@@ -29,6 +29,7 @@ type onboardingBlob interface {
 // OnboardingHandler is the HR-facing onboarding surface: read the document
 // checklist + progress for an application, and approve/reject each document.
 type OnboardingHandler struct {
+	lockGuard
 	apps     Repository
 	blob     onboardingBlob
 	required []string
@@ -92,6 +93,13 @@ func (h *OnboardingHandler) Review(c *fiber.Ctx) error {
 	u, _ := c.Locals(middleware.UserContextKey).(middleware.DevUser)
 	if !canManageOnboarding(u.Role) {
 		return fiber.NewError(fiber.StatusForbidden, "insufficient role to review onboarding")
+	}
+	if app, ferr := h.apps.FindByID(c.UserContext(), id); ferr != nil {
+		return ferr
+	} else if app != nil {
+		if ok, lerr := h.guardLock(c, app.CandidateID); !ok {
+			return lerr
+		}
 	}
 	docID, err := uuid.Parse(c.Params("docId"))
 	if err != nil {

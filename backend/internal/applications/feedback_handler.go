@@ -37,6 +37,7 @@ type feedbackStore interface {
 
 // FeedbackHandler records and lists structured interview feedback.
 type FeedbackHandler struct {
+	lockGuard
 	apps     feedbackStore
 	hrNotify hrFeedbackNotify
 }
@@ -114,6 +115,9 @@ func (h *FeedbackHandler) Create(c *fiber.Ctx) error {
 	app, err := h.apps.FindByID(c.UserContext(), id)
 	if err != nil {
 		return err
+	}
+	if ok, lerr := h.guardLock(c, app.CandidateID); !ok {
+		return lerr
 	}
 	if !CanRecordFeedback(app.Status) {
 		return fiber.NewError(fiber.StatusBadRequest, "interview feedback can only be recorded during the interview stage")

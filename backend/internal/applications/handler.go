@@ -38,6 +38,7 @@ type HiredSyncer interface {
 
 // Handler serves the intake and status endpoints.
 type Handler struct {
+	lockGuard
 	svc        *Service
 	apps       Repository
 	inspector  JobInspector
@@ -197,6 +198,12 @@ func (h *Handler) UpdateStatus(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
+	// Processing lock: only the operator who holds (or can take) the candidate's
+	// lock may advance their pipeline — stops two operators from the shared pool
+	// acting on the same person at once.
+	if ok, lerr := h.guardLock(c, app.CandidateID); !ok {
+		return lerr
+	}
 	if !CanTransition(app.Status, req.Status) {
 		return fiber.NewError(fiber.StatusBadRequest, "transition not allowed from "+app.Status)
 	}
@@ -260,6 +267,14 @@ func (h *Handler) UpdateAssignment(c *fiber.Ctx) error {
 		return serr
 	} else if !ok {
 		return fiber.NewError(fiber.StatusNotFound, "application not found")
+	}
+	// Reassigning placement is an operate action — gate it on the candidate lock.
+	app, err := h.apps.FindByID(c.UserContext(), id)
+	if err != nil {
+		return err
+	}
+	if ok, lerr := h.guardLock(c, app.CandidateID); !ok {
+		return lerr
 	}
 	var req assignmentReq
 	if err := c.BodyParser(&req); err != nil {

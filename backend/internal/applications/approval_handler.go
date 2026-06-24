@@ -28,6 +28,7 @@ type approvalStore interface {
 
 // ApprovalHandler drives the four-level hiring approval chain.
 type ApprovalHandler struct {
+	lockGuard
 	apps     approvalStore
 	slaHours int
 	hrNotify approvalNotify
@@ -81,6 +82,12 @@ func (h *ApprovalHandler) Create(c *fiber.Ctx) error {
 	app, err := h.apps.FindByID(c.UserContext(), id)
 	if err != nil {
 		return err
+	}
+	// Submitting for approval is an operate action by the candidate's owner — gate
+	// it on the lock. (The Decide endpoint is intentionally NOT gated: approvers /
+	// hiring managers are read-only and never hold a processing lock.)
+	if ok, lerr := h.guardLock(c, app.CandidateID); !ok {
+		return lerr
 	}
 	if !CanRequestApproval(app.Status) {
 		return fiber.NewError(fiber.StatusBadRequest, "a hiring approval can only be requested from the interviewed stage")
