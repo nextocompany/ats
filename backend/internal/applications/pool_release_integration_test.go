@@ -91,3 +91,61 @@ func TestReleaseStalePoolCandidates(t *testing.T) {
 		t.Error("already-pooled app must NOT be re-released (released_to_pool_at would be set)")
 	}
 }
+
+// TestMarkPickedUp proves pickup stamps only store-specific, not-yet-picked rows.
+func TestMarkPickedUp(t *testing.T) {
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, poolDSN())
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	defer pool.Close()
+
+	var cand, pos, actor uuid.UUID
+	if err := pool.QueryRow(ctx, `INSERT INTO candidates (full_name) VALUES ('Pickup') RETURNING id`).Scan(&cand); err != nil {
+		t.Fatalf("seed candidate: %v", err)
+	}
+	if err := pool.QueryRow(ctx, `INSERT INTO positions (title_th, title_en) VALUES ('p','p') RETURNING id`).Scan(&pos); err != nil {
+		t.Fatalf("seed position: %v", err)
+	}
+	if err := pool.QueryRow(ctx, `INSERT INTO users (email, role) VALUES ('pickup@test.local','hr_store') RETURNING id`).Scan(&actor); err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO stores (store_no, store_name) VALUES (97001,'S') ON CONFLICT DO NOTHING`); err != nil {
+		t.Fatalf("seed store: %v", err)
+	}
+	sn := 97001
+	var storeApp, poolApp uuid.UUID
+	pool.QueryRow(ctx, `INSERT INTO applications (candidate_id, position_id, assigned_store_id, talent_pool, status) VALUES ($1,$2,$3,false,'scored') RETURNING id`, cand, pos, sn).Scan(&storeApp)
+	pool.QueryRow(ctx, `INSERT INTO applications (candidate_id, position_id, assigned_store_id, talent_pool, status) VALUES ($1,$2,NULL,true,'scored') RETURNING id`, cand, pos).Scan(&poolApp)
+	t.Cleanup(func() {
+		pool.Exec(ctx, `DELETE FROM applications WHERE candidate_id=$1`, cand)
+		pool.Exec(ctx, `DELETE FROM candidates WHERE id=$1`, cand)
+		pool.Exec(ctx, `DELETE FROM positions WHERE id=$1`, pos)
+		pool.Exec(ctx, `DELETE FROM users WHERE id=$1`, actor)
+		pool.Exec(ctx, `DELETE FROM stores WHERE store_no=97001`)
+	})
+
+	r := NewRepository(pool).(*pgRepository)
+	n, err := r.MarkPickedUp(ctx, cand, actor)
+	if err != nil {
+		t.Fatalf("mark: %v", err)
+	}
+	if n != 1 {
+		t.Errorf("picked up %d rows, want 1 (only the store-specific app)", n)
+	}
+	var pickedBy *uuid.UUID
+	pool.QueryRow(ctx, `SELECT picked_up_by FROM applications WHERE id=$1`, storeApp).Scan(&pickedBy)
+	if pickedBy == nil || *pickedBy != actor {
+		t.Errorf("store app picked_up_by = %v, want %v", pickedBy, actor)
+	}
+	var poolPicked *uuid.UUID
+	pool.QueryRow(ctx, `SELECT picked_up_at FROM applications WHERE id=$1`, poolApp).Scan(&poolPicked)
+	if poolPicked != nil {
+		t.Error("pool app must NOT be marked picked up")
+	}
+	// Idempotent: second call stamps nothing.
+	if n2, _ := r.MarkPickedUp(ctx, cand, actor); n2 != 0 {
+		t.Errorf("second mark stamped %d, want 0 (idempotent)", n2)
+	}
+}

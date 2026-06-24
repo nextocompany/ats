@@ -7,6 +7,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 
 	"github.com/nexto/hr-ats/internal/middleware"
 	"github.com/nexto/hr-ats/internal/rbac"
@@ -21,10 +22,18 @@ type UserResolver interface {
 	ResolveUser(ctx context.Context, email string) (id uuid.UUID, fullName string, err error)
 }
 
+// PickupStamper records that a store HR has begun processing a candidate, which
+// stops that candidate's store-specific applications from being swept back to the
+// central pool. Acquiring the lock IS the "I'm taking this candidate" action.
+type PickupStamper interface {
+	MarkPickedUp(ctx context.Context, candidateID, byUser uuid.UUID) (int, error)
+}
+
 // Handler serves the candidate processing-lock endpoints.
 type Handler struct {
-	svc   *Service
-	users UserResolver
+	svc     *Service
+	users   UserResolver
+	pickups PickupStamper
 }
 
 // NewHandler builds the lock handler. The resolver is required to identify the
@@ -32,6 +41,10 @@ type Handler struct {
 func NewHandler(svc *Service, users UserResolver) *Handler {
 	return &Handler{svc: svc, users: users}
 }
+
+// SetPickupStamper wires the pickup recorder invoked on a successful acquire.
+// Optional: with no stamper, acquiring the lock does not stamp picked_up_at.
+func (h *Handler) SetPickupStamper(p PickupStamper) { h.pickups = p }
 
 // RegisterRoutes mounts the lock endpoints under a candidate.
 func RegisterRoutes(app *fiber.App, h *Handler) {
@@ -99,6 +112,14 @@ func (h *Handler) Acquire(c *fiber.Ctx) error {
 	}
 	if err != nil {
 		return httpx.Fail(c, fiber.StatusInternalServerError, "failed to acquire lock")
+	}
+	// Acquiring the lock is the "I'm taking this candidate" action → stamp pickup so
+	// the 3-day pool-release sweep no longer counts this candidate as abandoned.
+	// Best-effort: a stamping failure must not fail the lock the user already holds.
+	if h.pickups != nil {
+		if _, perr := h.pickups.MarkPickedUp(c.UserContext(), id, actor); perr != nil {
+			log.Warn().Err(perr).Str("candidate_id", id.String()).Msg("candidatelock: pickup stamp failed")
+		}
 	}
 	return httpx.OK(c, lock)
 }

@@ -60,6 +60,9 @@ type Repository interface {
 	// ReleaseStalePoolCandidates moves store-specific applications that no store HR
 	// picked up within graceDays back to the central pool. Returns the count moved.
 	ReleaseStalePoolCandidates(ctx context.Context, graceDays int) (int, error)
+	// MarkPickedUp stamps the first store-HR pickup on a candidate's still-unpicked
+	// store-specific applications, stopping their pool-release timer. Idempotent.
+	MarkPickedUp(ctx context.Context, candidateID, byUser uuid.UUID) (int, error)
 	// Sprint 3:
 	SetHired(ctx context.Context, id uuid.UUID) error
 	SetPSSynced(ctx context.Context, id uuid.UUID) error
@@ -552,6 +555,21 @@ func (r *pgRepository) ReleaseStalePoolCandidates(ctx context.Context, graceDays
 	tag, err := r.pool.Exec(ctx, q, graceDays)
 	if err != nil {
 		return 0, fmt.Errorf("applications: release stale pool candidates: %w", err)
+	}
+	return int(tag.RowsAffected()), nil
+}
+
+func (r *pgRepository) MarkPickedUp(ctx context.Context, candidateID, byUser uuid.UUID) (int, error) {
+	const q = `
+		UPDATE applications
+		SET picked_up_at = now(), picked_up_by = $2, updated_at = now()
+		WHERE candidate_id = $1
+		  AND assigned_store_id IS NOT NULL
+		  AND talent_pool = FALSE
+		  AND picked_up_at IS NULL`
+	tag, err := r.pool.Exec(ctx, q, candidateID, byUser)
+	if err != nil {
+		return 0, fmt.Errorf("applications: mark picked up: %w", err)
 	}
 	return int(tag.RowsAffected()), nil
 }

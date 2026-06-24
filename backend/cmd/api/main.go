@@ -464,9 +464,12 @@ func main() {
 	requisitions.RegisterRoutes(app, reqHandler)
 
 	// Candidate processing lock (one operator at a time over the shared pool).
-	candidatelock.RegisterRoutes(app, candidatelock.NewHandler(
+	// Acquiring the lock also stamps picked_up_at (stops the pool-release timer).
+	lockHandler := candidatelock.NewHandler(
 		candidatelock.NewService(candidatelock.NewRepository(pool), 0),
-		hrUserResolver{svc: hrAuthSvc}))
+		hrUserResolver{svc: hrAuthSvc})
+	lockHandler.SetPickupStamper(appRepo)
+	candidatelock.RegisterRoutes(app, lockHandler)
 
 	// Area management (dynamic store groupings for the area scope), gated area.admin.
 	areas.RegisterRoutes(app, areas.NewHandler(areas.NewRepository(pool)))
