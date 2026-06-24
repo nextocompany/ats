@@ -106,6 +106,12 @@ export function canRecordInterviewFeedback(me: PermHolder): boolean {
   return can(me, PERMS.scorecardTa) || can(me, PERMS.scorecardLm);
 }
 
+// canViewInterviews gates the HR interview calendar: HR who schedule (assignment
+// writers) plus the interviewers who record feedback (TA / line manager).
+export function canViewInterviews(me: PermHolder): boolean {
+  return can(me, PERMS.assignmentWrite) || canRecordInterviewFeedback(me);
+}
+
 // canManageRequisitions gates opening/editing/closing position openings.
 export function canManageRequisitions(me: PermHolder): boolean {
   return can(me, PERMS.requisitionManage);

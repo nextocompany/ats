@@ -114,6 +114,34 @@ const (
 	ModeOnline = "online"
 )
 
+// UpcomingInterview is a scheduled interview joined with candidate, position, and
+// store — for the HR calendar/agenda view (across applications, role-scoped).
+type UpcomingInterview struct {
+	ID              uuid.UUID `json:"id"`
+	ApplicationID   uuid.UUID `json:"application_id"`
+	RoundNo         int       `json:"round_no"`
+	ScheduledAt     time.Time `json:"scheduled_at"`
+	DurationMin     int       `json:"duration_min"`
+	Mode            string    `json:"mode"`
+	LocationText    string    `json:"location_text,omitempty"`
+	OnlineJoinURL   string    `json:"online_join_url,omitempty"`
+	CandidateName   string    `json:"candidate_name"`
+	PositionTitle   string    `json:"position_title"`
+	StoreName       string    `json:"store_name,omitempty"`
+	AssignedStoreID *int      `json:"assigned_store_id,omitempty"`
+}
+
+// UpcomingFilter parameterizes the HR calendar list: a time window, an optional
+// "only mine" filter (by the scheduling user), and paging.
+type UpcomingFilter struct {
+	From    time.Time
+	To      *time.Time
+	Mine    bool
+	ActorID uuid.UUID // resolved users.id; only used when Mine is true
+	Page    int
+	Limit   int
+}
+
 // PortalApplication is the candidate-facing row of a member's application
 // history (GET /api/v1/public/me/applications). Intentionally minimal: no AI
 // score / internal fields — only what a candidate may see, plus the opaque

@@ -101,3 +101,38 @@ func TestMock_OnlineReturnsJoinURL(t *testing.T) {
 		t.Fatalf("mock online should return a join url, got %+v err=%v", res, err)
 	}
 }
+
+// TestGraph_AddsInterviewerAttendee proves the HR interviewer is added as a second
+// attendee on the event when InterviewerEmail is set, and that with no interviewer
+// only the candidate is present.
+func TestGraph_AddsInterviewerAttendee(t *testing.T) {
+	capture := func(appt Appointment) []any {
+		var eventBody map[string]any
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch {
+			case strings.HasSuffix(r.URL.Path, "/onlineMeetings"):
+				_ = json.NewEncoder(w).Encode(map[string]any{"joinWebUrl": "https://t/x"})
+			case strings.HasSuffix(r.URL.Path, "/events"):
+				_ = json.NewDecoder(r.Body).Decode(&eventBody)
+				_ = json.NewEncoder(w).Encode(map[string]any{"id": "evt"})
+			}
+		}))
+		defer srv.Close()
+		if _, err := newTestGraph(srv.URL).CreateInterview(context.Background(), appt); err != nil {
+			t.Fatalf("CreateInterview: %v", err)
+		}
+		att, _ := eventBody["attendees"].([]any)
+		return att
+	}
+
+	base := Appointment{Mode: modeOnline, AttendeeEmail: "cand@x.com", AttendeeName: "C"}
+	if got := capture(base); len(got) != 1 {
+		t.Errorf("no interviewer: want 1 attendee, got %d", len(got))
+	}
+	withHR := base
+	withHR.InterviewerEmail = "hr@x.com"
+	withHR.InterviewerName = "HR"
+	if got := capture(withHR); len(got) != 2 {
+		t.Errorf("with interviewer: want 2 attendees, got %d", len(got))
+	}
+}

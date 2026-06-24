@@ -22,6 +22,10 @@ type Appointment struct {
 	LocationText  string // onsite address/room; online note
 	AttendeeEmail string // candidate email (required for online)
 	AttendeeName  string
+	// Interviewer is the scheduling HR user, added as a second required attendee so
+	// they also receive the calendar invite. Empty ⇒ not added (e.g. unresolved).
+	InterviewerEmail string
+	InterviewerName  string
 }
 
 // Result is what we persist on the appointment after booking.

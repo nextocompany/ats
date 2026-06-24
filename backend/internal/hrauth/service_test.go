@@ -3,6 +3,7 @@ package hrauth
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -110,6 +111,15 @@ func (f *fakeRepo) UpsertSSOUser(_ context.Context, _, _, _ string) error { f.ss
 func (f *fakeRepo) FindByAzureOID(_ context.Context, oid string) (User, error) {
 	for _, r := range f.users {
 		if r.u.IsActive && r.oid == oid {
+			return r.u, nil
+		}
+	}
+	return User{}, ErrNotFound
+}
+
+func (f *fakeRepo) FindByEmail(_ context.Context, email string) (User, error) {
+	for _, r := range f.users {
+		if r.u.IsActive && strings.EqualFold(r.u.Email, email) {
 			return r.u, nil
 		}
 	}

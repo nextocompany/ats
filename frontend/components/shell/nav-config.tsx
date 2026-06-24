@@ -10,6 +10,7 @@ import {
   ClipboardCheck,
   ClipboardList,
   CheckSquare,
+  CalendarDays,
   ShieldCheck,
   Lock,
   Settings,
@@ -24,6 +25,7 @@ import {
   canManageRequisitions,
   canManageScoring,
   canViewExecutive,
+  canViewInterviews,
   canViewReports,
   isLineManager,
   isSuperAdmin,
@@ -64,6 +66,8 @@ export const SHORTLIST_NAV: NavItem = { href: "/shortlist", label: "Shortlist", 
 // Approvals is the multi-level hiring sign-off queue — any chain role (hr_staff/
 // hr_manager/sgm/regional_director) + super_admin, gated via canAccessApprovals.
 export const APPROVALS_NAV: NavItem = { href: "/approvals", label: "Approvals", key: "approvals", icon: CheckSquare };
+// Interview calendar — HR who schedule + interviewers, gated via canViewInterviews.
+export const INTERVIEWS_NAV: NavItem = { href: "/interviews", label: "Interviews", key: "interviews", icon: CalendarDays };
 
 // Requisitions is the position-opening management queue — manage roles
 // (super_admin/regional_director/operation_director/sgm/hr_manager), gated via
@@ -94,6 +98,7 @@ export function navForRole(me?: Me): NavItem[] {
   if (canViewExecutive(me)) items.push(EXECUTIVE_NAV);
   if (isLineManager(me)) items.push(SHORTLIST_NAV);
   if (canAccessApprovals(me)) items.push(APPROVALS_NAV);
+  if (canViewInterviews(me)) items.push(INTERVIEWS_NAV);
   if (canBulkUpload(me)) items.push(BULK_NAV);
   if (canManageRequisitions(me)) items.push(REQUISITIONS_NAV);
   if (canAdminPdpa(me)) items.push(PDPA_NAV);
@@ -103,7 +108,7 @@ export function navForRole(me?: Me): NavItem[] {
 }
 
 // ALL_NAV is every possible item, for pathname→item lookups (e.g. header title).
-export const ALL_NAV: NavItem[] = [...NAV, REPORTS_NAV, EXECUTIVE_NAV, SHORTLIST_NAV, APPROVALS_NAV, BULK_NAV, REQUISITIONS_NAV, PDPA_NAV, SCORING_NAV, ADMIN_NAV, PRIVACY_NAV];
+export const ALL_NAV: NavItem[] = [...NAV, REPORTS_NAV, EXECUTIVE_NAV, SHORTLIST_NAV, APPROVALS_NAV, INTERVIEWS_NAV, BULK_NAV, REQUISITIONS_NAV, PDPA_NAV, SCORING_NAV, ADMIN_NAV, PRIVACY_NAV];
 
 // Brand lockup — text-only institutional wordmark, no monogram tile or dot mark.
 // "CP AXTRA" tracked uppercase over an "ATS Console" line (HSBC/JPM register),

@@ -14,6 +14,7 @@
     "executive": "Executive",
     "shortlist": "Shortlist",
     "approvals": "Approvals",
+    "interviews": "Interviews",
     "bulkUpload": "Bulk upload",
     "members": "Members",
     "admin": "Admin",
@@ -51,6 +52,21 @@
     "emptyHint": "Shortlisted candidates for your store appear here, ranked for your decision.",
     "notAvailable": "Not available for your role",
     "notAvailableHint": "The shortlist is limited to store line managers."
+  },
+  "interviews": {
+    "eyebrow": "Schedule",
+    "title": "Interviews",
+    "meta": "Upcoming interviews in your scope, soonest first.",
+    "notAvailable": "Not available for your role",
+    "notAvailableHint": "The interview calendar is limited to HR and interviewers.",
+    "emptyTitle": "No upcoming interviews",
+    "emptyHint": "Scheduled interviews appear here, grouped by day.",
+    "filterAll": "All",
+    "filterMine": "Scheduled by me",
+    "online": "Online",
+    "onsite": "On-site",
+    "join": "Join",
+    "round": "Round {n}"
   },
   "approvals": {
     "eyebrow": "Hiring approval",

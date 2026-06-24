@@ -14,6 +14,7 @@ func (mockProvider) CreateInterview(_ context.Context, a Appointment) (Result, e
 	log.Info().
 		Str("mode", a.Mode).
 		Str("attendee", a.AttendeeEmail).
+		Str("interviewer", a.InterviewerEmail).
 		Time("start", a.Start).
 		Msg("calendar(mock): create interview")
 	if a.Mode == modeOnline {
