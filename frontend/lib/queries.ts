@@ -18,6 +18,7 @@ import type {
   Funnel,
   HRUser,
   InterviewAppointment,
+  UpcomingInterview,
   StoreOption,
   InterviewFeedback,
   InterviewFeedbackInput,
@@ -413,6 +414,23 @@ export function useInterviewAppointments(id: string) {
     queryFn: () =>
       api.get<InterviewAppointment[]>(`/api/v1/applications/${id}/interview-appointments`).then((r) => r.data),
     enabled: !!id,
+  });
+}
+
+// useUpcomingInterviews loads the HR calendar feed: scheduled interviews from
+// `from` (default: server now) onward, role-scoped, optionally only the caller's
+// own bookings. The fetch is gated by `enabled` so a disallowed role never calls.
+export function useUpcomingInterviews(filter: { mine?: boolean; from?: string }, enabled = true) {
+  return useQuery({
+    queryKey: ["interviews-upcoming", filter],
+    queryFn: () =>
+      api
+        .get<UpcomingInterview[]>(
+          "/api/v1/interviews/upcoming" +
+            buildQuery({ mine: filter.mine ? "true" : undefined, from: filter.from }),
+        )
+        .then((r) => r.data),
+    enabled,
   });
 }
 

@@ -11,6 +11,7 @@ import (
 
 	"github.com/nexto/hr-ats/internal/calendar"
 	"github.com/nexto/hr-ats/internal/candidates"
+	"github.com/nexto/hr-ats/internal/middleware"
 	"github.com/nexto/hr-ats/internal/notify"
 	"github.com/nexto/hr-ats/internal/positions"
 	"github.com/nexto/hr-ats/pkg/httpx"
@@ -31,6 +32,14 @@ type positionReader interface {
 	FindByID(ctx context.Context, id uuid.UUID) (*positions.Position, error)
 }
 
+// UserResolver maps a request actor's email (uniform across SSO + password auth)
+// to their users.id + full name, so the scheduler can stamp created_by and add
+// the HR interviewer as a calendar attendee. Implemented by an hrauth adapter in
+// main.go; nil ⇒ the scheduler skips both (graceful — booking still succeeds).
+type UserResolver interface {
+	ResolveUser(ctx context.Context, email string) (id uuid.UUID, fullName string, err error)
+}
+
 // ScheduleHandler books a human interview: it sets status=interview, persists the
 // appointment, and for an online interview creates a Teams meeting + calendar
 // invite via the calendar provider.
@@ -39,6 +48,7 @@ type ScheduleHandler struct {
 	cal        calendar.Provider
 	cands      candidateReader
 	pos        positionReader
+	users      UserResolver
 	notifyDeps statusNotifyDeps
 }
 
@@ -46,6 +56,10 @@ type ScheduleHandler struct {
 func NewScheduleHandler(apps Repository, cal calendar.Provider, cands candidateReader, pos positionReader) *ScheduleHandler {
 	return &ScheduleHandler{apps: apps, cal: cal, cands: cands, pos: pos}
 }
+
+// SetUserResolver wires actor→users.id+name resolution (created_by stamping + HR
+// attendee). Optional: with no resolver the scheduler degrades gracefully.
+func (h *ScheduleHandler) SetUserResolver(u UserResolver) { h.users = u }
 
 // SetNotifier wires best-effort candidate notifications (mirrors the other handlers).
 func (h *ScheduleHandler) SetNotifier(n notify.Notifier, cands candidates.Repository, portalBaseURL string) {
@@ -56,6 +70,50 @@ func (h *ScheduleHandler) SetNotifier(n notify.Notifier, cands candidates.Reposi
 func RegisterScheduleRoutes(app *fiber.App, h *ScheduleHandler) {
 	app.Post("/api/v1/applications/:id/interview-schedule", h.Schedule)
 	app.Get("/api/v1/applications/:id/interview-appointments", h.List)
+	app.Get("/api/v1/interviews/upcoming", h.ListUpcoming)
+}
+
+// ListUpcoming handles GET /api/v1/interviews/upcoming — the HR calendar feed:
+// scheduled interviews from `from` (default now) onward, role-scoped, optionally
+// filtered to the requester's own bookings (?mine=true). Paginated envelope.
+func (h *ScheduleHandler) ListUpcoming(c *fiber.Ctx) error {
+	f := UpcomingFilter{
+		From:  time.Now(),
+		Mine:  c.Query("mine") == "true",
+		Page:  atoiDefault(c.Query("page"), 1),
+		Limit: atoiDefault(c.Query("limit"), DefaultLimit),
+	}
+	if v := c.Query("from"); v != "" {
+		if t, err := time.Parse(time.RFC3339, v); err == nil {
+			f.From = t
+		}
+	}
+	if v := c.Query("to"); v != "" {
+		if t, err := time.Parse(time.RFC3339, v); err == nil {
+			f.To = &t
+		}
+	}
+	// "mine" needs the actor's users.id; resolve by email (uniform key). If it can't
+	// be resolved, mine yields nothing (rather than leaking all) — log and proceed.
+	if f.Mine {
+		actor, _ := c.Locals(middleware.UserContextKey).(middleware.DevUser)
+		if h.users != nil && strings.TrimSpace(actor.Email) != "" {
+			if uid, _, rerr := h.users.ResolveUser(c.UserContext(), actor.Email); rerr == nil {
+				f.ActorID = uid
+			} else {
+				log.Warn().Err(rerr).Msg("interviews: resolve actor for mine failed (mine returns empty)")
+			}
+		}
+	}
+	items, total, err := h.apps.ListUpcomingInterviews(c.UserContext(), f, scopeFrom(c))
+	if err != nil {
+		return err
+	}
+	return c.Status(fiber.StatusOK).JSON(httpx.Envelope[[]UpcomingInterview]{
+		Success: true,
+		Data:    items,
+		Meta:    &httpx.Meta{Total: total, Page: f.Page, Limit: f.Limit},
+	})
 }
 
 // List handles GET /api/v1/applications/:id/interview-appointments — every
@@ -148,6 +206,24 @@ func (h *ScheduleHandler) Schedule(c *fiber.Ctx) error {
 		LocationText:  strings.TrimSpace(req.LocationText),
 	}
 
+	// Resolve the acting HR user (email is the uniform key; DevUser.ID is an OID
+	// for SSO). Used to stamp created_by (powers the calendar "mine" filter) and to
+	// add the interviewer as a calendar attendee with a real name. Best-effort: an
+	// unresolved actor must never block the booking.
+	actor, _ := c.Locals(middleware.UserContextKey).(middleware.DevUser)
+	interviewerEmail := strings.TrimSpace(actor.Email)
+	interviewerName := interviewerEmail
+	if h.users != nil && interviewerEmail != "" {
+		if uid, fullName, rerr := h.users.ResolveUser(c.UserContext(), interviewerEmail); rerr != nil {
+			log.Warn().Err(rerr).Str("email", interviewerEmail).Msg("schedule: resolve HR user failed (created_by left null)")
+		} else {
+			appt.CreatedBy = &uid
+			if strings.TrimSpace(fullName) != "" {
+				interviewerName = fullName
+			}
+		}
+	}
+
 	// Online: book the Teams meeting + calendar invite (best-effort — a Graph
 	// failure must not lose the schedule; the join link just stays empty). A
 	// failure is surfaced to HR via the response `warning` so they don't silently
@@ -155,14 +231,16 @@ func (h *ScheduleHandler) Schedule(c *fiber.Ctx) error {
 	var warning string
 	if req.Mode == ModeOnline {
 		res, calErr := h.cal.CreateInterview(c.UserContext(), calendar.Appointment{
-			Subject:       h.subject(c.UserContext(), app, cand),
-			BodyHTML:      "<p>นัดสัมภาษณ์งาน CP Axtra</p>",
-			Start:         when,
-			End:           when.Add(time.Duration(dur) * time.Minute),
-			Mode:          req.Mode,
-			LocationText:  appt.LocationText,
-			AttendeeEmail: cand.Email,
-			AttendeeName:  cand.FullName,
+			Subject:          h.subject(c.UserContext(), app, cand),
+			BodyHTML:         "<p>นัดสัมภาษณ์งาน CP Axtra</p>",
+			Start:            when,
+			End:              when.Add(time.Duration(dur) * time.Minute),
+			Mode:             req.Mode,
+			LocationText:     appt.LocationText,
+			AttendeeEmail:    cand.Email,
+			AttendeeName:     cand.FullName,
+			InterviewerEmail: interviewerEmail,
+			InterviewerName:  interviewerName,
 		})
 		if calErr != nil {
 			log.Warn().Err(calErr).Str("application", id.String()).Msg("schedule: calendar invite failed (non-fatal)")

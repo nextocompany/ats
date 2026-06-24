@@ -84,6 +84,23 @@ export interface InterviewAppointment {
   warning?: string;
 }
 
+// UpcomingInterview is a scheduled interview joined with candidate/position/store
+// for the HR calendar (GET /api/v1/interviews/upcoming, role-scoped).
+export interface UpcomingInterview {
+  id: string;
+  application_id: string;
+  round_no: number;
+  scheduled_at: string;
+  duration_min: number;
+  mode: "onsite" | "online";
+  location_text?: string;
+  online_join_url?: string;
+  candidate_name: string;
+  position_title: string;
+  store_name?: string;
+  assigned_store_id?: number | null;
+}
+
 // InterviewCompetencies mirrors applications.InterviewCompetencies — per-dimension
 // 0..5 ratings (0 = not rated).
 // Superset of competency dimensions across perspectives (0 = not rated). TA rates

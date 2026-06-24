@@ -14,6 +14,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/helmet"
 	"github.com/gofiber/fiber/v2/middleware/limiter"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	goredis "github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
@@ -67,15 +68,15 @@ import (
 )
 
 const (
-	rbacCacheTTL     = 60 * time.Second // dynamic-RBAC matrix refresh interval per replica
-	shutdownTimeout  = 10 * time.Second
+	rbacCacheTTL    = 60 * time.Second // dynamic-RBAC matrix refresh interval per replica
+	shutdownTimeout = 10 * time.Second
 	// maxBodyBytes is a generous backstop, not the real policy gate: a bulk upload
 	// of up to 30 CVs must fit (the old 12MB cap rejected even a handful with 413).
 	// Paired with StreamRequestBody=true so large multipart bodies stream to the
 	// ephemeral disk instead of buffering in RAM (the box has only 1Gi); the bulk
 	// handler reads files one at a time, so peak memory stays ~one file.
 	maxBodyBytes     = 256 * 1024 * 1024
-	publicRateWindow = time.Minute      // rate-limit window for /api/v1/public/* (Max from config)
+	publicRateWindow = time.Minute // rate-limit window for /api/v1/public/* (Max from config)
 )
 
 func main() {
@@ -420,6 +421,7 @@ func main() {
 	// (mock log-only by default; real behind GRAPH_PROVIDER=real).
 	scheduleHandler := applications.NewScheduleHandler(appRepo, calendar.NewProvider(cfg), candidateRepo, positionRepo)
 	scheduleHandler.SetNotifier(notifier, candidateRepo, cfg.PortalBaseURL)
+	scheduleHandler.SetUserResolver(hrUserResolver{svc: hrAuthSvc})
 	applications.RegisterScheduleRoutes(app, scheduleHandler)
 	// Structured interview feedback recorded by the hiring panel (sgm/hr_manager/
 	// super_admin) during the interview stage; many entries per application. HR is
@@ -530,6 +532,18 @@ func main() {
 	}()
 
 	waitForShutdown(app)
+}
+
+// hrUserResolver adapts hrauth.Service to applications.UserResolver, mapping an
+// actor email to their users.id + full name (interview created_by + HR attendee).
+type hrUserResolver struct{ svc *hrauth.Service }
+
+func (a hrUserResolver) ResolveUser(ctx context.Context, email string) (uuid.UUID, string, error) {
+	u, err := a.svc.UserByEmail(ctx, email)
+	if err != nil {
+		return uuid.Nil, "", err
+	}
+	return u.ID, u.FullName, nil
 }
 
 func waitForShutdown(app *fiber.App) {

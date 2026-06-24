@@ -42,6 +42,9 @@ type Repository interface {
 	FindByAzureOID(ctx context.Context, oid string) (User, error)
 	ListUsers(ctx context.Context) ([]User, error)
 	GetUser(ctx context.Context, id uuid.UUID) (User, error)
+	// FindByEmail returns the active account for an email across any auth source
+	// (SSO-only accounts included). ErrNotFound when none/inactive.
+	FindByEmail(ctx context.Context, email string) (User, error)
 	CreateUser(ctx context.Context, email, fullName, role string, storeID *int, subregion, passwordHash string) (User, error)
 	UpdateUser(ctx context.Context, id uuid.UUID, in UpdateUserInput, passwordHash *string) (User, error)
 }
@@ -204,6 +207,14 @@ func (s *Service) ResolveSSOUser(ctx context.Context, oid string) (auth.Identity
 
 // ListUsers returns all local HR accounts.
 func (s *Service) ListUsers(ctx context.Context) ([]User, error) { return s.repo.ListUsers(ctx) }
+
+// UserByEmail resolves an email (the uniform actor key across SSO + password) to
+// its active users row. Used to map a request's DevUser to a real users.id +
+// full name (e.g. stamping interview created_by / adding the HR interviewer as a
+// calendar attendee).
+func (s *Service) UserByEmail(ctx context.Context, email string) (User, error) {
+	return s.repo.FindByEmail(ctx, normalizeEmail(email))
+}
 
 // CreateUser provisions a new local account with a password. Validates the role
 // and password policy before hashing.

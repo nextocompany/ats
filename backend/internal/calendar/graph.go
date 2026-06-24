@@ -89,16 +89,25 @@ func (g graphProvider) createEvent(ctx context.Context, a Appointment, joinURL s
 			body += fmt.Sprintf(`<p>Join online: <a href="%s">%s</a></p>`, joinURL, joinURL)
 		}
 	}
-	payload := map[string]any{
-		"subject":  a.Subject,
-		"body":     map[string]any{"contentType": "HTML", "content": body},
-		"start":    map[string]any{"dateTime": a.Start.UTC().Format("2006-01-02T15:04:05"), "timeZone": "UTC"},
-		"end":      map[string]any{"dateTime": a.End.UTC().Format("2006-01-02T15:04:05"), "timeZone": "UTC"},
-		"location": map[string]any{"displayName": location},
-		"attendees": []map[string]any{{
-			"emailAddress": map[string]any{"address": a.AttendeeEmail, "name": a.AttendeeName},
+	attendees := []map[string]any{{
+		"emailAddress": map[string]any{"address": a.AttendeeEmail, "name": a.AttendeeName},
+		"type":         "required",
+	}}
+	// Add the scheduling HR user as a second required attendee so they get the
+	// invite too (not just the candidate).
+	if a.InterviewerEmail != "" {
+		attendees = append(attendees, map[string]any{
+			"emailAddress": map[string]any{"address": a.InterviewerEmail, "name": a.InterviewerName},
 			"type":         "required",
-		}},
+		})
+	}
+	payload := map[string]any{
+		"subject":   a.Subject,
+		"body":      map[string]any{"contentType": "HTML", "content": body},
+		"start":     map[string]any{"dateTime": a.Start.UTC().Format("2006-01-02T15:04:05"), "timeZone": "UTC"},
+		"end":       map[string]any{"dateTime": a.End.UTC().Format("2006-01-02T15:04:05"), "timeZone": "UTC"},
+		"location":  map[string]any{"displayName": location},
+		"attendees": attendees,
 	}
 	var out struct {
 		ID string `json:"id"`

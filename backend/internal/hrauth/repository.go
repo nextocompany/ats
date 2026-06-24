@@ -170,6 +170,23 @@ func (r *pgRepository) GetUser(ctx context.Context, id uuid.UUID) (User, error) 
 	return u, nil
 }
 
+// FindByEmail returns the active account for an email, regardless of auth source
+// (SSO-only accounts have no password — unlike FindCredentialsByEmail, this does
+// not require one). Email is the uniform actor key across SSO + password login,
+// so it is the safe way to resolve a request's DevUser (whose ID is an OID for
+// SSO, a uuid for password) to a real users.id. ErrNotFound when no active match.
+func (r *pgRepository) FindByEmail(ctx context.Context, email string) (User, error) {
+	u, err := scanUser(r.pool.QueryRow(ctx,
+		`SELECT `+userColumns+` FROM users WHERE lower(email) = lower($1) AND is_active = TRUE`, email))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return User{}, ErrNotFound
+	}
+	if err != nil {
+		return User{}, fmt.Errorf("hrauth: find by email: %w", err)
+	}
+	return u, nil
+}
+
 // UpsertSSOUser persists (JIT-provisions) an Entra SSO identity into the users
 // table on sign-in. New accounts are created with NO role (default-deny: an admin
 // grants access in-app) and source 'sso'. The role is never overwritten here, so an

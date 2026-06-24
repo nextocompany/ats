@@ -40,6 +40,9 @@ type Repository interface {
 	FindAppointment(ctx context.Context, applicationID uuid.UUID) (*Appointment, error)
 	// ListAppointments returns every round for an application, ordered by round_no.
 	ListAppointments(ctx context.Context, applicationID uuid.UUID) ([]Appointment, error)
+	// ListUpcomingInterviews returns scheduled interviews across applications for
+	// the HR calendar, role-scoped (the cross-store privacy boundary).
+	ListUpcomingInterviews(ctx context.Context, f UpcomingFilter, scope rbac.Scope) ([]UpcomingInterview, int, error)
 	// Interview feedback (structured panel outcome; many rows per application).
 	CreateFeedback(ctx context.Context, f InterviewFeedback) (InterviewFeedback, error)
 	ListFeedback(ctx context.Context, applicationID uuid.UUID) ([]InterviewFeedback, error)
@@ -261,6 +264,78 @@ func (r *pgRepository) ListAppointments(ctx context.Context, applicationID uuid.
 		out = append(out, a)
 	}
 	return out, rows.Err()
+}
+
+// ListUpcomingInterviews returns scheduled interviews (>= From) joined with
+// candidate/position/store for the HR calendar, role-scoped via the same
+// ApplicationsClause the inbox uses. Optional To window + Mine (by created_by).
+// Returns the page + total count for paging. The scope clause's bare
+// assigned_store_id is unambiguous here (only `applications` has that column).
+func (r *pgRepository) ListUpcomingInterviews(ctx context.Context, f UpcomingFilter, scope rbac.Scope) ([]UpcomingInterview, int, error) {
+	args := []any{f.From}
+	where := "ia.scheduled_at >= $1"
+	if f.To != nil {
+		args = append(args, *f.To)
+		where += fmt.Sprintf(" AND ia.scheduled_at <= $%d", len(args))
+	}
+	if f.Mine {
+		args = append(args, f.ActorID)
+		where += fmt.Sprintf(" AND ia.created_by = $%d", len(args))
+	}
+	if clause, cargs := scope.ApplicationsClause(len(args) + 1); clause != "" {
+		where += " AND " + clause
+		args = append(args, cargs...)
+	}
+
+	var total int
+	countQ := `SELECT COUNT(*) FROM interview_appointments ia
+		JOIN applications a ON a.id = ia.application_id WHERE ` + where
+	if err := r.pool.QueryRow(ctx, countQ, args...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("applications: count upcoming interviews: %w", err)
+	}
+
+	limit := f.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+	page := f.Page
+	if page < 1 {
+		page = 1
+	}
+	args = append(args, limit)
+	limitPH := len(args)
+	args = append(args, (page-1)*limit)
+	offsetPH := len(args)
+
+	q := `SELECT ia.id, ia.application_id, ia.round_no, ia.scheduled_at, ia.duration_min, ia.mode,
+	             COALESCE(ia.location_text,''), COALESCE(ia.online_join_url,''),
+	             COALESCE(c.full_name,''), COALESCE(NULLIF(p.title_en,''), p.title_th, ''),
+	             COALESCE(s.store_name,''), a.assigned_store_id
+	      FROM interview_appointments ia
+	      JOIN applications a ON a.id = ia.application_id
+	      JOIN candidates c ON c.id = a.candidate_id
+	      LEFT JOIN positions p ON p.id = a.position_id
+	      LEFT JOIN stores s ON s.store_no = a.assigned_store_id
+	      WHERE ` + where + fmt.Sprintf(" ORDER BY ia.scheduled_at ASC LIMIT $%d OFFSET $%d", limitPH, offsetPH)
+	rows, err := r.pool.Query(ctx, q, args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("applications: list upcoming interviews: %w", err)
+	}
+	defer rows.Close()
+
+	out := make([]UpcomingInterview, 0)
+	for rows.Next() {
+		var it UpcomingInterview
+		if err := rows.Scan(
+			&it.ID, &it.ApplicationID, &it.RoundNo, &it.ScheduledAt, &it.DurationMin, &it.Mode,
+			&it.LocationText, &it.OnlineJoinURL, &it.CandidateName, &it.PositionTitle,
+			&it.StoreName, &it.AssignedStoreID,
+		); err != nil {
+			return nil, 0, fmt.Errorf("applications: scan upcoming interview: %w", err)
+		}
+		out = append(out, it)
+	}
+	return out, total, rows.Err()
 }
 
 func (r *pgRepository) CreateFeedback(ctx context.Context, f InterviewFeedback) (InterviewFeedback, error) {
