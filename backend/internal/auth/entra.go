@@ -14,9 +14,14 @@ import (
 // 1:1 onto middleware.DevUser; the middleware (not this package, to avoid an
 // import cycle) does that conversion.
 type Identity struct {
-	ID        string
-	Email     string
-	Name      string // display name (Entra `name` claim); used to seed the persisted user row
+	ID    string
+	Email string
+	Name  string // display name (Entra `name` claim); used to seed the persisted user row
+	// LocalID is the local users.id (UUID string). Uniform across SSO + password,
+	// unlike ID (the Entra OID for SSO). Empty when the SSO identity has no
+	// provisioned users row yet → area/requisition scopes fail closed. Drives the
+	// area/requisition RBAC scopes (user_areas.user_id / vacancies.hiring_manager_user_id).
+	LocalID   string
 	Role      string
 	StoreID   *int
 	Subregion string

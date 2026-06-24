@@ -113,7 +113,7 @@ func RegisterDashboardRoutes(app *fiber.App, h *DashboardHandler) {
 
 func scopeFrom(c *fiber.Ctx) rbac.Scope {
 	u, _ := c.Locals(middleware.UserContextKey).(middleware.DevUser)
-	return rbac.New(u.Role, u.StoreID, u.Subregion)
+	return rbac.New(u.Role, u.StoreID, u.Subregion).WithUserID(u.LocalID)
 }
 
 // List handles GET /api/v1/applications (ranked, filtered, scoped, paginated).

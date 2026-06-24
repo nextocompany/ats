@@ -79,7 +79,7 @@ func user(c *fiber.Ctx) (middleware.DevUser, bool) {
 }
 
 func scopeFrom(u middleware.DevUser) rbac.Scope {
-	return rbac.New(u.Role, u.StoreID, u.Subregion)
+	return rbac.New(u.Role, u.StoreID, u.Subregion).WithUserID(u.LocalID)
 }
 
 func (h *Handler) List(c *fiber.Ctx) error {

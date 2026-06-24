@@ -147,6 +147,7 @@ func (s *Service) ValidateSession(ctx context.Context, token string) (auth.Ident
 	}
 	return auth.Identity{
 		ID:        u.ID.String(),
+		LocalID:   u.ID.String(),
 		Email:     u.Email,
 		Role:      u.Role,
 		StoreID:   u.StoreID,
@@ -195,6 +196,7 @@ func (s *Service) ResolveSSOUser(ctx context.Context, oid string) (auth.Identity
 	}
 	return auth.Identity{
 		ID:        oid,
+		LocalID:   u.ID.String(),
 		Email:     u.Email,
 		Name:      u.FullName,
 		Role:      u.Role,

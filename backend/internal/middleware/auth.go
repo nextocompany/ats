@@ -132,7 +132,7 @@ func Auth(ctx context.Context, cfg *config.Config, allowAll AllowAllTenantsReade
 // setUser stores the resolved identity on the request locals.
 func setUser(c *fiber.Ctx, id auth.Identity) {
 	c.Locals(UserContextKey, DevUser{
-		ID: id.ID, Email: id.Email, Role: id.Role, StoreID: id.StoreID, Subregion: id.Subregion,
+		ID: id.ID, LocalID: id.LocalID, Email: id.Email, Role: id.Role, StoreID: id.StoreID, Subregion: id.Subregion,
 	})
 }
 

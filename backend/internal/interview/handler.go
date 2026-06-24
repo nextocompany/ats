@@ -36,7 +36,7 @@ func NewHandler(svc *Service, scoper ScopeChecker, portalBaseURL string) *Handle
 // scopeFrom derives the caller's RBAC scope from the authenticated-user locals.
 func scopeFrom(c *fiber.Ctx) rbac.Scope {
 	u, _ := c.Locals(middleware.UserContextKey).(middleware.DevUser)
-	return rbac.New(u.Role, u.StoreID, u.Subregion)
+	return rbac.New(u.Role, u.StoreID, u.Subregion).WithUserID(u.LocalID)
 }
 
 // authorizeApplication returns a 404 (not 403, to avoid leaking existence) when
