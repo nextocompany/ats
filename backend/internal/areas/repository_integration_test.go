@@ -15,7 +15,7 @@ func dsn() string {
 	if v := os.Getenv("DB_URL"); v != "" {
 		return v
 	}
-	return "postgres://postgres:test@localhost:5432/atstest?sslmode=disable"
+	return "postgres://hruser:hrpass@localhost:5432/hr_db?sslmode=disable"
 }
 
 func TestAreaCRUDAndMembership(t *testing.T) {
@@ -101,6 +101,24 @@ func TestAreaCRUDAndMembership(t *testing.T) {
 	}
 	if n != 1 {
 		t.Errorf("area scope resolved %d stores for the user, want 1", n)
+	}
+
+	// User-side area coverage (the user-admin picker).
+	if err := r.SetUserAreas(ctx, userID, []uuid.UUID{a.ID}); err != nil {
+		t.Fatalf("set user areas: %v", err)
+	}
+	uareas, err := r.AreaIDsForUser(ctx, userID)
+	if err != nil {
+		t.Fatalf("area ids for user: %v", err)
+	}
+	if len(uareas) != 1 || uareas[0] != a.ID.String() {
+		t.Errorf("user areas wrong: %v", uareas)
+	}
+	if err := r.SetUserAreas(ctx, userID, []uuid.UUID{}); err != nil {
+		t.Fatalf("clear user areas: %v", err)
+	}
+	if got, _ := r.AreaIDsForUser(ctx, userID); len(got) != 0 {
+		t.Errorf("user areas should be empty after clear, got %v", got)
 	}
 
 	// Update + delete.

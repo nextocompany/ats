@@ -22,7 +22,7 @@ func (r *pgRepository) CreateApprovalRequest(ctx context.Context, applicationID,
 	if err != nil {
 		return ApprovalRequest{}, fmt.Errorf("applications: begin approval request: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	tag, err := tx.Exec(ctx,
 		`UPDATE applications SET status = $2, updated_at = NOW()
@@ -173,7 +173,7 @@ func (r *pgRepository) DecideApproval(ctx context.Context, a approvalDecideArgs)
 	if err != nil {
 		return ApprovalRequest{}, fmt.Errorf("applications: begin decide approval: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	var appID uuid.UUID
 	if err := tx.QueryRow(ctx,

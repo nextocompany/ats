@@ -15,7 +15,7 @@ func poolDSN() string {
 	if v := os.Getenv("DB_URL"); v != "" {
 		return v
 	}
-	return "postgres://postgres:test@localhost:5432/atstest?sslmode=disable"
+	return "postgres://hruser:hrpass@localhost:5432/hr_db?sslmode=disable"
 }
 
 // TestReleaseStalePoolCandidates proves the sweep releases ONLY store-specific

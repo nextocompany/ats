@@ -135,6 +135,22 @@ func TestNewScoredHR(t *testing.T) {
 	}
 }
 
+func TestNewCandidateHM_EmailOnlyTargetsOwner(t *testing.T) {
+	// The hiring-manager notify is sent email-only (teamsEnabled=false): one
+	// targeted email to the owner, no shared Teams card.
+	msgs := NewCandidateHM([]string{"hm@x.com"}, false, "สมชาย", "ผู้จัดการสาขา", 88, "https://dash/applications/1")
+	if len(msgs) != 1 {
+		t.Fatalf("want 1 message, got %d", len(msgs))
+	}
+	m := msgs[0]
+	if m.Channel != ChannelEmail || m.Recipient != "hm@x.com" {
+		t.Fatalf("want email to hm@x.com, got channel=%q recipient=%q", m.Channel, m.Recipient)
+	}
+	if m.HTML == "" {
+		t.Error("hiring-manager email should carry branded HTML")
+	}
+}
+
 func TestFeedbackRecordedHR_NoTeamsWhenDisabled(t *testing.T) {
 	msgs := FeedbackRecordedHR([]string{"hr@x.com"}, false, "", "", "gm@x.com", "pass", "https://dash/applications/1")
 	for _, m := range msgs {

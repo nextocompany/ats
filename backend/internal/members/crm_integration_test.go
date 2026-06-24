@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+
+	"github.com/nexto/hr-ats/internal/rbac"
 )
 
 func TestNotes_AddListAndMissingMember(t *testing.T) {
@@ -84,10 +86,10 @@ func TestList_TagFilter(t *testing.T) {
 	if err := r.AddTag(ctx, id, "vip"); err != nil {
 		t.Fatalf("tag: %v", err)
 	}
-	if _, total, _ := r.List(ctx, ListFilter{Tag: "vip"}); total != 1 {
+	if _, total, _ := r.List(ctx, ListFilter{Tag: "vip"}, rbac.AllScope()); total != 1 {
 		t.Errorf("tag filter vip: want 1, got %d", total)
 	}
-	if _, total, _ := r.List(ctx, ListFilter{Tag: "nobody"}); total != 0 {
+	if _, total, _ := r.List(ctx, ListFilter{Tag: "nobody"}, rbac.AllScope()); total != 0 {
 		t.Errorf("tag filter nobody: want 0, got %d", total)
 	}
 }
@@ -97,19 +99,19 @@ func TestListForExport_RespectsFilterAndCap(t *testing.T) {
 	ctx := context.Background()
 
 	// setup seeds 4 members (1 suspended). Export honours the same filters as List.
-	all, err := r.ListForExport(ctx, ListFilter{}, 1000)
+	all, err := r.ListForExport(ctx, ListFilter{}, rbac.AllScope(), 1000)
 	if err != nil {
 		t.Fatalf("export all: %v", err)
 	}
 	if len(all) != 4 {
 		t.Fatalf("expected 4 rows, got %d", len(all))
 	}
-	suspended, _ := r.ListForExport(ctx, ListFilter{Status: StatusSuspended}, 1000)
+	suspended, _ := r.ListForExport(ctx, ListFilter{Status: StatusSuspended}, rbac.AllScope(), 1000)
 	if len(suspended) != 1 {
 		t.Fatalf("export suspended: want 1, got %d", len(suspended))
 	}
 	// Cap bounds the result set.
-	capped, _ := r.ListForExport(ctx, ListFilter{}, 2)
+	capped, _ := r.ListForExport(ctx, ListFilter{}, rbac.AllScope(), 2)
 	if len(capped) != 2 {
 		t.Fatalf("export cap=2: want 2, got %d", len(capped))
 	}

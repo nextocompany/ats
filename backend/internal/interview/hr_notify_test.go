@@ -60,6 +60,10 @@ func (s stubHR) EmailsForRoleStore(_ context.Context, _ string, _ *int) ([]strin
 	return nil, nil
 }
 
+func (s stubHR) HiringManagerForVacancy(_ context.Context, _ uuid.UUID) (string, string, error) {
+	return "", "", nil
+}
+
 // runInterviewToCompletion invites, starts, and answers until the session
 // completes (maxTurns=1 finishes in a single Respond). Fails the test on any error.
 func runInterviewToCompletion(t *testing.T, svc *Service, appID uuid.UUID) {

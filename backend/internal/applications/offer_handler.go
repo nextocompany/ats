@@ -16,6 +16,7 @@ import (
 // OfferHandler is the HR-facing offer management surface: compose, edit (while
 // draft), send, and read an application's offer.
 type OfferHandler struct {
+	lockGuard
 	apps   Repository
 	notify statusNotifyDeps
 }
@@ -51,6 +52,20 @@ func (h *OfferHandler) scopedAppID(c *fiber.Ctx) (uuid.UUID, error) {
 	return id, nil
 }
 
+// guardOfferLock resolves the application's candidate and enforces the processing
+// lock — the offer mutations carry only the application id, so the candidate is
+// loaded here.
+func (h *OfferHandler) guardOfferLock(c *fiber.Ctx, id uuid.UUID) (bool, error) {
+	app, err := h.apps.FindByID(c.UserContext(), id)
+	if err != nil {
+		return false, err
+	}
+	if app == nil {
+		return true, nil // unknown application — let the downstream op return 404/conflict
+	}
+	return h.guardLock(c, app.CandidateID)
+}
+
 // Create composes a draft offer for an application in the offer stage.
 func (h *OfferHandler) Create(c *fiber.Ctx) error {
 	id, err := h.scopedAppID(c)
@@ -64,6 +79,9 @@ func (h *OfferHandler) Create(c *fiber.Ctx) error {
 	app, err := h.apps.FindByID(c.UserContext(), id)
 	if err != nil {
 		return err
+	}
+	if ok, lerr := h.guardLock(c, app.CandidateID); !ok {
+		return lerr
 	}
 	if app.Status != StatusOffer {
 		return fiber.NewError(fiber.StatusBadRequest, "an offer can only be created once the candidate reaches the offer stage")
@@ -94,6 +112,9 @@ func (h *OfferHandler) Update(c *fiber.Ctx) error {
 	if !canManageOffer(u.Role) {
 		return fiber.NewError(fiber.StatusForbidden, "insufficient role to manage offers")
 	}
+	if ok, lerr := h.guardOfferLock(c, id); !ok {
+		return lerr
+	}
 	var in OfferInput
 	if err := c.BodyParser(&in); err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "invalid payload")
@@ -118,6 +139,9 @@ func (h *OfferHandler) Send(c *fiber.Ctx) error {
 	u, _ := c.Locals(middleware.UserContextKey).(middleware.DevUser)
 	if !canManageOffer(u.Role) {
 		return fiber.NewError(fiber.StatusForbidden, "insufficient role to manage offers")
+	}
+	if ok, lerr := h.guardOfferLock(c, id); !ok {
+		return lerr
 	}
 	existing, err := h.apps.GetOfferByApplication(c.UserContext(), id)
 	if err != nil {

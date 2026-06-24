@@ -21,7 +21,8 @@
     "requisitions": "Requisitions",
     "pdpa": "PDPA / DPO",
     "scoring": "Scoring weights",
-    "privacy": "Privacy"
+    "privacy": "Privacy",
+    "areas": "Areas"
   },
   "scoring": {
     "eyebrow": "Settings",
@@ -637,7 +638,22 @@
     "dpoPrimaryBadge": "Lead DPO",
     "fieldPhone": "DPO phone",
     "phonePlaceholder": "e.g. 02-000-0000",
-    "dpoBadge": "DPO"
+    "dpoBadge": "DPO",
+    "role_hr_store": "HR (store)",
+    "roleFull_hr_store": "HR (store)",
+    "role_area_hr": "Area HR",
+    "roleFull_area_hr": "Area HR",
+    "role_hiring_manager_store": "Hiring manager (store)",
+    "roleFull_hiring_manager_store": "Hiring manager (store)",
+    "role_hiring_manager_ho": "Hiring manager (HO)",
+    "roleFull_hiring_manager_ho": "Hiring manager (HO)",
+    "role_ta": "Talent acquisition",
+    "roleFull_ta": "Talent acquisition",
+    "areaCoverage": "Area coverage",
+    "areaCoverageNone": "No areas defined yet (create them in the Areas console)",
+    "areaCoverageSave": "Save coverage",
+    "areaCoverageSaved": "Area coverage updated",
+    "areaCoverageFailed": "Could not update area coverage"
   },
   "members": {
     "eyebrow": "Member management",
@@ -1071,5 +1087,47 @@
     "signedInAs": "Signed in as",
     "signOut": "Sign out",
     "checking": "Checking your access…"
+  },
+  "areas": {
+    "title": "Area management",
+    "subtitle": "Group stores into areas and assign the area HR who cover them.",
+    "denied": "You do not have permission to manage areas.",
+    "namePlaceholder": "New area name",
+    "created": "Area created",
+    "createFailed": "Could not create area",
+    "confirmDelete": "Delete this area? Store and member assignments will be removed.",
+    "deleted": "Area deleted",
+    "deleteFailed": "Could not delete area",
+    "empty": "No areas yet. Create one above.",
+    "selectPrompt": "Select an area to manage its stores and members.",
+    "storeCount": "{n} stores",
+    "saved": "Saved",
+    "saveFailed": "Could not save",
+    "rename": "Rename",
+    "active": "Active",
+    "delete": "Delete",
+    "stores": "Stores",
+    "filterStores": "Filter stores...",
+    "saveStores": "Save stores",
+    "members": "Area HR",
+    "saveMembers": "Save members",
+    "storesSaved": "Stores updated",
+    "membersSaved": "Members updated",
+    "noAreaHr": "No area_hr users available.",
+    "eyebrow": "Access control"
+  },
+  "lock": {
+    "unlocked": "No one is processing this candidate",
+    "claim": "Start processing",
+    "claimed": "You are now processing this candidate",
+    "claimFailed": "Could not claim this candidate",
+    "youAreProcessing": "You are processing this candidate",
+    "processingBy": "Being processed by {name}",
+    "anotherUser": "another user",
+    "until": "until {time}",
+    "release": "Release",
+    "released": "Lock released",
+    "releaseFailed": "Could not release",
+    "forceRelease": "Force release"
   }
 }

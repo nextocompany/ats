@@ -58,6 +58,10 @@ services:
       BLOB_PUBLIC_ENDPOINT: http://localhost:10000/devstoreaccount1
       JWT_SECRET: ${JWT_SECRET:-dev-only-change-me}
       REPORT_RECIPIENTS: ${REPORT_RECIPIENTS:-}
+      # Dev/e2e: the cross-system suite makes many /api/v1/public/* calls from one
+      # IP in a single window (apply, status, positions, AI-interview chat). The
+      # 30/min production default would 429 it; raise it well clear of the suite.
+      RATE_LIMIT_PUBLIC_MAX: "100000"
     ports:
       - "8080:8080"
     depends_on:

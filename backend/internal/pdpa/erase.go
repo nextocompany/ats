@@ -52,24 +52,32 @@ func (s *RetentionService) eraseAccountDirect(ctx context.Context, accountID uui
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
+	// See eraseAccountIfOrphan: capture the pre-erase resume/email from a MATERIALIZED
+	// `old` CTE + UPDATE-as-CTE, NOT a scalar sub-SELECT in RETURNING (which reads the
+	// post-update NULLs and silently skips otp + blob cleanup).
 	const eraseAccount = `
-		WITH old AS (SELECT resume_blob_url, email FROM candidate_accounts WHERE id = $1 FOR UPDATE)
-		UPDATE candidate_accounts SET
-			full_name        = $2,
-			email            = NULL,
-			email_verified   = FALSE,
-			phone            = NULL,
-			line_user_id     = NULL,
-			line_display_id  = NULL,
-			google_sub       = NULL,
-			province         = NULL,
-			resume_blob_url   = NULL,
-			resume_file_type  = NULL,
-			status            = 'anonymized',
-			anonymized_at     = NOW(),
-			updated_at        = NOW()
-		WHERE id = $1 AND status <> 'anonymized'
-		RETURNING (SELECT resume_blob_url FROM old), (SELECT email FROM old)`
+		WITH old AS MATERIALIZED (
+			SELECT id, resume_blob_url, email FROM candidate_accounts WHERE id = $1 FOR UPDATE
+		), upd AS (
+			UPDATE candidate_accounts t SET
+				full_name        = $2,
+				email            = NULL,
+				email_verified   = FALSE,
+				phone            = NULL,
+				line_user_id     = NULL,
+				line_display_id  = NULL,
+				google_sub       = NULL,
+				province         = NULL,
+				resume_blob_url   = NULL,
+				resume_file_type  = NULL,
+				status            = 'anonymized',
+				anonymized_at     = NOW(),
+				updated_at        = NOW()
+			FROM old
+			WHERE t.id = old.id AND t.status <> 'anonymized'
+			RETURNING t.id
+		)
+		SELECT old.resume_blob_url, old.email FROM old JOIN upd ON upd.id = old.id`
 
 	var oldResume, oldEmail *string
 	err = tx.QueryRow(ctx, eraseAccount, accountID, redactedName).Scan(&oldResume, &oldEmail)
@@ -97,13 +105,22 @@ func (s *RetentionService) eraseAccountDirect(ctx context.Context, accountID uui
 			return fmt.Errorf("pdpa: erase account otps: %w", err)
 		}
 	}
+	// Resume library (extra CVs) + the default resume pointer — collected here,
+	// deleted from storage after commit.
+	blobs, err := accountResumeBlobs(ctx, tx, accountID)
+	if err != nil {
+		return err
+	}
+	if oldResume != nil {
+		blobs = mergeBlobKey(blobs, *oldResume)
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("pdpa: erase account commit: %w", err)
 	}
 
-	if oldResume != nil && *oldResume != "" {
-		if derr := s.deleteBlob(ctx, *oldResume); derr != nil {
-			log.Warn().Err(derr).Str("account_id", accountID.String()).Msg("pdpa: account resume blob delete failed (orphaned)")
+	for _, b := range blobs {
+		if derr := s.deleteBlob(ctx, b); derr != nil {
+			log.Warn().Err(derr).Str("account_id", accountID.String()).Msg("pdpa: account blob delete failed (orphaned)")
 		}
 	}
 	return nil
@@ -145,7 +162,7 @@ func (s *RetentionService) EraseSubject(ctx context.Context, candidateID uuid.UU
 		return err
 	}
 
-	accountResume, err := s.eraseRows(ctx, candidateID, accountID)
+	accountBlobs, err := s.eraseRows(ctx, candidateID, accountID)
 	if err != nil {
 		return err
 	}
@@ -156,9 +173,11 @@ func (s *RetentionService) EraseSubject(ctx context.Context, candidateID uuid.UU
 			log.Warn().Err(derr).Str("candidate_id", candidateID.String()).Msg("pdpa: blob delete failed (orphaned)")
 		}
 	}
-	if accountResume != "" {
-		if derr := s.deleteBlob(ctx, accountResume); derr != nil {
-			log.Warn().Err(derr).Str("candidate_id", candidateID.String()).Msg("pdpa: account resume blob delete failed (orphaned)")
+	// Account-side blobs (default resume pointer + resume library), erased only when
+	// this candidate was its account's last un-erased subject.
+	for _, b := range accountBlobs {
+		if derr := s.deleteBlob(ctx, b); derr != nil {
+			log.Warn().Err(derr).Str("candidate_id", candidateID.String()).Msg("pdpa: account blob delete failed (orphaned)")
 		}
 	}
 	if s.index != nil {
@@ -256,10 +275,10 @@ func (s *RetentionService) candidateBlobs(ctx context.Context, candidateID uuid.
 // was erased in this call (the last un-erased candidate), so the caller can purge
 // it post-commit. The candidate guard re-checks pdpa_anonymized_at so overlapping
 // runs cannot double-process.
-func (s *RetentionService) eraseRows(ctx context.Context, candidateID uuid.UUID, accountID *uuid.UUID) (string, error) {
+func (s *RetentionService) eraseRows(ctx context.Context, candidateID uuid.UUID, accountID *uuid.UUID) ([]string, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		return "", fmt.Errorf("pdpa: erase begin: %w", err)
+		return nil, fmt.Errorf("pdpa: erase begin: %w", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
@@ -271,13 +290,13 @@ func (s *RetentionService) eraseRows(ctx context.Context, candidateID uuid.UUID,
 		`SELECT pdpa_anonymized_at IS NOT NULL FROM candidates WHERE id = $1 FOR UPDATE`, candidateID,
 	).Scan(&alreadyErased)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return "", nil
+		return nil, nil
 	}
 	if err != nil {
-		return "", fmt.Errorf("pdpa: erase lock: %w", err)
+		return nil, fmt.Errorf("pdpa: erase lock: %w", err)
 	}
 	if alreadyErased {
-		return "", nil // a concurrent erase already handled this subject
+		return nil, nil // a concurrent erase already handled this subject
 	}
 
 	// 1) The candidate's own direct identifiers, including the LINE OAuth subject
@@ -290,7 +309,7 @@ func (s *RetentionService) eraseRows(ctx context.Context, candidateID uuid.UUID,
 			pdpa_anonymized_at = NOW(), updated_at = NOW()
 		 WHERE id = $1 AND pdpa_anonymized_at IS NULL`,
 		candidateID, redactedName); err != nil {
-		return "", fmt.Errorf("pdpa: redact candidate: %w", err)
+		return nil, fmt.Errorf("pdpa: redact candidate: %w", err)
 	}
 
 	// 2) Applications: resume-derived pointers + AI free-text.
@@ -300,13 +319,13 @@ func (s *RetentionService) eraseRows(ctx context.Context, candidateID uuid.UUID,
 			raw_file_blob_url = NULL, ocr_text_blob_url = NULL, parsed_profile_blob_url = NULL,
 			ai_summary = NULL, ai_red_flags = NULL, updated_at = NOW()
 		 WHERE candidate_id = $1`, candidateID); err != nil {
-		return "", fmt.Errorf("pdpa: redact applications: %w", err)
+		return nil, fmt.Errorf("pdpa: redact applications: %w", err)
 	}
 
 	// 3) Consent ledger IPs (consent rows are retained as consent-of-record).
 	if _, err := tx.Exec(ctx,
 		`UPDATE pdpa_consents SET ip_address = NULL WHERE candidate_id = $1`, candidateID); err != nil {
-		return "", fmt.Errorf("pdpa: redact consents: %w", err)
+		return nil, fmt.Errorf("pdpa: redact consents: %w", err)
 	}
 
 	// 4) AI pre-interview transcript + evaluation free-text. The access_token is a
@@ -319,7 +338,7 @@ func (s *RetentionService) eraseRows(ctx context.Context, candidateID uuid.UUID,
 			conversation = '[]'::jsonb, summary = NULL, strengths = NULL, concerns = NULL,
 			access_token = 'erased:' || id::text
 		 WHERE application_id IN (SELECT id FROM applications WHERE candidate_id = $1)`, candidateID); err != nil {
-		return "", fmt.Errorf("pdpa: redact interview sessions: %w", err)
+		return nil, fmt.Errorf("pdpa: redact interview sessions: %w", err)
 	}
 
 	// 5) Cross-position fit analysis free-text.
@@ -327,14 +346,14 @@ func (s *RetentionService) eraseRows(ctx context.Context, candidateID uuid.UUID,
 		`UPDATE application_fit_analyses SET
 			summary = '', strengths = '[]'::jsonb, concerns = '[]'::jsonb, no_match_reason = ''
 		 WHERE application_id IN (SELECT id FROM applications WHERE candidate_id = $1)`, candidateID); err != nil {
-		return "", fmt.Errorf("pdpa: redact fit analyses: %w", err)
+		return nil, fmt.Errorf("pdpa: redact fit analyses: %w", err)
 	}
 
 	// 6) Human interview feedback free-text.
 	if _, err := tx.Exec(ctx,
 		`UPDATE interview_feedback SET strengths = NULL, concerns = NULL, notes = NULL
 		 WHERE application_id IN (SELECT id FROM applications WHERE candidate_id = $1)`, candidateID); err != nil {
-		return "", fmt.Errorf("pdpa: redact interview feedback: %w", err)
+		return nil, fmt.Errorf("pdpa: redact interview feedback: %w", err)
 	}
 
 	// 7) Offer free-text + the candidate's proposed salary (financial data, PDPA
@@ -342,7 +361,7 @@ func (s *RetentionService) eraseRows(ctx context.Context, candidateID uuid.UUID,
 	if _, err := tx.Exec(ctx,
 		`UPDATE offers SET terms = NULL, decline_reason = NULL, salary = NULL, start_date = NULL
 		 WHERE application_id IN (SELECT id FROM applications WHERE candidate_id = $1)`, candidateID); err != nil {
-		return "", fmt.Errorf("pdpa: redact offers: %w", err)
+		return nil, fmt.Errorf("pdpa: redact offers: %w", err)
 	}
 
 	// 7a) Approval-workflow free-text written about the application (approver
@@ -353,12 +372,12 @@ func (s *RetentionService) eraseRows(ctx context.Context, candidateID uuid.UUID,
 			SELECT id FROM approval_requests
 			WHERE application_id IN (SELECT id FROM applications WHERE candidate_id = $1)
 		 )`, candidateID); err != nil {
-		return "", fmt.Errorf("pdpa: redact approval steps: %w", err)
+		return nil, fmt.Errorf("pdpa: redact approval steps: %w", err)
 	}
 	if _, err := tx.Exec(ctx,
 		`UPDATE approval_requests SET decision_reason = NULL
 		 WHERE application_id IN (SELECT id FROM applications WHERE candidate_id = $1)`, candidateID); err != nil {
-		return "", fmt.Errorf("pdpa: redact approval requests: %w", err)
+		return nil, fmt.Errorf("pdpa: redact approval requests: %w", err)
 	}
 
 	// 7b) Interview appointment links tied to the subject (Teams join URL +
@@ -368,7 +387,7 @@ func (s *RetentionService) eraseRows(ctx context.Context, candidateID uuid.UUID,
 		`UPDATE interview_appointments SET
 			location_text = NULL, online_join_url = NULL, calendar_event_id = NULL
 		 WHERE application_id IN (SELECT id FROM applications WHERE candidate_id = $1)`, candidateID); err != nil {
-		return "", fmt.Errorf("pdpa: redact interview appointments: %w", err)
+		return nil, fmt.Errorf("pdpa: redact interview appointments: %w", err)
 	}
 
 	// 8) Onboarding document scans (special-category data) - rows deleted, blobs
@@ -376,20 +395,20 @@ func (s *RetentionService) eraseRows(ctx context.Context, candidateID uuid.UUID,
 	if _, err := tx.Exec(ctx,
 		`DELETE FROM onboarding_documents
 		 WHERE application_id IN (SELECT id FROM applications WHERE candidate_id = $1)`, candidateID); err != nil {
-		return "", fmt.Errorf("pdpa: delete onboarding documents: %w", err)
+		return nil, fmt.Errorf("pdpa: delete onboarding documents: %w", err)
 	}
 
 	// 9) Generated letters - rows deleted, blobs collected.
 	if _, err := tx.Exec(ctx,
 		`DELETE FROM letters
 		 WHERE application_id IN (SELECT id FROM applications WHERE candidate_id = $1)`, candidateID); err != nil {
-		return "", fmt.Errorf("pdpa: delete letters: %w", err)
+		return nil, fmt.Errorf("pdpa: delete letters: %w", err)
 	}
 
 	// 10) Notification payloads (carry name / contact snapshots).
 	if _, err := tx.Exec(ctx,
 		`UPDATE notifications SET payload = NULL WHERE candidate_id = $1`, candidateID); err != nil {
-		return "", fmt.Errorf("pdpa: redact notifications: %w", err)
+		return nil, fmt.Errorf("pdpa: redact notifications: %w", err)
 	}
 
 	// 10a) Re-engagement outreach history about this person (contact targets +
@@ -399,21 +418,21 @@ func (s *RetentionService) eraseRows(ctx context.Context, candidateID uuid.UUID,
 		`DELETE FROM reengagement_logs WHERE candidate_id = $1`,
 	} {
 		if _, err := tx.Exec(ctx, del, candidateID); err != nil {
-			return "", fmt.Errorf("pdpa: delete reengagement rows: %w", err)
+			return nil, fmt.Errorf("pdpa: delete reengagement rows: %w", err)
 		}
 	}
 
 	// 11) The linked portal account - only when this was its last un-erased
 	//     candidate (a still-active sibling keeps the account alive).
-	accountResume, err := s.eraseAccountIfOrphan(ctx, tx, candidateID, accountID)
+	accountBlobs, err := s.eraseAccountIfOrphan(ctx, tx, candidateID, accountID)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return "", fmt.Errorf("pdpa: erase commit: %w", err)
+		return nil, fmt.Errorf("pdpa: erase commit: %w", err)
 	}
-	return accountResume, nil
+	return accountBlobs, nil
 }
 
 // eraseAccountIfOrphan redacts the candidate's portal account (and deletes its
@@ -422,69 +441,137 @@ func (s *RetentionService) eraseRows(ctx context.Context, candidateID uuid.UUID,
 // so the NOT EXISTS check sees only siblings. Returns the account's pre-erase
 // resume blob URL when the account was erased, else "". A nil accountID (walk-in
 // candidate with no account) is a no-op.
-func (s *RetentionService) eraseAccountIfOrphan(ctx context.Context, tx pgx.Tx, candidateID uuid.UUID, accountID *uuid.UUID) (string, error) {
+func (s *RetentionService) eraseAccountIfOrphan(ctx context.Context, tx pgx.Tx, candidateID uuid.UUID, accountID *uuid.UUID) ([]string, error) {
 	if accountID == nil {
-		return "", nil
+		return nil, nil
 	}
 
-	// The CTE snapshots the pre-erase resume blob URL and email before the UPDATE
-	// nulls them; RETURNING reads from that snapshot. RETURNING yields a row only
-	// when the UPDATE matched (last un-erased candidate), so ErrNoRows means the
-	// account was kept (active sibling) or already anonymized.
+	// `old` MATERIALIZED snapshots the pre-erase resume blob URL + email; the UPDATE
+	// runs as its own CTE and the final SELECT reads the snapshot, returning a row
+	// only when the UPDATE matched (last un-erased candidate). ErrNoRows therefore
+	// means the account was kept (active sibling) or already anonymized.
+	//
+	// Do NOT collapse this back to `RETURNING (SELECT x FROM old)` on the UPDATE: a
+	// scalar sub-SELECT in a RETURNING clause is evaluated against the POST-update
+	// row, so it returned NULL for both values — leaving email_otps + the account
+	// resume blob un-erased (a PDPA completeness gap).
 	const eraseAccount = `
-		WITH old AS (SELECT resume_blob_url, email FROM candidate_accounts WHERE id = $1 FOR UPDATE)
-		UPDATE candidate_accounts SET
-			full_name        = $3,
-			email            = NULL,
-			email_verified   = FALSE,
-			phone            = NULL,
-			line_user_id     = NULL,
-			line_display_id  = NULL,
-			google_sub       = NULL,
-			province         = NULL,
-			resume_blob_url   = NULL,
-			resume_file_type  = NULL,
-			status            = 'anonymized',
-			anonymized_at     = NOW(),
-			updated_at        = NOW()
-		WHERE id = $1
-		  AND status <> 'anonymized'
-		  AND NOT EXISTS (
-			SELECT 1 FROM candidates c
-			WHERE c.account_id = $1 AND c.id <> $2 AND c.pdpa_anonymized_at IS NULL
-		  )
-		RETURNING (SELECT resume_blob_url FROM old), (SELECT email FROM old)`
+		WITH old AS MATERIALIZED (
+			SELECT id, resume_blob_url, email FROM candidate_accounts WHERE id = $1 FOR UPDATE
+		), upd AS (
+			UPDATE candidate_accounts t SET
+				full_name        = $3,
+				email            = NULL,
+				email_verified   = FALSE,
+				phone            = NULL,
+				line_user_id     = NULL,
+				line_display_id  = NULL,
+				google_sub       = NULL,
+				province         = NULL,
+				resume_blob_url   = NULL,
+				resume_file_type  = NULL,
+				status            = 'anonymized',
+				anonymized_at     = NOW(),
+				updated_at        = NOW()
+			FROM old
+			WHERE t.id = old.id
+			  AND t.status <> 'anonymized'
+			  AND NOT EXISTS (
+				SELECT 1 FROM candidates c
+				WHERE c.account_id = $1 AND c.id <> $2 AND c.pdpa_anonymized_at IS NULL
+			  )
+			RETURNING t.id
+		)
+		SELECT old.resume_blob_url, old.email FROM old JOIN upd ON upd.id = old.id`
 
 	var oldResume, oldEmail *string
 	err := tx.QueryRow(ctx, eraseAccount, *accountID, candidateID, redactedName).Scan(&oldResume, &oldEmail)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return "", nil // account kept (active sibling) or already anonymized
+		return nil, nil // account kept (active sibling) or already anonymized
 	}
 	if err != nil {
-		return "", fmt.Errorf("pdpa: erase account: %w", err)
+		return nil, fmt.Errorf("pdpa: erase account: %w", err)
 	}
 
 	if _, err := tx.Exec(ctx, `DELETE FROM candidate_sessions WHERE account_id = $1`, *accountID); err != nil {
-		return "", fmt.Errorf("pdpa: erase account sessions: %w", err)
+		return nil, fmt.Errorf("pdpa: erase account sessions: %w", err)
 	}
 	if _, err := tx.Exec(ctx, `DELETE FROM member_notes WHERE account_id = $1`, *accountID); err != nil {
-		return "", fmt.Errorf("pdpa: erase account notes: %w", err)
+		return nil, fmt.Errorf("pdpa: erase account notes: %w", err)
 	}
 	if _, err := tx.Exec(ctx, `DELETE FROM member_tags WHERE account_id = $1`, *accountID); err != nil {
-		return "", fmt.Errorf("pdpa: erase account tags: %w", err)
+		return nil, fmt.Errorf("pdpa: erase account tags: %w", err)
 	}
 	// email_otps is keyed by email (no account_id), so purge by the pre-erase email
 	// captured above; otherwise the address lingers until the OTP-expiry sweep.
 	if oldEmail != nil && *oldEmail != "" {
 		if _, err := tx.Exec(ctx, `DELETE FROM email_otps WHERE email = $1`, *oldEmail); err != nil {
-			return "", fmt.Errorf("pdpa: erase account otps: %w", err)
+			return nil, fmt.Errorf("pdpa: erase account otps: %w", err)
 		}
 	}
 
-	if oldResume != nil {
-		return *oldResume, nil
+	// The resume library (extra CVs the candidate kept on the portal) + the
+	// denormalized default resume pointer — both deleted from storage post-commit.
+	blobs, err := accountResumeBlobs(ctx, tx, *accountID)
+	if err != nil {
+		return nil, err
 	}
-	return "", nil
+	if oldResume != nil {
+		blobs = mergeBlobKey(blobs, *oldResume)
+	}
+	return blobs, nil
+}
+
+// accountResumeBlobs collects every blob key stored in a portal account's resume
+// library (candidate_account_resumes, up to 5 CVs) and deletes the rows. The FK is
+// ON DELETE CASCADE, but erasure ANONYMIZES the account in place (UPDATE) rather
+// than deleting it, so without this the library rows — and their storage blobs —
+// would survive erasure (a PDPA gap). The returned keys are deleted from storage
+// after the tx commits. Rows are read fully (and closed) before the DELETE so the
+// single-connection tx is not left mid-iteration.
+func accountResumeBlobs(ctx context.Context, tx pgx.Tx, accountID uuid.UUID) ([]string, error) {
+	rows, err := tx.Query(ctx, `SELECT blob_key FROM candidate_account_resumes WHERE account_id = $1`, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("pdpa: account resume library query: %w", err)
+	}
+	var keys []string
+	func() {
+		defer rows.Close()
+		for rows.Next() {
+			var k string
+			if err = rows.Scan(&k); err != nil {
+				return
+			}
+			if k != "" {
+				keys = append(keys, k)
+			}
+		}
+	}()
+	if err != nil {
+		return nil, fmt.Errorf("pdpa: scan account resume key: %w", err)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("pdpa: account resume rows: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM candidate_account_resumes WHERE account_id = $1`, accountID); err != nil {
+		return nil, fmt.Errorf("pdpa: delete account resume library: %w", err)
+	}
+	return keys, nil
+}
+
+// mergeBlobKey appends key to keys when non-empty and not already present, so the
+// account's denormalized default resume pointer is not deleted twice when it also
+// appears in the resume library.
+func mergeBlobKey(keys []string, key string) []string {
+	if key == "" {
+		return keys
+	}
+	for _, k := range keys {
+		if k == key {
+			return keys
+		}
+	}
+	return append(keys, key)
 }
 
 // deleteBlob removes one stored blob, choosing the deletion form by value shape:

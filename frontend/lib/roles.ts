@@ -30,6 +30,7 @@ export const PERMS = {
   requisitionApprove: "requisition.approve",
   breachManage: "breach.manage",
   pdpaAdmin: "pdpa.admin",
+  areaAdmin: "area.admin",
 } as const;
 
 // can reports whether the user holds a permission key.
@@ -130,6 +131,12 @@ export function canAdminPdpa(me: PermHolder): boolean {
 // canManageScoring gates the per-position screening-weights settings page.
 export function canManageScoring(me: PermHolder): boolean {
   return can(me, PERMS.settingsAdmin);
+}
+
+// canManageAreas gates the area-management console (dynamic store groupings +
+// area_hr assignment) backing the area visibility scope.
+export function canManageAreas(me: PermHolder): boolean {
+  return can(me, PERMS.areaAdmin);
 }
 
 // canSubmitApproval gates opening a hiring-approval request.

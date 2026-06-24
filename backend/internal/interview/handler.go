@@ -8,6 +8,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 
+	"github.com/nexto/hr-ats/internal/candidatelock"
 	"github.com/nexto/hr-ats/internal/middleware"
 	"github.com/nexto/hr-ats/internal/rbac"
 	"github.com/nexto/hr-ats/pkg/httpx"
@@ -26,11 +27,35 @@ type Handler struct {
 	svc           *Service
 	scoper        ScopeChecker
 	portalBaseURL string
+	lock          *candidatelock.Enforcer
+	appCand       func(context.Context, uuid.UUID) (uuid.UUID, error)
 }
 
 // NewHandler builds the interview HTTP handler.
 func NewHandler(svc *Service, scoper ScopeChecker, portalBaseURL string) *Handler {
 	return &Handler{svc: svc, scoper: scoper, portalBaseURL: portalBaseURL}
+}
+
+// SetLockEnforcer enables candidate-lock enforcement on the HR "send AI
+// interview" action. resolve maps an application id to its candidate id (the
+// lock key). Both must be non-nil for enforcement to engage; unset → no-op.
+func (h *Handler) SetLockEnforcer(e *candidatelock.Enforcer, resolve func(context.Context, uuid.UUID) (uuid.UUID, error)) {
+	h.lock = e
+	h.appCand = resolve
+}
+
+// guardLock enforces the processing lock for the application's candidate. Returns
+// (proceed, err); when proceed is false the HTTP response is already written and
+// the caller must return err.
+func (h *Handler) guardLock(c *fiber.Ctx, appID uuid.UUID) (bool, error) {
+	if h.lock == nil || h.appCand == nil {
+		return true, nil
+	}
+	candID, err := h.appCand(c.UserContext(), appID)
+	if err != nil {
+		return false, err
+	}
+	return h.lock.Guard(c, candID)
 }
 
 // scopeFrom derives the caller's RBAC scope from the authenticated-user locals.
@@ -110,6 +135,9 @@ func (h *Handler) Invite(c *fiber.Ctx) error {
 	}
 	if err := h.authorizeApplication(c, id); err != nil {
 		return err
+	}
+	if ok, lerr := h.guardLock(c, id); !ok {
+		return lerr
 	}
 	session, err := h.svc.Invite(c.UserContext(), id)
 	if err != nil {

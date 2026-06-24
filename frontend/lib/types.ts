@@ -69,6 +69,17 @@ export interface StoreOption {
   province: string;
 }
 
+// Area mirrors internal/areas.Area — a dynamic grouping of stores backing the
+// area visibility scope. store_nos / member_ids are populated on the detail GET.
+export interface Area {
+  id: string;
+  name: string;
+  active: boolean;
+  store_count: number;
+  store_nos?: number[];
+  member_ids?: string[];
+}
+
 export interface InterviewAppointment {
   id: string;
   application_id: string;
@@ -567,6 +578,19 @@ export interface Me {
   // GET /users/me. The UI gates on these instead of hardcoded role lists.
   permissions?: string[];
   scope?: string;
+  // Local users.id (uniform across SSO + password); used to tell whether a
+  // candidate lock is held by the current user. id is the Entra OID for SSO.
+  local_id?: string;
+}
+
+// CandidateLock mirrors internal/candidatelock.Lock — the short-lived processing
+// lock on a candidate (keyed by canonical candidates.id).
+export interface CandidateLock {
+  candidate_id: string;
+  locked_by: string;
+  locked_by_name?: string;
+  locked_at: string;
+  expires_at: string;
 }
 
 // --- Dynamic RBAC (admin role/permission management) ---
@@ -719,6 +743,9 @@ export interface Member {
   // Populated only on the person detail (the unified Candidates detail): one row
   // per position the person applied to, across all linked candidate rows.
   applications?: AccountApplication[];
+  // Canonical (non-duplicate) candidate id for this account — the key for the
+  // candidate processing lock. Absent for an account with no candidate yet.
+  candidate_id?: string;
 }
 
 // AccountApplication mirrors the Go members.AccountApplication — a per-position

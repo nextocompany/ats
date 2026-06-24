@@ -82,7 +82,7 @@ func (r *pgRepository) ReviewOnboardingDocument(ctx context.Context, docID, appl
 	if err != nil {
 		return OnboardingDocument{}, fmt.Errorf("applications: begin review onboarding: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	var existing uuid.UUID
 	err = tx.QueryRow(ctx,

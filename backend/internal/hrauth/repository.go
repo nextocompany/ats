@@ -308,7 +308,7 @@ func (r *pgRepository) UpdateUser(ctx context.Context, id uuid.UUID, in UpdateUs
 	if err != nil {
 		return User{}, fmt.Errorf("hrauth: update user (begin): %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	if _, err := tx.Exec(ctx,
 		`UPDATE users SET is_primary_dpo = FALSE WHERE is_primary_dpo = TRUE AND id <> $1`, id,
 	); err != nil {
