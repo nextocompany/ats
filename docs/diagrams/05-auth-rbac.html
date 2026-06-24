@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>05 ยืนยันตัวตน &amp; สิทธิ์ — CP Axtra HR ATS</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="brandmark"><b>CP AXTRA</b><span>AI HR ATS · System Diagrams</span></div>
+    <a class="backlink" href="index.html">← กลับหน้ารวม</a>
+  </div>
+
+  <span class="eyebrow">05 · Auth &amp; RBAC</span>
+  <h1 class="page-title">ยืนยันตัวตนและสิทธิ์การเข้าถึง</h1>
+  <p class="page-sub">
+    ระบบมี 2 ระนาบตัวตนที่แยกขาดกัน: ผู้สมัคร (career portal) และพนักงาน HR (dashboard)
+    คนละวิธี login คนละ cookie · ฝั่ง HR ยังมีโมเดล RBAC ที่จำกัดการมองเห็นตามสาขา/ภูมิภาค
+  </p>
+
+  <hr class="rule" />
+
+  <div class="canvas-board">
+    <div class="grid g2">
+
+      <!-- CANDIDATE PLANE -->
+      <div class="layer">
+        <span class="layer-label">ระนาบ 1 · ผู้สมัคร (Career Portal)</span>
+        <div class="col">
+          <div class="row fill">
+            <div class="node node--external eq"><div class="nt">LINE Login</div><div class="nm">ช่องทางหลัก (OAuth 2.1)</div></div>
+            <div class="node node--external eq"><div class="nt">Google</div><div class="nm">OAuth ทางเลือก</div></div>
+            <div class="node node--external eq"><div class="nt">Email OTP</div><div class="nm">passwordless</div></div>
+          </div>
+          <div class="arrow down">↓ backend เป็นเจ้าของ OAuth (portal ไม่ถือ secret)</div>
+          <div class="node node--accent">
+            <div class="nt">internal/candidateauth</div>
+            <div class="nm">สร้าง/หาบัญชีผู้สมัคร · stamp PDPA consent ตอน signup · จัดการโปรไฟล์ + resume library</div>
+          </div>
+          <div class="arrow down">↓</div>
+          <div class="node">
+            <div class="nt">🍪 cookie <code>cp_session</code></div>
+            <div class="nm">httpOnly opaque session · prod: Secure + SameSite=None · middleware <code>RequireCandidate</code> คุม <code>/public/auth|apply</code> + <code>me/*</code></div>
+          </div>
+          <div class="node node--ghost">
+            <div class="nt">ขอบเขตการเห็นข้อมูล</div>
+            <div class="nm">ผู้สมัคร<strong>ไม่มี role RBAC</strong> — เห็นเฉพาะข้อมูลของบัญชีตัวเองเท่านั้น</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- HR PLANE -->
+      <div class="layer layer--brand">
+        <span class="layer-label">ระนาบ 2 · พนักงาน HR (Dashboard)</span>
+        <div class="col">
+          <div class="row fill">
+            <div class="node node--external eq"><div class="nt">Entra ID / Azure AD SSO</div><div class="nm">bearer JWT · ตรวจผ่าน OIDC · จำกัด tenant</div></div>
+            <div class="node eq"><div class="nt">Local Password</div><div class="nm">internal/hrauth · cookie <code>hr_auth</code> (12 ชม.)</div></div>
+          </div>
+          <div class="arrow down">↓ <code>middleware.Auth</code> (เลือกด้วย AUTH_PROVIDER mock/real)</div>
+          <div class="node node--accent">
+            <div class="nt">JIT Provisioning</div>
+            <div class="nm">ครั้งแรกที่ SSO เข้า → สร้าง user ใน store ของแอปเอง · <strong>role + scope มาจาก store ไม่ใช่ claim ใน token</strong> (default-deny ถ้าไม่มีบัญชี active)</div>
+          </div>
+          <div class="arrow down">↓</div>
+          <div class="node node--queue">
+            <div class="nt">internal/rbac — เมทริกซ์ DB-backed</div>
+            <div class="nm">role→permission + role→data-scope · มี legacy fallback แบบ compiled-in (fail-static ไม่ fail-open) · refresh ทุก ~60s</div>
+          </div>
+          <div class="node node--ghost">
+            <div class="nt">/users/me → permission set</div>
+            <div class="nm">dashboard เรนเดอร์ nav/หน้าจากชุด permission ที่ resolve ได้ ไม่ hardcode role</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- RBAC SCOPE -->
+  <div class="section-title">โมเดล Data Scope — ใครเห็นข้อมูลใคร</div>
+  <div class="canvas-board plain">
+    <div class="row fill" style="align-items:stretch">
+      <div class="node node--data eq">
+        <div class="nt">🌍 all — ทั้งองค์กร</div>
+        <div class="nm">เห็นทุกใบสมัคร/ตำแหน่ง</div>
+        <div style="margin-top:10px"><span class="pill">super_admin</span> <span class="pill">regional_director</span> <span class="pill">auditor</span></div>
+      </div>
+      <span class="arrow">⊃</span>
+      <div class="node node--data eq">
+        <div class="nt">🗺️ subregion — ระดับภูมิภาค</div>
+        <div class="nm">เห็นเฉพาะสาขาในภูมิภาคของตน</div>
+        <div style="margin-top:10px"><span class="pill">operation_director</span></div>
+      </div>
+      <span class="arrow">⊃</span>
+      <div class="node node--data eq">
+        <div class="nt">🏪 store — ระดับสาขา</div>
+        <div class="nm">เห็นเฉพาะสาขาเดียวของตน · ถ้าไม่มีสาขา → <code>1=0</code> (ไม่เห็นอะไรเลย)</div>
+        <div style="margin-top:10px"><span class="pill">sgm</span> <span class="pill">hr_manager</span> <span class="pill">hr_staff</span></div>
+      </div>
+    </div>
+    <div class="legend">
+      <div class="li">scope สร้างจาก role + <code>StoreID</code> + <code>Subregion</code> แล้วแปลงเป็น SQL clause กรอง <code>applications</code>/<code>vacancies</code></div>
+      <div class="li">role ที่ไม่รู้จัก → ตกไปที่ scope แคบสุด (store)</div>
+    </div>
+  </div>
+
+  <div class="section-title">คำอธิบาย</div>
+  <div class="grid g2">
+    <div class="card desc">
+      <p><strong>SSO = พิสูจน์ว่าเป็นใคร, in-app = บอกว่าทำอะไรได้</strong> — Entra ทำหน้าที่ authentication
+      เท่านั้น ส่วนสิทธิ์ (authorization) มาจาก user store ของแอปเอง admin กำหนด role + scope + DPO
+      ต่อบัญชีได้ ทำให้ผู้ใช้ SSO ที่ยังไม่มี role จะเจอ default-deny</p>
+      <p><strong>fail-static ไม่ fail-open</strong> — ถ้าโหลดเมทริกซ์ RBAC จาก DB ไม่ได้ จะใช้ตารางสำรองที่
+      compile มากับโค้ด ไม่ใช่ปล่อยผ่านทุกอย่าง</p>
+    </div>
+    <div class="card desc">
+      <p><strong>permission catalog</strong> — เช่น <code>executive.view</code>, <code>reports.export</code>,
+      <code>bulk.upload</code>, <code>offer.write</code>, <code>onboarding.write</code>,
+      <code>approval.decide_l1..l4</code>, <code>requisition.manage</code>, <code>pdpa.admin</code>,
+      <code>users.admin</code> · <code>super_admin</code> เป็น bypass ในโค้ดถือสิทธิ์ทั้งหมด</p>
+      <p><strong>2 cookie แยกกัน</strong> — <code>cp_session</code> (ผู้สมัคร) และ <code>hr_auth</code> (HR password)
+      ไม่ปะปนกัน · dashboard ยังมี marker cookie <code>hr_session</code> = entra/pw/dev สำหรับ gate route</p>
+    </div>
+  </div>
+
+  <div class="card desc" style="margin-top:14px;border-left:4px solid var(--amber)">
+    <p><strong>หมายเหตุ:</strong> หน้านี้คือ RBAC <strong>ปัจจุบัน</strong> (all/subregion/store) · สำหรับโมเดลสิทธิ์
+    <strong>ใหม่ที่เสนอ</strong> (2 แกน + area dynamic + pool + lock + timeout) ดู
+    <a class="backlink" href="08-rbac-redesign.html" style="padding:4px 10px">08 RBAC Redesign →</a></p>
+  </div>
+
+  <footer class="foot">
+    <span>05 · ยืนยันตัวตน &amp; สิทธิ์ (ปัจจุบัน)</span>
+    <span>ถัดไป → <a class="backlink" href="06-integrations.html" style="padding:4px 10px">06 การเชื่อมต่อภายนอก</a></span>
+  </footer>
+
+</div>
+</body>
+</html>

@@ -30,6 +30,12 @@ type assignAppsStub struct {
 func (s *assignAppsStub) ExistsInScope(context.Context, uuid.UUID, rbac.Scope) (bool, error) {
 	return s.inScope, nil
 }
+
+// FindByID is loaded so UpdateAssignment can resolve the candidate for the
+// processing-lock gate (the gate itself is a no-op here — no enforcer is wired).
+func (s *assignAppsStub) FindByID(context.Context, uuid.UUID) (*Application, error) {
+	return &Application{CandidateID: uuid.New()}, nil
+}
 func (s *assignAppsStub) SetAssignment(_ context.Context, _ uuid.UUID, storeNo *int, pool bool) error {
 	s.setCalled, s.setStore, s.setPool = true, storeNo, pool
 	return nil

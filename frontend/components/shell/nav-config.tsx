@@ -13,6 +13,7 @@ import {
   CalendarDays,
   ShieldCheck,
   Lock,
+  Map,
   Settings,
   SlidersHorizontal,
   type LucideIcon,
@@ -22,6 +23,7 @@ import {
   canAccessApprovals,
   canAdminPdpa,
   canBulkUpload,
+  canManageAreas,
   canManageRequisitions,
   canManageScoring,
   canViewExecutive,
@@ -81,6 +83,10 @@ export const PDPA_NAV: NavItem = { href: "/pdpa", label: "PDPA", key: "pdpa", ic
 // Admin is super_admin-only — appended via navForRole, never in the base NAV.
 export const ADMIN_NAV: NavItem = { href: "/admin", label: "Admin", key: "admin", icon: Settings };
 
+// Areas is the dynamic store-grouping console backing the area scope, gated via
+// canManageAreas (area.admin), mirroring the backend.
+export const AREAS_NAV: NavItem = { href: "/areas", label: "Areas", key: "areas", icon: Map };
+
 // Scoring weights — per-position screening-weight config, gated via canManageScoring
 // (settings.admin), mirroring the backend allowlist.
 export const SCORING_NAV: NavItem = { href: "/scoring", label: "Scoring", key: "scoring", icon: SlidersHorizontal };
@@ -103,12 +109,13 @@ export function navForRole(me?: Me): NavItem[] {
   if (canManageRequisitions(me)) items.push(REQUISITIONS_NAV);
   if (canAdminPdpa(me)) items.push(PDPA_NAV);
   if (canManageScoring(me)) items.push(SCORING_NAV);
+  if (canManageAreas(me)) items.push(AREAS_NAV);
   if (isSuperAdmin(me)) items.push(ADMIN_NAV);
   return items;
 }
 
 // ALL_NAV is every possible item, for pathname→item lookups (e.g. header title).
-export const ALL_NAV: NavItem[] = [...NAV, REPORTS_NAV, EXECUTIVE_NAV, SHORTLIST_NAV, APPROVALS_NAV, INTERVIEWS_NAV, BULK_NAV, REQUISITIONS_NAV, PDPA_NAV, SCORING_NAV, ADMIN_NAV, PRIVACY_NAV];
+export const ALL_NAV: NavItem[] = [...NAV, REPORTS_NAV, EXECUTIVE_NAV, SHORTLIST_NAV, APPROVALS_NAV, INTERVIEWS_NAV, BULK_NAV, REQUISITIONS_NAV, PDPA_NAV, SCORING_NAV, AREAS_NAV, ADMIN_NAV, PRIVACY_NAV];
 
 // Brand lockup — text-only institutional wordmark, no monogram tile or dot mark.
 // "CP AXTRA" tracked uppercase over an "ATS Console" line (HSBC/JPM register),

@@ -47,7 +47,7 @@ func (h *ATSReportHandler) build(c *fiber.Ctx) (ATSReport, error) {
 	if err != nil {
 		return ATSReport{}, fiber.NewError(fiber.StatusBadRequest, err.Error())
 	}
-	scope := rbac.New(u.Role, u.StoreID, u.Subregion)
+	scope := rbac.New(u.Role, u.StoreID, u.Subregion).WithUserID(u.LocalID)
 	rep, err := h.repo.ATSReport(c.UserContext(), scope, f, h.requiredDocs)
 	if err != nil {
 		return ATSReport{}, err

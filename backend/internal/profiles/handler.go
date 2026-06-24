@@ -37,7 +37,7 @@ func RegisterRoutes(app *fiber.App, h *Handler) {
 
 func scopeFrom(c *fiber.Ctx) rbac.Scope {
 	u, _ := c.Locals(middleware.UserContextKey).(middleware.DevUser)
-	return rbac.New(u.Role, u.StoreID, u.Subregion)
+	return rbac.New(u.Role, u.StoreID, u.Subregion).WithUserID(u.LocalID)
 }
 
 func atoiDefault(s string, def int) int {

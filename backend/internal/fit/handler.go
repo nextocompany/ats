@@ -7,6 +7,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 
+	"github.com/nexto/hr-ats/internal/candidatelock"
 	"github.com/nexto/hr-ats/internal/middleware"
 	"github.com/nexto/hr-ats/internal/rbac"
 	"github.com/nexto/hr-ats/pkg/httpx"
@@ -21,8 +22,10 @@ type ScopeChecker interface {
 
 // Handler exposes the HR-facing fit-analysis endpoints.
 type Handler struct {
-	svc    *Service
-	scoper ScopeChecker
+	svc     *Service
+	scoper  ScopeChecker
+	lock    *candidatelock.Enforcer
+	appCand func(context.Context, uuid.UUID) (uuid.UUID, error)
 }
 
 // NewHandler builds the fit HTTP handler. A nil scoper is a wiring bug — every
@@ -35,9 +38,31 @@ func NewHandler(svc *Service, scoper ScopeChecker) *Handler {
 	return &Handler{svc: svc, scoper: scoper}
 }
 
+// SetLockEnforcer enables candidate-lock enforcement on the fit-analysis action.
+// resolve maps an application id to its candidate id (the lock key). Both must be
+// non-nil for enforcement to engage; unset → no-op.
+func (h *Handler) SetLockEnforcer(e *candidatelock.Enforcer, resolve func(context.Context, uuid.UUID) (uuid.UUID, error)) {
+	h.lock = e
+	h.appCand = resolve
+}
+
+// guardLock enforces the processing lock for the application's candidate. Returns
+// (proceed, err); when proceed is false the HTTP response is already written and
+// the caller must return err.
+func (h *Handler) guardLock(c *fiber.Ctx, appID uuid.UUID) (bool, error) {
+	if h.lock == nil || h.appCand == nil {
+		return true, nil
+	}
+	candID, err := h.appCand(c.UserContext(), appID)
+	if err != nil {
+		return false, err
+	}
+	return h.lock.Guard(c, candID)
+}
+
 func scopeFrom(c *fiber.Ctx) rbac.Scope {
 	u, _ := c.Locals(middleware.UserContextKey).(middleware.DevUser)
-	return rbac.New(u.Role, u.StoreID, u.Subregion)
+	return rbac.New(u.Role, u.StoreID, u.Subregion).WithUserID(u.LocalID)
 }
 
 // authorizeApplication returns a 404 (not 403, to avoid leaking existence) when
@@ -71,6 +96,9 @@ func (h *Handler) Generate(c *fiber.Ctx) error {
 	}
 	if err := h.authorizeApplication(c, id); err != nil {
 		return err
+	}
+	if ok, lerr := h.guardLock(c, id); !ok {
+		return lerr
 	}
 	a, err := h.svc.Generate(c.UserContext(), id, generatedBy(c))
 	if err != nil {

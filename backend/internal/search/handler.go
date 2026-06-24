@@ -24,7 +24,7 @@ func RegisterRoutes(app *fiber.App, h *Handler) {
 
 func scopeFrom(c *fiber.Ctx) rbac.Scope {
 	u, _ := c.Locals(middleware.UserContextKey).(middleware.DevUser)
-	return rbac.New(u.Role, u.StoreID, u.Subregion)
+	return rbac.New(u.Role, u.StoreID, u.Subregion).WithUserID(u.LocalID)
 }
 
 // Search handles GET /api/v1/candidates/search?q=&status=&min_score=&page=&limit=.

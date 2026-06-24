@@ -1,6 +1,7 @@
 package requisitions
 
 import (
+	"context"
 	"errors"
 	"strconv"
 	"strings"
@@ -14,18 +15,47 @@ import (
 	"github.com/nexto/hr-ats/pkg/httpx"
 )
 
+// resolveHiringManager maps the actor's email to a local users.id for the
+// requisition's hiring-manager link. Returns nil (no link) when there is no
+// resolver, no email, or the lookup fails — never blocking the create.
+func (h *Handler) resolveHiringManager(ctx context.Context, email string) *uuid.UUID {
+	email = strings.TrimSpace(email)
+	if h.users == nil || email == "" {
+		return nil
+	}
+	id, _, err := h.users.ResolveUser(ctx, email)
+	if err != nil {
+		log.Warn().Err(err).Msg("requisitions: resolve hiring manager failed; leaving link null")
+		return nil
+	}
+	return &id
+}
+
 const maxHeadcount = 999
 
 // Handler serves /api/v1/requisitions, gated to requisition.manage /
 // requisition.approve. RBAC scope (store/subregion/all) bounds every read.
+// UserResolver maps an authenticated actor's email to their local users.id, so a
+// requisition can record its owning hiring manager as a resolvable user (the
+// Entra OID in the token is not a users.id). Mirrors the interview scheduler's
+// resolver. Optional: with no resolver the hiring-manager link is left null.
+type UserResolver interface {
+	ResolveUser(ctx context.Context, email string) (id uuid.UUID, fullName string, err error)
+}
+
 type Handler struct {
-	repo Repository
+	repo  Repository
+	users UserResolver
 }
 
 // NewHandler builds the requisitions handler.
 func NewHandler(repo Repository) *Handler {
 	return &Handler{repo: repo}
 }
+
+// SetUserResolver wires the actor email → users.id resolver used to stamp the
+// requisition's hiring manager. Safe to leave unset (link stays null).
+func (h *Handler) SetUserResolver(u UserResolver) { h.users = u }
 
 // RegisterRoutes mounts the requisition endpoints. Static segments are declared
 // before the parameterised ones so Fiber does not capture them as :id.
@@ -49,7 +79,7 @@ func user(c *fiber.Ctx) (middleware.DevUser, bool) {
 }
 
 func scopeFrom(u middleware.DevUser) rbac.Scope {
-	return rbac.New(u.Role, u.StoreID, u.Subregion)
+	return rbac.New(u.Role, u.StoreID, u.Subregion).WithUserID(u.LocalID)
 }
 
 func (h *Handler) List(c *fiber.Ctx) error {
@@ -175,6 +205,10 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 	if err != nil {
 		return httpx.Fail(c, fiber.StatusBadRequest, "authenticated user has no internal id")
 	}
+	// The manager who opens the requisition is its hiring manager (drives the
+	// requisition visibility scope). Resolve by email to a real users.id; an
+	// unresolved actor leaves the link null rather than failing the create.
+	hiringManager := h.resolveHiringManager(c.UserContext(), u.Email)
 	req2, err := h.repo.Create(c.UserContext(), CreateInput{
 		PositionID:       positionID,
 		StoreID:          req.StoreID,
@@ -188,6 +222,7 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 		SalaryMax:        req.SalaryMax,
 		Priority:         priority,
 		OpenReason:       reason,
+		HiringManager:    hiringManager,
 	}, creator)
 	if err != nil {
 		return h.writeErr(c, err)

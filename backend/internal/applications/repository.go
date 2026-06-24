@@ -54,6 +54,15 @@ type Repository interface {
 	SetDedupState(ctx context.Context, id uuid.UUID, state string, confidence float64) error
 	SetScore(ctx context.Context, id uuid.UUID, s Score) error
 	SetAssignment(ctx context.Context, id uuid.UUID, storeNo *int, talentPool bool) error
+	// SetVacancy links an application to the open vacancy it was matched to, so the
+	// requisition scope can resolve application → vacancy → owning hiring manager.
+	SetVacancy(ctx context.Context, id uuid.UUID, vacancyID *uuid.UUID) error
+	// ReleaseStalePoolCandidates moves store-specific applications that no store HR
+	// picked up within graceDays back to the central pool. Returns the count moved.
+	ReleaseStalePoolCandidates(ctx context.Context, graceDays int) (int, error)
+	// MarkPickedUp stamps the first store-HR pickup on a candidate's still-unpicked
+	// store-specific applications, stopping their pool-release timer. Idempotent.
+	MarkPickedUp(ctx context.Context, candidateID, byUser uuid.UUID) (int, error)
 	// Sprint 3:
 	SetHired(ctx context.Context, id uuid.UUID) error
 	SetPSSynced(ctx context.Context, id uuid.UUID) error
@@ -524,6 +533,45 @@ func (r *pgRepository) SetAssignment(ctx context.Context, id uuid.UUID, storeNo 
 		return fmt.Errorf("applications: set assignment: %w", err)
 	}
 	return nil
+}
+
+func (r *pgRepository) SetVacancy(ctx context.Context, id uuid.UUID, vacancyID *uuid.UUID) error {
+	const q = `UPDATE applications SET vacancy_id = $2, updated_at = NOW() WHERE id = $1`
+	if _, err := r.pool.Exec(ctx, q, id, vacancyID); err != nil {
+		return fmt.Errorf("applications: set vacancy: %w", err)
+	}
+	return nil
+}
+
+func (r *pgRepository) ReleaseStalePoolCandidates(ctx context.Context, graceDays int) (int, error) {
+	const q = `
+		UPDATE applications
+		SET assigned_store_id = NULL, talent_pool = TRUE, released_to_pool_at = now(), updated_at = now()
+		WHERE assigned_store_id IS NOT NULL
+		  AND talent_pool = FALSE
+		  AND picked_up_at IS NULL
+		  AND released_to_pool_at IS NULL
+		  AND created_at < now() - make_interval(days => $1)`
+	tag, err := r.pool.Exec(ctx, q, graceDays)
+	if err != nil {
+		return 0, fmt.Errorf("applications: release stale pool candidates: %w", err)
+	}
+	return int(tag.RowsAffected()), nil
+}
+
+func (r *pgRepository) MarkPickedUp(ctx context.Context, candidateID, byUser uuid.UUID) (int, error) {
+	const q = `
+		UPDATE applications
+		SET picked_up_at = now(), picked_up_by = $2, updated_at = now()
+		WHERE candidate_id = $1
+		  AND assigned_store_id IS NOT NULL
+		  AND talent_pool = FALSE
+		  AND picked_up_at IS NULL`
+	tag, err := r.pool.Exec(ctx, q, candidateID, byUser)
+	if err != nil {
+		return 0, fmt.Errorf("applications: mark picked up: %w", err)
+	}
+	return int(tag.RowsAffected()), nil
 }
 
 func (r *pgRepository) SetHired(ctx context.Context, id uuid.UUID) error {

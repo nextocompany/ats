@@ -176,6 +176,8 @@ func main() {
 	mux.HandleFunc(queue.TypeRetentionSweep, retentionSvc.HandleRetentionSweep)
 	mux.HandleFunc(queue.TypeAuthCleanup, authCleanupSvc.HandleAuthCleanup)
 	mux.HandleFunc(queue.TypeApprovalSLASweep, approvalSLASvc.HandleApprovalSLASweep)
+	poolReleaseSvc := applications.NewPoolReleaseService(appRepo, cfg.PoolReleaseGraceDays)
+	mux.HandleFunc(queue.TypePoolReleaseSweep, poolReleaseSvc.HandlePoolReleaseSweep)
 
 	log.Info().Str("provider", cfg.AIProvider).Msg("worker started; consuming process_application + vacancy:reengage + report:export + retention:sweep + auth:cleanup")
 	if err := srv.Run(mux); err != nil {

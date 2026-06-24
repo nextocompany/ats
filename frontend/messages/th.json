@@ -21,7 +21,8 @@
     "requisitions": "การเปิดรับ",
     "pdpa": "PDPA / DPO",
     "scoring": "น้ำหนักการคัดกรอง",
-    "privacy": "ความเป็นส่วนตัว"
+    "privacy": "ความเป็นส่วนตัว",
+    "areas": "พื้นที่"
   },
   "scoring": {
     "eyebrow": "ตั้งค่า",
@@ -637,7 +638,22 @@
     "dpoPrimaryBadge": "DPO หลัก",
     "fieldPhone": "เบอร์โทร DPO",
     "phonePlaceholder": "เช่น 02-000-0000",
-    "dpoBadge": "DPO"
+    "dpoBadge": "DPO",
+    "role_hr_store": "HR สาขา",
+    "roleFull_hr_store": "HR สาขา",
+    "role_area_hr": "HR เขต",
+    "roleFull_area_hr": "HR เขต",
+    "role_hiring_manager_store": "ผู้จัดการสรรหา (สาขา)",
+    "roleFull_hiring_manager_store": "ผู้จัดการสรรหา (สาขา)",
+    "role_hiring_manager_ho": "ผู้จัดการสรรหา (สนญ.)",
+    "roleFull_hiring_manager_ho": "ผู้จัดการสรรหา (สนญ.)",
+    "role_ta": "ฝ่ายสรรหา (TA)",
+    "roleFull_ta": "ฝ่ายสรรหา (TA)",
+    "areaCoverage": "พื้นที่ที่ดูแล",
+    "areaCoverageNone": "ยังไม่มีพื้นที่ (สร้างได้ในหน้า Area)",
+    "areaCoverageSave": "บันทึกพื้นที่",
+    "areaCoverageSaved": "อัปเดตพื้นที่ที่ดูแลแล้ว",
+    "areaCoverageFailed": "อัปเดตพื้นที่ไม่สำเร็จ"
   },
   "members": {
     "eyebrow": "จัดการสมาชิก",
@@ -1071,5 +1087,47 @@
     "signedInAs": "เข้าสู่ระบบในชื่อ",
     "signOut": "ออกจากระบบ",
     "checking": "กำลังตรวจสอบสิทธิ์ของคุณ…"
+  },
+  "areas": {
+    "title": "จัดการพื้นที่ (Area)",
+    "subtitle": "จัดกลุ่มสาขาเป็นพื้นที่ และกำหนด HR เขตที่ดูแลแต่ละพื้นที่",
+    "denied": "คุณไม่มีสิทธิ์จัดการพื้นที่",
+    "namePlaceholder": "ชื่อพื้นที่ใหม่",
+    "created": "สร้างพื้นที่แล้ว",
+    "createFailed": "สร้างพื้นที่ไม่สำเร็จ",
+    "confirmDelete": "ลบพื้นที่นี้? การกำหนดสาขาและสมาชิกจะถูกลบ",
+    "deleted": "ลบพื้นที่แล้ว",
+    "deleteFailed": "ลบพื้นที่ไม่สำเร็จ",
+    "empty": "ยังไม่มีพื้นที่ สร้างด้านบนได้เลย",
+    "selectPrompt": "เลือกพื้นที่เพื่อจัดการสาขาและสมาชิก",
+    "storeCount": "{n} สาขา",
+    "saved": "บันทึกแล้ว",
+    "saveFailed": "บันทึกไม่สำเร็จ",
+    "rename": "เปลี่ยนชื่อ",
+    "active": "ใช้งาน",
+    "delete": "ลบ",
+    "stores": "สาขา",
+    "filterStores": "ค้นหาสาขา...",
+    "saveStores": "บันทึกสาขา",
+    "members": "HR เขต",
+    "saveMembers": "บันทึกสมาชิก",
+    "storesSaved": "อัปเดตสาขาแล้ว",
+    "membersSaved": "อัปเดตสมาชิกแล้ว",
+    "noAreaHr": "ไม่มีผู้ใช้ area_hr",
+    "eyebrow": "การควบคุมการเข้าถึง"
+  },
+  "lock": {
+    "unlocked": "ยังไม่มีผู้ดำเนินการผู้สมัครนี้",
+    "claim": "เริ่มดำเนินการ",
+    "claimed": "คุณกำลังดำเนินการผู้สมัครนี้แล้ว",
+    "claimFailed": "จับจองผู้สมัครนี้ไม่สำเร็จ",
+    "youAreProcessing": "คุณกำลังดำเนินการผู้สมัครนี้",
+    "processingBy": "กำลังถูกดำเนินการโดย {name}",
+    "anotherUser": "ผู้ใช้รายอื่น",
+    "until": "ถึง {time}",
+    "release": "ปล่อยล็อก",
+    "released": "ปล่อยล็อกแล้ว",
+    "releaseFailed": "ปล่อยล็อกไม่สำเร็จ",
+    "forceRelease": "บังคับปล่อย"
   }
 }

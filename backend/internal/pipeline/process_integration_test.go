@@ -424,7 +424,12 @@ func TestPipeline_LowConfidenceFlagsReview(t *testing.T) {
 	pos := seedPosition(t, f, 0, 0)
 	p := seedCandidateApp(t, f, pos)
 
-	proc := f.processor(fakeOCR{conf: 0.5}, fakeParser{profile: ai.Profile{Personal: ai.Personal{Name: "ทดสอบ"}}})
+	// IsResume:true — a valid resume that merely OCR'd with low confidence. Without
+	// it the struct literal defaults IsResume=false and the #161 not-a-resume gate
+	// returns before SetParseResults (the sole writer of needs_manual_review). In
+	// production a real parse decodes via Profile.UnmarshalJSON, which defaults
+	// IsResume=true when the key is absent, so only this hand-built fixture needs it.
+	proc := f.processor(fakeOCR{conf: 0.5}, fakeParser{profile: ai.Profile{IsResume: true, Personal: ai.Personal{Name: "ทดสอบ"}}})
 	if err := proc.HandleProcessApplication(context.Background(), task(t, p)); err != nil {
 		t.Fatalf("pipeline error: %v", err)
 	}

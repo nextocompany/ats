@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>04 โครงสร้างบน Azure — CP Axtra HR ATS</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="brandmark"><b>CP AXTRA</b><span>AI HR ATS · System Diagrams</span></div>
+    <a class="backlink" href="index.html">← กลับหน้ารวม</a>
+  </div>
+
+  <span class="eyebrow">04 · Cloud Architecture (Azure)</span>
+  <h1 class="page-title">โครงสร้างบน Azure</h1>
+  <p class="page-sub">
+    ระบบ deploy ด้วย Bicep ทั้งหมดอยู่บน Azure Container Apps · เวอร์ชัน v1 เป็น public-network (ยังไม่มี VNet)
+    AI plane แยกไป region <code>eastus</code> ส่วนที่เหลืออยู่ <code>southeastasia</code> · resource group <code>hrats-prod-rg</code>
+  </p>
+
+  <hr class="rule" />
+
+  <div class="canvas-board">
+
+    <!-- INTERNET -->
+    <div class="layer">
+      <span class="layer-label">อินเทอร์เน็ต</span>
+      <div class="row fill">
+        <div class="node node--accent eq"><div class="nt">👤 เบราว์เซอร์ผู้สมัคร</div><div class="nm">โหลด Portal แล้วเรียก API ตรง</div></div>
+        <div class="node node--accent eq"><div class="nt">🧑‍💼 เบราว์เซอร์ HR</div><div class="nm">โหลด Dashboard แล้วเรียก API ตรง</div></div>
+        <div class="node node--external eq"><div class="nt">🏢 PeopleSoft / ฟอร์มภายนอก</div><div class="nm">webhook เข้า API</div></div>
+      </div>
+    </div>
+
+    <div class="conn-down"><div class="ln"></div><div class="hd">▼ HTTPS · TLS (allowInsecure: false)</div></div>
+
+    <!-- ACA ENV -->
+    <div class="layer layer--brand">
+      <span class="layer-label">Container Apps Environment · hrats-prod-cae (southeastasia)</span>
+
+      <div class="grid g3" style="margin-bottom:12px">
+        <div class="node node--accent">
+          <div class="nt">hrats-prod-portal</div>
+          <div class="nm"><span class="pill--live pill">public ingress</span> Next.js :3000 · 1–3 replicas · ไม่มี secret runtime</div>
+        </div>
+        <div class="node node--accent">
+          <div class="nt">hrats-prod-dashboard</div>
+          <div class="nm"><span class="pill--live pill">public ingress</span> Next.js :3000 · 1–3 replicas · NEXT_PUBLIC_* baked ตอน build</div>
+        </div>
+        <div class="node node--accent">
+          <div class="nt">hrats-prod-api</div>
+          <div class="nm"><span class="pill--live pill">public ingress</span> Go :8080 · 1–3 replicas · ถือ secret/env ทั้งหมด</div>
+        </div>
+      </div>
+
+      <div class="row fill">
+        <div class="node node--queue eq">
+          <div class="nt">hrats-prod-worker</div>
+          <div class="nm"><span class="pill--mock pill">internal :8081</span> asynq consumer · 1–3 replicas</div>
+        </div>
+        <div class="node node--queue eq">
+          <div class="nt">hrats-prod-scheduler</div>
+          <div class="nm"><span class="pill--mock pill">no ingress</span> cron · <strong>ปักหมุด 1 replica</strong></div>
+        </div>
+      </div>
+
+      <div class="legend" style="margin-top:12px">
+        <div class="li">ทั้ง 5 แอป: 0.5 CPU / 1 GiB · single-revision · 100% traffic → revision ล่าสุด</div>
+        <div class="li"><span class="pill">image จาก ACR</span> 1 Dockerfile + build-arg <code>SVC</code> = api/worker/scheduler</div>
+      </div>
+    </div>
+
+    <div class="conn-down"><div class="ln"></div><div class="hd">▼ egress (public network, TLS)</div></div>
+
+    <!-- DATA PLANE -->
+    <div class="layer">
+      <span class="layer-label">ชั้นข้อมูล (southeastasia)</span>
+      <div class="grid g4">
+        <div class="node node--data"><div class="nt">🐘 PostgreSQL Flexible</div><div class="nm"><code>hrats-prod-pg</code> · v16 · Standard_B1ms Burstable · 32GB · DB <code>hr_db</code> · firewall AllowAllAzureServices</div></div>
+        <div class="node node--data"><div class="nt">⚡ Azure Cache for Redis</div><div class="nm">Basic C0 · TLS :6380 · asynq queue (หรือ Redis ใน cluster เมื่อ redisAsContainer)</div></div>
+        <div class="node node--data"><div class="nt">📦 Storage Account</div><div class="nm">Standard_LRS · container <code>resumes</code> (private) · เรซูเม่/OCR/รายงาน</div></div>
+        <div class="node node--data"><div class="nt">🔎 Azure AI Search</div><div class="nm">free tier · index <code>candidates</code> · hybrid RRF · <span class="pill--mock pill">phase-2, off by default</span></div></div>
+      </div>
+    </div>
+
+    <div class="conn-down"><div class="ln"></div><div class="hd">▼ AI plane</div></div>
+
+    <!-- AI PLANE -->
+    <div class="layer">
+      <span class="layer-label">AI Plane (eastus) + ความปลอดภัย/สังเกตการณ์</span>
+      <div class="grid g4">
+        <div class="node node--external"><div class="nt">🤖 Azure OpenAI</div><div class="nm">S0 · chat <code>gpt-4o-mini</code> + embeddings <code>text-embedding-3-small</code> (1536 dims)</div></div>
+        <div class="node node--external"><div class="nt">📄 Document Intelligence</div><div class="nm">S0 · OCR (FormRecognizer prebuilt-layout)</div></div>
+        <div class="node node--data"><div class="nt">🔑 Key Vault</div><div class="nm">db-url, redis-url, jwt-secret, blob-conn, openai/search keys · UAMI อ่านผ่าน secretRef</div></div>
+        <div class="node node--data"><div class="nt">📈 Log Analytics + App Insights</div><div class="nm">log sink + telemetry ของทุกแอป backend</div></div>
+      </div>
+      <div class="row fill" style="margin-top:12px">
+        <div class="node eq"><div class="nt">📇 Container Registry (ACR)</div><div class="nm">Basic · repos <code>hr-ats/*</code> 5 image · pull ด้วย UAMI (AcrPull)</div></div>
+        <div class="node eq"><div class="nt">🪪 User-assigned Managed Identity</div><div class="nm"><code>hrats-prod-id</code> · AcrPull + Key Vault Secrets User · ใช้ร่วมทั้ง 5 แอป</div></div>
+      </div>
+    </div>
+
+    <div class="legend">
+      <div class="li"><span class="swatch" style="background:var(--brand)"></span> Container Apps</div>
+      <div class="li"><span class="swatch" style="background:var(--teal)"></span> ข้อมูล/ความปลอดภัย</div>
+      <div class="li"><span class="swatch" style="background:var(--amber)"></span> AI / SaaS</div>
+      <div class="li"><span class="swatch" style="background:var(--violet)"></span> งานเบื้องหลัง</div>
+    </div>
+  </div>
+
+  <div class="section-title">CI/CD และ Secrets</div>
+  <div class="grid g2">
+    <div class="card desc">
+      <p><strong>Pipeline (<code>.github/workflows/deploy.yml</code>)</strong></p>
+      <ul>
+        <li>Trigger: <code>workflow_dispatch</code> หรือ push tag <code>v*</code></li>
+        <li>Auth เข้า Azure ด้วย <strong>OIDC federated</strong> (ไม่มี secret ค้าง)</li>
+        <li>Build ฝั่ง server: <code>az acr build</code> (ไม่ใช้ Docker บน runner) · backend loop สร้าง api/worker/scheduler · web build portal/dashboard พร้อม baked <code>NEXT_PUBLIC_*</code></li>
+        <li><code>az containerapp update --image ...:TAG</code> ทั้ง 5 แอป แล้ว smoke check <code>/health</code></li>
+        <li><strong>ไม่</strong>รัน DB migration อัตโนมัติ — ทำมือด้วย golang-migrate</li>
+      </ul>
+    </div>
+    <div class="card desc">
+      <p><strong>การจัดการ secret</strong></p>
+      <ul>
+        <li>โหมด RBAC (ค่าเริ่มต้น): secret อยู่ใน <strong>Key Vault</strong> · Container App อ้างผ่าน <code>keyVaultUrl</code> + UAMI · env ใช้ <code>secretRef</code></li>
+        <li>เว็บแอปไม่มี secret runtime — ค่าฝังตอน build</li>
+      </ul>
+      <p><strong>โดเมน:</strong> <code>&lt;app&gt;.yellowmoss-b9b985f7.southeastasia.azurecontainerapps.io</code></p>
+      <p><strong>เส้นทาง traffic:</strong> Internet → ACA ingress (TLS) → portal/dashboard + api → API enqueue Redis → worker/scheduler บริโภค → ทุก service เข้าถึง Postgres/Blob/Redis + AI plane (eastus)</p>
+    </div>
+  </div>
+
+  <div class="card desc" style="margin-top:14px;border-left:4px solid var(--amber)">
+    <p><strong>หมายเหตุที่ควรรู้</strong> — แม้ comment ใน Bicep จะเขียนว่า gpt-4o แต่ค่า default จริงคือ
+    <code>gpt-4o-mini</code> · และ deployment embeddings (<code>text-embedding-3-small</code>) ถูกใช้โดยแอป
+    แต่<strong>ไม่ได้</strong>ประกาศไว้ใน Bicep module ของ OpenAI ต้องสร้างแยกเองก่อนเปิด hybrid search ·
+    Postgres/Redis/Storage ฯลฯ เปิด public network ทั้งหมด (v1 ยังไม่มี VNet)</p>
+  </div>
+
+  <footer class="foot">
+    <span>04 · โครงสร้างบน Azure</span>
+    <span>ถัดไป → <a class="backlink" href="05-auth-rbac.html" style="padding:4px 10px">05 ยืนยันตัวตน &amp; สิทธิ์</a></span>
+  </footer>
+
+</div>
+</body>
+</html>

@@ -92,6 +92,23 @@ func main() {
 		log.Info().Msg("scheduler: approval SLA sweep disabled (APPROVAL_SLA_ENABLED=false)")
 	}
 
+	// Pool-release sweep (RBAC redesign P2): return store-specific candidates no
+	// store HR picked up within the grace window to the central pool. Disabled by
+	// default — keep off until picked_up_at stamping is wired (else it releases all).
+	if cfg.PoolReleaseEnabled {
+		prTask, err := queue.NewPoolReleaseSweepTask(queue.PoolReleaseSweepPayload{GraceDays: cfg.PoolReleaseGraceDays})
+		if err != nil {
+			log.Fatal().Err(err).Msg("build pool release sweep task failed")
+		}
+		prID, err := scheduler.Register(cfg.PoolReleaseCron, prTask)
+		if err != nil {
+			log.Fatal().Err(err).Str("cron", cfg.PoolReleaseCron).Msg("register pool release sweep failed")
+		}
+		log.Info().Str("cron", cfg.PoolReleaseCron).Str("entry_id", prID).Msg("scheduler: pool:release_sweep registered")
+	} else {
+		log.Info().Msg("scheduler: pool release sweep disabled (POOL_RELEASE_ENABLED=false)")
+	}
+
 	// Time-based re-engagement: nudge dormant candidates at 6 and 12 months. One
 	// daily run; each threshold is its own task (suppressed at-most-once per trigger).
 	// Disabled by default so a fresh environment never messages anyone until opted in.

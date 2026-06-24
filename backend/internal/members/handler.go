@@ -101,7 +101,7 @@ func authedScope(c *fiber.Ctx) (rbac.Scope, bool) {
 	if rbac.Can(u.Role, rbac.PermMembersAdmin) {
 		return rbac.AllScope(), true
 	}
-	return rbac.New(u.Role, u.StoreID, u.Subregion), true
+	return rbac.New(u.Role, u.StoreID, u.Subregion).WithUserID(u.LocalID), true
 }
 
 // authorizedErase gates the super_admin-only destructive anonymize action.

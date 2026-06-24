@@ -110,6 +110,74 @@ func TestAccountsClause(t *testing.T) {
 	}
 }
 
+func TestAreaAndRequisitionKinds(t *testing.T) {
+	if got := New("area_hr", nil, "").Kind(); got != KindArea {
+		t.Errorf("area_hr kind = %q, want %q", got, KindArea)
+	}
+	for _, role := range []string{"hiring_manager_store", "hiring_manager_ho"} {
+		if got := New(role, nil, "").Kind(); got != KindRequisition {
+			t.Errorf("%s kind = %q, want %q", role, got, KindRequisition)
+		}
+	}
+	if got := New("ta", nil, "").Kind(); got != KindAll {
+		t.Errorf("ta kind = %q, want %q", got, KindAll)
+	}
+	if got := New("hr_store", nil, "").Kind(); got != KindStore {
+		t.Errorf("hr_store kind = %q, want %q", got, KindStore)
+	}
+}
+
+func TestAreaClause(t *testing.T) {
+	uid := "11111111-1111-1111-1111-111111111111"
+
+	// Area scope resolves stores via user_areas/area_stores and includes the pool.
+	c, args := New("area_hr", nil, "").WithUserID(uid).ApplicationsClause(1)
+	if len(args) != 1 || args[0] != uid {
+		t.Fatalf("area clause args wrong: %q %v", c, args)
+	}
+	for _, want := range []string{"area_stores", "user_areas", "$1::uuid", "talent_pool"} {
+		if !contains(c, want) {
+			t.Errorf("area applications clause missing %q: %q", want, c)
+		}
+	}
+
+	// Area scope without a user id fails closed.
+	if c, _ := New("area_hr", nil, "").ApplicationsClause(1); c != "1=0" {
+		t.Errorf("area scope without user id should match nothing, got %q", c)
+	}
+}
+
+func TestRequisitionClause(t *testing.T) {
+	uid := "22222222-2222-2222-2222-222222222222"
+
+	// Hiring manager sees only candidates in their own requisitions, NO pool.
+	c, args := New("hiring_manager_ho", nil, "").WithUserID(uid).ApplicationsClause(2)
+	if len(args) != 1 || args[0] != uid || !contains(c, "vacancy_id") || !contains(c, "hiring_manager_user_id") || !contains(c, "$2::uuid") {
+		t.Errorf("requisition applications clause wrong: %q %v", c, args)
+	}
+	if contains(c, "talent_pool") {
+		t.Errorf("requisition scope must NOT include the central pool: %q", c)
+	}
+
+	// Vacancies clause for a hiring manager is their owned requisitions.
+	if c, _ := New("hiring_manager_store", nil, "").WithUserID(uid).VacanciesClause(1); !contains(c, "hiring_manager_user_id = $1::uuid") {
+		t.Errorf("requisition vacancies clause wrong: %q", c)
+	}
+
+	// No user id → fail closed.
+	if c, _ := New("hiring_manager_store", nil, "").ApplicationsClause(1); c != "1=0" {
+		t.Errorf("requisition scope without user id should match nothing, got %q", c)
+	}
+}
+
+func TestStoreScopeIncludesPool(t *testing.T) {
+	store := 7
+	c, _ := New("hr_store", &store, "").ApplicationsClause(1)
+	if !contains(c, "assigned_store_id = $1") || !contains(c, "talent_pool = TRUE AND assigned_store_id IS NULL") {
+		t.Errorf("store scope should include own store + central pool: %q", c)
+	}
+}
+
 func contains(s, sub string) bool {
 	return len(s) >= len(sub) && (indexOf(s, sub) >= 0)
 }

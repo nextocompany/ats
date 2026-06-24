@@ -278,3 +278,42 @@ func ParseApprovalSLASweepPayload(body []byte) (ApprovalSLASweepPayload, error) 
 	}
 	return p, nil
 }
+
+// TypePoolReleaseSweep is the asynq task type for the store-pickup SLA sweep:
+// release store-specific candidates that no store HR acted on within the grace
+// window back into the shared central pool (RBAC redesign P2).
+const TypePoolReleaseSweep = "pool:release_sweep"
+
+// PoolReleaseSweepPayload carries the grace window in days (0 → config default).
+type PoolReleaseSweepPayload struct {
+	GraceDays int `json:"grace_days"`
+}
+
+// poolReleaseUniqueTTL dedups overlapping sweep enqueues during a rolling deploy.
+const poolReleaseUniqueTTL = 1 * time.Hour
+
+// NewPoolReleaseSweepTask builds the pool-release sweep task with retry/timeout
+// policy and enqueue-scoped uniqueness.
+func NewPoolReleaseSweepTask(p PoolReleaseSweepPayload) (*asynq.Task, error) {
+	body, err := json.Marshal(p)
+	if err != nil {
+		return nil, fmt.Errorf("queue: marshal payload: %w", err)
+	}
+	return asynq.NewTask(
+		TypePoolReleaseSweep,
+		body,
+		asynq.MaxRetry(taskMaxRetry),
+		asynq.Timeout(taskTimeout),
+		asynq.Retention(taskRetention),
+		asynq.Unique(poolReleaseUniqueTTL),
+	), nil
+}
+
+// ParsePoolReleaseSweepPayload decodes a pool-release sweep task body.
+func ParsePoolReleaseSweepPayload(body []byte) (PoolReleaseSweepPayload, error) {
+	var p PoolReleaseSweepPayload
+	if err := json.Unmarshal(body, &p); err != nil {
+		return p, fmt.Errorf("queue: unmarshal payload: %w", err)
+	}
+	return p, nil
+}

@@ -39,6 +39,10 @@ type Member struct {
 	ActiveSessions int        `json:"active_sessions"`
 	LastLoginAt    *time.Time `json:"last_login_at"` // newest session created_at (login time, not last activity)
 	CreatedAt      time.Time  `json:"created_at"`
+	// CandidateID is the account's canonical (non-duplicate) candidate row, the key
+	// for the candidate processing lock. Nil for an account with no candidate yet
+	// (portal signup who never applied).
+	CandidateID *uuid.UUID `json:"candidate_id,omitempty"`
 	// Applications is the per-position funnel list, populated only on the detail
 	// read (the unified person page). Nil on list rows (omitempty hides it).
 	Applications []AccountApplication `json:"applications,omitempty"`

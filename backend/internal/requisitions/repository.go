@@ -110,16 +110,16 @@ func (r *pgRepository) List(ctx context.Context, f ListFilter, scope rbac.Scope)
 func (r *pgRepository) Create(ctx context.Context, in CreateInput, createdBy uuid.UUID) (Requisition, error) {
 	const ins = `
 		INSERT INTO vacancies (
-			position_id, store_id, headcount, status, source, created_by, opened_at, created_at, updated_at,
+			position_id, store_id, headcount, status, source, created_by, hiring_manager_user_id, opened_at, created_at, updated_at,
 			responsibilities, qualifications, benefits, other_details,
 			employment_type, salary_min, salary_max, priority, open_reason)
-		VALUES ($1, $2, $3, $4, $5, $6, NULL, now(), now(),
-			$7, $8, $9, $10,
-			$11, $12, $13, $14, $15)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, NULL, now(), now(),
+			$8, $9, $10, $11,
+			$12, $13, $14, $15, $16)
 		RETURNING id`
 	var id uuid.UUID
 	if err := r.pool.QueryRow(ctx, ins,
-		in.PositionID, in.StoreID, in.Headcount, StatusPendingApproval, SourceManual, createdBy,
+		in.PositionID, in.StoreID, in.Headcount, StatusPendingApproval, SourceManual, createdBy, in.HiringManager,
 		in.Responsibilities, in.Qualifications, in.Benefits, in.OtherDetails,
 		in.EmploymentType, in.SalaryMin, in.SalaryMax, in.Priority, in.OpenReason,
 	).Scan(&id); err != nil {

@@ -26,11 +26,22 @@ var (
 
 // allowedRoles is the set of HR roles a local account may hold. It mirrors the
 // roles rbac.Scope understands; an unknown role would fail closed to store scope,
-// so we reject it at creation rather than silently narrowing visibility.
+// so we reject it at creation rather than silently narrowing visibility. This is a
+// fail-static fallback only — in production the dynamic validator (rbac
+// RoleExists) is authoritative, so once the RBAC cutover retires the old roles
+// they are no longer assignable regardless of this map. Old roles are retained
+// here during the transition (harmless: legacy.go still maps their scope).
 var allowedRoles = map[string]bool{
-	"super_admin":        true,
+	"super_admin": true,
+	"auditor":     true,
+	// New 2-axis roles.
+	"hr_store":             true,
+	"area_hr":              true,
+	"hiring_manager_store": true,
+	"hiring_manager_ho":    true,
+	"ta":                   true,
+	// Old single-axis roles (retired by the cutover migration; kept for transition).
 	"regional_director":  true,
-	"auditor":            true,
 	"operation_director": true,
 	"sgm":                true,
 	"hr_manager":         true,

@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>01 ภาพรวมระบบ — CP Axtra HR ATS</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="brandmark"><b>CP AXTRA</b><span>AI HR ATS · System Diagrams</span></div>
+    <a class="backlink" href="index.html">← กลับหน้ารวม</a>
+  </div>
+
+  <span class="eyebrow">01 · Overall / System Context</span>
+  <h1 class="page-title">ภาพรวมระบบ</h1>
+  <p class="page-sub">
+    มองระบบ ATS จากภายนอกเข้ามา ใครคือผู้ใช้ ระบบแกนกลางมีหน้าที่อะไร และพึ่งพาบริการภายนอกใดบ้าง
+    เส้นทางทั้งหมดวิ่งผ่าน Go API หนึ่งเดียวที่เป็นประตูสู่ระบบ
+  </p>
+
+  <hr class="rule" />
+
+  <div class="canvas-board">
+
+    <!-- ACTORS -->
+    <div class="layer">
+      <span class="layer-label">ผู้ใช้งาน / Actors</span>
+      <div class="grid g4">
+        <div class="node node--accent">
+          <div class="nt">👤 ผู้สมัครงาน</div>
+          <div class="nm">Candidate · ใช้ <strong>Career Portal</strong> เพื่อค้นหางาน สมัคร ติดตามสถานะ และตอบรับข้อเสนอ</div>
+        </div>
+        <div class="node node--accent">
+          <div class="nt">🧑‍💼 ทีม HR / สรรหา</div>
+          <div class="nm">HR staff/manager, SGM (สาขา) · ใช้ <strong>HR Dashboard</strong> คัดกรอง สัมภาษณ์ อนุมัติ ออกข้อเสนอ</div>
+        </div>
+        <div class="node node--accent">
+          <div class="nt">📊 ผู้บริหาร</div>
+          <div class="nm">Regional/Operation Director, Auditor · ดู Executive overview, รายงาน, การอนุมัติระดับสูง</div>
+        </div>
+        <div class="node node--external">
+          <div class="nt">🏢 PeopleSoft HCM</div>
+          <div class="nm">ระบบ HR กลางองค์กร · ส่งใบสมัคร/ตำแหน่งเข้ามา และรับข้อมูลพนักงานใหม่กลับเมื่อจ้าง</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="conn-down"><div class="ln"></div><div class="hd">▼</div></div>
+
+    <!-- THE SYSTEM -->
+    <div class="layer layer--brand">
+      <span class="layer-label">ระบบ HR ATS (สิ่งที่เราสร้าง)</span>
+      <div class="grid g3" style="margin-bottom:14px">
+        <div class="node">
+          <div class="nt">🌐 Career Portal</div>
+          <div class="nm">Next.js · เว็บผู้สมัคร (PWA) — landing, jobs, apply, status, account, offers</div>
+        </div>
+        <div class="node">
+          <div class="nt">🖥️ HR Dashboard</div>
+          <div class="nm">Next.js · คอนโซลพนักงาน — applications, candidates, interviews, approvals, executive, PDPA</div>
+        </div>
+        <div class="node node--external">
+          <div class="nt">📨 Inbound Webhook</div>
+          <div class="nm">รับใบสมัครจาก MS Forms / SEEK / JobsDB ผ่าน HMAC webhook</div>
+        </div>
+      </div>
+      <div class="conn-down"><div class="ln"></div><div class="hd">▼</div></div>
+      <div class="node node--accent" style="border-left-width:5px">
+        <div class="nt">⚙️ Go API (Fiber) — ประตูหลักของระบบ</div>
+        <div class="nm">
+          จุดเดียวที่รับ traffic จากผู้ใช้ทั้งหมด · ทำงาน HR แบบ synchronous (สัมภาษณ์ AI, fit, shortlist,
+          อนุมัติ, ออกข้อเสนอ) และ <strong>โยนงานหนัก (อ่าน/คัดกรองเรซูเม่) เข้าคิว</strong> ให้ Worker ประมวลผลเบื้องหลัง
+        </div>
+      </div>
+      <div class="row" style="margin-top:14px">
+        <div class="node node--queue eq">
+          <div class="nt">🔧 Worker</div>
+          <div class="nm">ประมวลผล pipeline คัดกรองเรซูเม่แบบ async + งานกวาดข้อมูลตามรอบ</div>
+        </div>
+        <div class="node node--queue eq">
+          <div class="nt">⏰ Scheduler</div>
+          <div class="nm">ตั้งเวลา cron — ส่งออกรายงาน, กวาด retention, re-engage talent pool, SLA อนุมัติ</div>
+        </div>
+        <div class="node node--data eq">
+          <div class="nt">🗄️ ชั้นข้อมูล</div>
+          <div class="nm">PostgreSQL · Redis (คิว) · Blob (เรซูเม่) · AI Search (ค้นหา)</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="conn-down"><div class="ln"></div><div class="hd">▼</div></div>
+
+    <!-- EXTERNAL -->
+    <div class="layer">
+      <span class="layer-label">บริการภายนอก / External Services</span>
+      <div class="grid g4">
+        <div class="node node--external">
+          <div class="nt">🤖 Azure OpenAI</div>
+          <div class="nm">LLM (GPT-4o-mini) แยกข้อมูล CV + สัมภาษณ์ AI · embeddings สำหรับ semantic search</div>
+        </div>
+        <div class="node node--external">
+          <div class="nt">📄 Document Intelligence</div>
+          <div class="nm">OCR อ่านเรซูเม่ทุกฟอร์แมต (prebuilt-layout)</div>
+        </div>
+        <div class="node node--external">
+          <div class="nt">💬 LINE Platform</div>
+          <div class="nm">เข้าสู่ระบบด้วย LINE + ส่งข้อความแจ้งเตือนผู้สมัคร</div>
+        </div>
+        <div class="node node--external">
+          <div class="nt">🔐 Microsoft Entra ID</div>
+          <div class="nm">SSO สำหรับ HR · Microsoft Graph สร้างนัดสัมภาษณ์/Teams meeting</div>
+        </div>
+        <div class="node node--external">
+          <div class="nt">✉️ Azure Comm. Services</div>
+          <div class="nm">ส่งอีเมล (OTP + แจ้งเตือนทุกสถานะ) แบบ branded</div>
+        </div>
+        <div class="node node--external">
+          <div class="nt">🔵 Google OAuth</div>
+          <div class="nm">ทางเลือกเข้าสู่ระบบของผู้สมัคร</div>
+        </div>
+        <div class="node node--external">
+          <div class="nt">👥 Microsoft Teams</div>
+          <div class="nm">แจ้งเตือนช่อง HR ผ่าน incoming webhook</div>
+        </div>
+        <div class="node node--external">
+          <div class="nt">🏢 PeopleSoft IB</div>
+          <div class="nm">Integration Broker · sync ข้อมูลพนักงานใหม่ออก (OAuth)</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="legend">
+      <div class="li"><span class="swatch" style="background:var(--brand)"></span> ระบบของเรา / แกนหลัก</div>
+      <div class="li"><span class="swatch" style="background:var(--teal)"></span> ชั้นข้อมูล</div>
+      <div class="li"><span class="swatch" style="background:var(--violet)"></span> งานเบื้องหลัง (คิว)</div>
+      <div class="li"><span class="swatch" style="background:var(--amber)"></span> บริการภายนอก</div>
+    </div>
+  </div>
+
+  <div class="section-title">คำอธิบาย</div>
+  <div class="grid g2">
+    <div class="card desc">
+      <p><strong>ทำไม API เป็นประตูเดียว</strong> — ทั้ง Career Portal และ HR Dashboard เป็น Next.js
+      ที่เรียก Go API โดยตรงผ่าน HTTPS (CORS อนุญาตเฉพาะสอง origin นี้) API เป็น Container App
+      เพียงตัวเดียวที่เปิด public ingress สำหรับ business logic ส่วน Worker/Scheduler ไม่รับ traffic
+      จากภายนอกเลย</p>
+      <p><strong>งานหนักแยกออกจาก request</strong> — การอ่านและคัดกรองเรซูเม่ใช้เวลาและเรียก AI หลายครั้ง
+      จึงไม่ทำใน request ตรงๆ แต่ API จะ enqueue งานเข้า Redis แล้ว Worker ดึงไปทำเบื้องหลัง
+      ผู้สมัครได้รับการตอบกลับทันที และติดตามสถานะภายหลังได้</p>
+    </div>
+    <div class="card desc">
+      <p><strong>หลายช่องทางรับสมัคร แต่ pipeline เดียว</strong> — ไม่ว่าจะมาจาก portal, อัปโหลดเป็นชุด,
+      ฟอร์มภายนอก หรือ PeopleSoft ทุกใบสมัครจะถูกโยนเข้า pipeline คัดกรองตัวเดียวกัน
+      ทำให้ผลลัพธ์ (การให้คะแนน การจัดสาขา) สม่ำเสมอ</p>
+      <p><strong>บริการภายนอกสลับ mock/real ได้</strong> — ทุกการเชื่อมต่อภายนอกมีตัวสลับ
+      <code>*_PROVIDER</code> โดยปริยายเป็น mock เพื่อให้พัฒนา/ทดสอบได้โดยไม่ต้องมีของจริง
+      แล้วค่อยเปิด real ใน production (ดูแผนผัง 06)</p>
+    </div>
+  </div>
+
+  <footer class="foot">
+    <span>01 · ภาพรวมระบบ</span>
+    <span>ถัดไป → <a class="backlink" href="02-end-to-end.html" style="padding:4px 10px">02 เส้นทางผู้สมัคร</a></span>
+  </footer>
+
+</div>
+</body>
+</html>

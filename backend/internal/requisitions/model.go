@@ -147,6 +147,11 @@ type CreateInput struct {
 	SalaryMax        *int
 	Priority         string
 	OpenReason       string
+	// HiringManager is the resolved users.id of the manager who opened the
+	// requisition (nil when the actor could not be resolved to a local user row).
+	// It drives the requisition visibility scope (a hiring manager sees only
+	// candidates in the positions they opened).
+	HiringManager *uuid.UUID
 }
 
 // UpdateInput sparsely edits a pending requisition (nil = unchanged).

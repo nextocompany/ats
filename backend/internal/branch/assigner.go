@@ -16,6 +16,7 @@ import (
 // Assignment is the outcome of branch assignment.
 type Assignment struct {
 	StoreNo    *int
+	VacancyID  *uuid.UUID // the open vacancy the candidate was matched to (nil for talent pool)
 	TalentPool bool
 	Subregion  string
 }
@@ -62,8 +63,10 @@ func (a *Assigner) Assign(ctx context.Context, province string, positionID uuid.
 		}
 	}
 
-	storeNo := open[bestIdx].StoreNo
-	return Assignment{StoreNo: &storeNo, Subregion: subregion}, nil
+	best := open[bestIdx]
+	storeNo := best.StoreNo
+	vacancyID := best.ID
+	return Assignment{StoreNo: &storeNo, VacancyID: &vacancyID, Subregion: subregion}, nil
 }
 
 // LocationScore returns 0–20 for the scoring engine: full marks when the

@@ -8,8 +8,11 @@ const UserContextKey = "user"
 // DevUser is the fixed identity injected during local development in place of
 // real Azure AD SSO. It must NEVER be active outside ENV=development.
 type DevUser struct {
-	ID        string `json:"id"`
-	Email     string `json:"email"`
+	ID    string `json:"id"`
+	Email string `json:"email"`
+	// LocalID is the local users.id (uniform across SSO + password; empty for an
+	// unprovisioned SSO identity). Use it — not ID — for area/requisition scope.
+	LocalID   string `json:"local_id"`
 	Role      string `json:"role"`
 	StoreID   *int   `json:"store_id"`
 	Subregion string `json:"subregion"`
@@ -20,9 +23,10 @@ type DevUser struct {
 // guarantees it cannot leak into production.
 func MockJWT(enabled bool) fiber.Handler {
 	dev := DevUser{
-		ID:    "00000000-0000-0000-0000-000000000001",
-		Email: "dev.superadmin@local.test",
-		Role:  "super_admin", // sees all; role scoping is unit-tested across roles
+		ID:      "00000000-0000-0000-0000-000000000001",
+		LocalID: "00000000-0000-0000-0000-000000000001",
+		Email:   "dev.superadmin@local.test",
+		Role:    "super_admin", // sees all; role scoping is unit-tested across roles
 	}
 	return func(c *fiber.Ctx) error {
 		if enabled {

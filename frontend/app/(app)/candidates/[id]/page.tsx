@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { ScoreBadge } from "@/components/inbox/ScoreBadge";
 import { InitialChip } from "@/components/people/PeopleBits";
 import { MemberStatusBadge } from "@/components/people/MemberStatusBadge";
+import { LockBar } from "@/components/candidates/LockBar";
 import { MemberActions } from "@/components/members/MemberActions";
 import { NotesPanel } from "@/components/members/NotesPanel";
 import { TagEditor } from "@/components/members/TagEditor";
@@ -73,6 +74,8 @@ export default function CandidateProfilePage() {
           {tc("detailNotFound")}
         </div>
       )}
+
+      {m?.candidate_id && <LockBar candidateId={m.candidate_id} me={me} />}
 
       {m && (
         <div className="grid gap-6 lg:grid-cols-[1fr_320px]">

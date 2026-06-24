@@ -344,6 +344,9 @@ func TestEraseSubject_Completeness(t *testing.T) {
 	exec("member_note", `INSERT INTO member_notes (account_id, author_email, body) VALUES ($1,'hr@x.com','sensitive note')`, acctID)
 	exec("member_tag", `INSERT INTO member_tags (account_id, tag) VALUES ($1,'vip')`, acctID)
 	exec("session", `INSERT INTO candidate_sessions (account_id, token_hash, expires_at) VALUES ($1,'hash-erase-1', NOW() + INTERVAL '1 day')`, acctID)
+	// Resume library: a second CV the candidate kept on the portal (its blob must
+	// also be erased, and the row deleted).
+	exec("account_resume_library", `INSERT INTO candidate_account_resumes (account_id, blob_key, file_type) VALUES ($1,'portal/lib-resume.pdf','pdf')`, acctID)
 
 	blob := &fakeBlobDeleter{}
 	idx := &fakeIndexer{}
@@ -402,12 +405,14 @@ func TestEraseSubject_Completeness(t *testing.T) {
 	assertEmpty("member notes", `SELECT count(*) FROM member_notes WHERE account_id=$1`, acctID)
 	assertEmpty("member tags", `SELECT count(*) FROM member_tags WHERE account_id=$1`, acctID)
 	assertEmpty("candidate sessions", `SELECT count(*) FROM candidate_sessions WHERE account_id=$1`, acctID)
+	assertEmpty("account resume library", `SELECT count(*) FROM candidate_account_resumes WHERE account_id=$1`, acctID)
 
 	// --- assert external stores erased ---
 	wantBlobs := map[string]bool{
 		"http://blob/resumes/r1.pdf": true, "http://blob/resumes/raw1.pdf": true,
 		"http://blob/resumes/ocr1.txt": true, "http://blob/resumes/parsed1.json": true,
 		"onboarding/doc1.pdf": true, "letters/offer1.pdf": true, "portal/acct-resume.pdf": true,
+		"portal/lib-resume.pdf": true,
 	}
 	if len(blob.deleted) != len(wantBlobs) {
 		t.Errorf("expected %d blob deletes, got %d: %v", len(wantBlobs), len(blob.deleted), blob.deleted)

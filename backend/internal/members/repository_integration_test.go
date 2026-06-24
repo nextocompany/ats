@@ -10,6 +10,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/nexto/hr-ats/internal/rbac"
 )
 
 func dsn() string {
@@ -74,7 +76,7 @@ func setup(t *testing.T) *pgRepository {
 
 func TestList_NoFilter(t *testing.T) {
 	r := setup(t)
-	items, total, err := r.List(context.Background(), ListFilter{})
+	items, total, err := r.List(context.Background(), ListFilter{}, rbac.AllScope())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,27 +89,27 @@ func TestList_SearchProviderStatusResume(t *testing.T) {
 	r := setup(t)
 	ctx := context.Background()
 
-	if _, total, _ := r.List(ctx, ListFilter{Search: "สมชาย"}); total != 1 {
+	if _, total, _ := r.List(ctx, ListFilter{Search: "สมชาย"}, rbac.AllScope()); total != 1 {
 		t.Errorf("search สมชาย: want 1, got %d", total)
 	}
-	if _, total, _ := r.List(ctx, ListFilter{Provider: "line"}); total != 1 {
+	if _, total, _ := r.List(ctx, ListFilter{Provider: "line"}, rbac.AllScope()); total != 1 {
 		t.Errorf("provider line: want 1, got %d", total)
 	}
-	if _, total, _ := r.List(ctx, ListFilter{Provider: "google"}); total != 1 {
+	if _, total, _ := r.List(ctx, ListFilter{Provider: "google"}, rbac.AllScope()); total != 1 {
 		t.Errorf("provider google: want 1, got %d", total)
 	}
-	if _, total, _ := r.List(ctx, ListFilter{Status: "suspended"}); total != 1 {
+	if _, total, _ := r.List(ctx, ListFilter{Status: "suspended"}, rbac.AllScope()); total != 1 {
 		t.Errorf("status suspended: want 1, got %d", total)
 	}
 	yes := true
-	if _, total, _ := r.List(ctx, ListFilter{HasResume: &yes}); total != 1 {
+	if _, total, _ := r.List(ctx, ListFilter{HasResume: &yes}, rbac.AllScope()); total != 1 {
 		t.Errorf("has_resume: want 1, got %d", total)
 	}
 }
 
 func TestList_Paginate(t *testing.T) {
 	r := setup(t)
-	items, total, err := r.List(context.Background(), ListFilter{Page: 1, Limit: 2})
+	items, total, err := r.List(context.Background(), ListFilter{Page: 1, Limit: 2}, rbac.AllScope())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,7 +121,7 @@ func TestList_Paginate(t *testing.T) {
 func TestGetByID_DerivedFields(t *testing.T) {
 	r := setup(t)
 	ctx := context.Background()
-	items, _, _ := r.List(ctx, ListFilter{Search: "somchai@example.com"})
+	items, _, _ := r.List(ctx, ListFilter{Search: "somchai@example.com"}, rbac.AllScope())
 	if len(items) != 1 {
 		t.Fatalf("setup: expected 1 m1, got %d", len(items))
 	}
@@ -150,7 +152,7 @@ func TestGetByID_NotFound(t *testing.T) {
 
 func TestStats(t *testing.T) {
 	r := setup(t)
-	s, err := r.Stats(context.Background())
+	s, err := r.Stats(context.Background(), rbac.AllScope())
 	if err != nil {
 		t.Fatal(err)
 	}

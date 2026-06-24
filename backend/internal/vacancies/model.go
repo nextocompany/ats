@@ -13,6 +13,7 @@ import (
 
 // OpenVacancy is an open vacancy joined with its store's location/format.
 type OpenVacancy struct {
+	ID         uuid.UUID
 	StoreNo    int
 	StoreName  string
 	FormatType string
@@ -56,7 +57,7 @@ func NewRepository(pool *pgxpool.Pool) Repository {
 
 func (r *pgRepository) FindOpen(ctx context.Context, subregion string, positionID uuid.UUID) ([]OpenVacancy, error) {
 	const q = `
-		SELECT s.store_no, s.store_name, COALESCE(s.format_type,''), COALESCE(s.subregion,''),
+		SELECT v.id, s.store_no, s.store_name, COALESCE(s.format_type,''), COALESCE(s.subregion,''),
 		       s.latitude, s.longitude, v.headcount
 		FROM vacancies v
 		JOIN stores s ON s.store_no = v.store_id
@@ -70,7 +71,7 @@ func (r *pgRepository) FindOpen(ctx context.Context, subregion string, positionI
 	var out []OpenVacancy
 	for rows.Next() {
 		var v OpenVacancy
-		if err := rows.Scan(&v.StoreNo, &v.StoreName, &v.FormatType, &v.Subregion, &v.StoreLat, &v.StoreLng, &v.Headcount); err != nil {
+		if err := rows.Scan(&v.ID, &v.StoreNo, &v.StoreName, &v.FormatType, &v.Subregion, &v.StoreLat, &v.StoreLng, &v.Headcount); err != nil {
 			return nil, fmt.Errorf("vacancies: scan: %w", err)
 		}
 		out = append(out, v)

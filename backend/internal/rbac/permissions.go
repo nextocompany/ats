@@ -33,6 +33,7 @@ const (
 	PermRequisitionApprove = "requisition.approve" // approve a pending requisition → open
 	PermBreachManage       = "breach.manage"       // PDPA breach register CRUD (s.37 72h)
 	PermPDPAAdmin          = "pdpa.admin"          // PDPA/DPO console (DSAR queue, consent lookup)
+	PermAreaAdmin          = "area.admin"          // manage areas (dynamic store grouping + area_hr assignment)
 )
 
 // RoleSuperAdmin is the built-in role that is a hard code bypass: it implicitly
@@ -51,6 +52,7 @@ var AllPermissions = []string{
 	PermApprovalSubmit, PermApprovalDecideL1, PermApprovalDecideL2, PermApprovalDecideL3, PermApprovalDecideL4,
 	PermRequisitionManage, PermRequisitionApprove,
 	PermBreachManage, PermPDPAAdmin,
+	PermAreaAdmin,
 }
 
 // ApprovalDecidePermForLevel returns the permission gating a given approval chain

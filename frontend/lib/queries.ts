@@ -5,6 +5,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError, buildQuery } from "./api";
 import type {
   AdminSettings,
+  Area,
+  CandidateLock,
   Application,
   ApplicationFilter,
   ApprovalDecisionInput,
@@ -388,6 +390,122 @@ export function useStores() {
     queryKey: ["stores"],
     queryFn: () => api.get<StoreOption[]>("/api/v1/stores").then((r) => r.data),
     staleTime: 5 * 60_000, // reference data — rarely changes
+  });
+}
+
+// --- Candidate processing lock ---
+
+export function useCandidateLock(candidateId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["candidate-lock", candidateId],
+    queryFn: () => api.get<CandidateLock | null>(`/api/v1/candidates/${candidateId}/lock`).then((r) => r.data ?? null),
+    enabled: !!candidateId,
+    refetchInterval: 60_000, // keep the "being processed" state reasonably fresh
+  });
+}
+
+export function useAcquireLock() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (candidateId: string) =>
+      api.post<CandidateLock>(`/api/v1/candidates/${candidateId}/lock`).then((r) => r.data),
+    onSuccess: (_d, candidateId) => qc.invalidateQueries({ queryKey: ["candidate-lock", candidateId] }),
+  });
+}
+
+export function useReleaseLock() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (candidateId: string) => api.del(`/api/v1/candidates/${candidateId}/lock`),
+    onSuccess: (_d, candidateId) => qc.invalidateQueries({ queryKey: ["candidate-lock", candidateId] }),
+  });
+}
+
+// --- Area management (dynamic store groupings for the area scope) ---
+
+export function useAreas(enabled = true) {
+  return useQuery({
+    queryKey: ["areas"],
+    queryFn: () => api.get<Area[]>("/api/v1/areas").then((r) => r.data ?? []),
+    enabled,
+  });
+}
+
+export function useArea(id: string | null) {
+  return useQuery({
+    queryKey: ["area", id],
+    queryFn: () => api.get<Area>(`/api/v1/areas/${id}`).then((r) => r.data),
+    enabled: !!id,
+  });
+}
+
+export function useCreateArea() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) => api.post<Area>("/api/v1/areas", { name }).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["areas"] }),
+  });
+}
+
+export function useUpdateArea() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...patch }: { id: string; name?: string; active?: boolean }) =>
+      api.patch<Area>(`/api/v1/areas/${id}`, patch).then((r) => r.data),
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ["areas"] });
+      qc.invalidateQueries({ queryKey: ["area", v.id] });
+    },
+  });
+}
+
+export function useDeleteArea() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.del(`/api/v1/areas/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["areas"] }),
+  });
+}
+
+export function useSetAreaStores() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, storeNos }: { id: string; storeNos: number[] }) =>
+      api.put(`/api/v1/areas/${id}/stores`, { store_nos: storeNos }),
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ["areas"] });
+      qc.invalidateQueries({ queryKey: ["area", v.id] });
+    },
+  });
+}
+
+export function useSetAreaMembers() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, userIds }: { id: string; userIds: string[] }) =>
+      api.put(`/api/v1/areas/${id}/members`, { user_ids: userIds }),
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ["areas"] });
+      qc.invalidateQueries({ queryKey: ["area", v.id] });
+    },
+  });
+}
+
+// User-side area coverage (the user-admin area picker for area_hr).
+export function useUserAreas(userId: string | null) {
+  return useQuery({
+    queryKey: ["user-areas", userId],
+    queryFn: () => api.get<string[]>(`/api/v1/users/${userId}/areas`).then((r) => r.data ?? []),
+    enabled: !!userId,
+  });
+}
+
+export function useSetUserAreas() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, areaIds }: { userId: string; areaIds: string[] }) =>
+      api.put(`/api/v1/users/${userId}/areas`, { area_ids: areaIds }),
+    onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: ["user-areas", v.userId] }),
   });
 }
 

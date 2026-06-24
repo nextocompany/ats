@@ -22,10 +22,12 @@ import (
 	"github.com/nexto/hr-ats/internal/activity"
 	"github.com/nexto/hr-ats/internal/ai"
 	"github.com/nexto/hr-ats/internal/applications"
+	"github.com/nexto/hr-ats/internal/areas"
 	"github.com/nexto/hr-ats/internal/auth"
 	"github.com/nexto/hr-ats/internal/breach"
 	"github.com/nexto/hr-ats/internal/calendar"
 	"github.com/nexto/hr-ats/internal/candidateauth"
+	"github.com/nexto/hr-ats/internal/candidatelock"
 	"github.com/nexto/hr-ats/internal/candidates"
 	"github.com/nexto/hr-ats/internal/dsar"
 	"github.com/nexto/hr-ats/internal/executive"
@@ -457,7 +459,43 @@ func main() {
 	// Requisition management (HR dashboard): open/approve/close manual position
 	// openings as rows in the shared `vacancies` table (source='manual'), RBAC-scoped.
 	// Approved requisitions flow into branch assignment + executive + portal automatically.
-	requisitions.RegisterRoutes(app, requisitions.NewHandler(requisitions.NewRepository(pool)))
+	reqHandler := requisitions.NewHandler(requisitions.NewRepository(pool))
+	reqHandler.SetUserResolver(hrUserResolver{svc: hrAuthSvc})
+	requisitions.RegisterRoutes(app, reqHandler)
+
+	// Candidate processing lock (one operator at a time over the shared pool).
+	// Acquiring the lock also stamps picked_up_at (stops the pool-release timer).
+	lockSvc := candidatelock.NewService(candidatelock.NewRepository(pool), 0)
+	lockHandler := candidatelock.NewHandler(lockSvc, hrUserResolver{svc: hrAuthSvc})
+	lockHandler.SetPickupStamper(appRepo)
+	candidatelock.RegisterRoutes(app, lockHandler)
+
+	// Hard-enforce the processing lock across the operate surface: a mutating
+	// candidate action takes-or-refreshes the lock (atomic Acquire) and is
+	// rejected with 409 when another operator already holds it. super_admin
+	// bypasses; the approval-decide endpoint is intentionally exempt (approvers /
+	// hiring managers are read-only and never hold a lock). The same enforcer is
+	// shared by every gated handler so the lock is one consistent gate.
+	lockEnforcer := candidatelock.NewEnforcer(lockSvc, hrUserResolver{svc: hrAuthSvc})
+	lockEnforcer.SetPickupStamper(appRepo)
+	appCandidateID := func(ctx context.Context, appID uuid.UUID) (uuid.UUID, error) {
+		a, ferr := appRepo.FindByID(ctx, appID)
+		if ferr != nil {
+			return uuid.Nil, ferr
+		}
+		return a.CandidateID, nil
+	}
+	intakeHandler.SetLockEnforcer(lockEnforcer)
+	dashboardHandler.SetLockEnforcer(lockEnforcer)
+	scheduleHandler.SetLockEnforcer(lockEnforcer)
+	feedbackHandler.SetLockEnforcer(lockEnforcer)
+	approvalHandler.SetLockEnforcer(lockEnforcer)
+	offerHandler.SetLockEnforcer(lockEnforcer)
+	onboardingHandler.SetLockEnforcer(lockEnforcer)
+	interviewHandler.SetLockEnforcer(lockEnforcer, appCandidateID)
+
+	// Area management (dynamic store groupings for the area scope), gated area.admin.
+	areas.RegisterRoutes(app, areas.NewHandler(areas.NewRepository(pool)))
 	// PDPA breach register (DPO/legal): record personal-data breaches, drive the
 	// s.37(4) 72h PDPC-notification countdown, and generate the notification
 	// content. Gated to breach.manage; company-wide (no RBAC data-scope). The DPO
@@ -473,7 +511,9 @@ func main() {
 	// result + the AI pre-interview, matched against the whole Master JD catalogue.
 	// Mock summarizer by default; Azure OpenAI behind config. Synchronous (no worker).
 	fitSvc := fit.NewService(fit.NewRepository(pool), fit.New(cfg), appRepo, interviewRepo, positionRepo, candidateRepo)
-	fit.RegisterDashboardRoutes(app, fit.NewHandler(fitSvc, appRepo))
+	fitHandler := fit.NewHandler(fitSvc, appRepo)
+	fitHandler.SetLockEnforcer(lockEnforcer, appCandidateID)
+	fit.RegisterDashboardRoutes(app, fitHandler)
 	// HR member management (career-portal accounts): role-gated directory + lifecycle
 	// (super_admin + hr_manager; PDPA erase super_admin-only). Reads candidate_accounts
 	// directly; resume URLs are signed on demand and erased on anonymize via the blob

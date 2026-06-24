@@ -13,8 +13,12 @@ import (
 // meResponse is the authenticated identity plus its resolved RBAC capabilities,
 // so the dashboard gates UI on permissions (not hardcoded role lists).
 type meResponse struct {
-	ID          string   `json:"id"`
-	Email       string   `json:"email"`
+	ID    string `json:"id"`
+	Email string `json:"email"`
+	// LocalID is the local users.id (uniform across SSO + password; ID is the Entra
+	// OID for SSO). The UI uses it to tell whether a candidate lock is held by the
+	// current user. Empty for an unprovisioned SSO identity.
+	LocalID     string   `json:"local_id"`
 	Role        string   `json:"role"`
 	StoreID     *int     `json:"store_id"`
 	Subregion   string   `json:"subregion"`
@@ -41,6 +45,7 @@ func (h *Handler) Me(c *fiber.Ctx) error {
 	}
 	return httpx.OK(c, meResponse{
 		ID:          u.ID,
+		LocalID:     u.LocalID,
 		Email:       u.Email,
 		Role:        u.Role,
 		StoreID:     u.StoreID,

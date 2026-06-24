@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CP Axtra HR ATS — แผนผังระบบ (System Diagrams)</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="brandmark"><b>CP AXTRA</b><span>AI HR ATS · System Diagrams</span></div>
+  </div>
+
+  <span class="eyebrow">เอกสารสถาปัตยกรรมระบบ</span>
+  <h1 class="page-title">ระบบ AI คัดกรองและจัดการผู้สมัครงาน</h1>
+  <p class="page-sub">
+    ชุดแผนผังอธิบายระบบ ATS (Applicant Tracking System) ของ CP Axtra ทั้งหมด ตั้งแต่ภาพรวม
+    เส้นทางผู้สมัครแบบ end-to-end สถาปัตยกรรมแอปพลิเคชัน โครงสร้างบนคลาวด์ ระบบยืนยันตัวตน/สิทธิ์
+    ไปจนถึงการเชื่อมต่อภายนอกและการแจ้งเตือน ทุกแผนผังอ้างอิงจากซอร์สโค้ดจริง
+  </p>
+
+  <hr class="rule" />
+
+  <div class="hub">
+
+    <a class="hub-card" href="01-overview.html">
+      <div class="hn">01 · OVERALL</div>
+      <div class="ht">ภาพรวมระบบ (System Context)</div>
+      <div class="hd">ใครใช้ระบบ ระบบประกอบด้วยอะไร และเชื่อมต่อกับบริการภายนอกใดบ้าง มองจากภายนอกเข้ามา</div>
+    </a>
+
+    <a class="hub-card" href="02-end-to-end.html">
+      <div class="hn">02 · END-TO-END</div>
+      <div class="ht">เส้นทางผู้สมัคร (End-to-End Flow)</div>
+      <div class="hd">ตั้งแต่ยื่นใบสมัคร → OCR/แยกข้อมูล → ตรวจซ้ำ → ให้คะแนน AI → สัมภาษณ์ → อนุมัติ → จ้างงาน พร้อม status machine</div>
+    </a>
+
+    <a class="hub-card" href="03-architecture.html">
+      <div class="hn">03 · ARCHITECTURE</div>
+      <div class="ht">สถาปัตยกรรมแอปพลิเคชัน</div>
+      <div class="hd">Frontend 2 แอป, Go API / Worker / Scheduler, คิวงานแบบ async, ชั้นข้อมูล และโมดูลภายใน 40+ แพ็กเกจ</div>
+    </a>
+
+    <a class="hub-card" href="04-cloud.html">
+      <div class="hn">04 · CLOUD</div>
+      <div class="ht">โครงสร้างบน Azure (Cloud)</div>
+      <div class="hd">Azure Container Apps, PostgreSQL, Redis, Blob, OpenAI, AI Search, Key Vault และเส้นทาง traffic</div>
+    </a>
+
+    <a class="hub-card" href="05-auth-rbac.html">
+      <div class="hn">05 · AUTH &amp; RBAC</div>
+      <div class="ht">ยืนยันตัวตนและสิทธิ์การเข้าถึง</div>
+      <div class="hd">2 ระนาบตัวตน (ผู้สมัคร vs HR), Entra SSO / LINE / Google / OTP และโมเดล RBAC แบบ scope ตามสาขา/ภูมิภาค</div>
+    </a>
+
+    <a class="hub-card" href="06-integrations.html">
+      <div class="hn">06 · INTEGRATIONS</div>
+      <div class="ht">การเชื่อมต่อภายนอกและการแจ้งเตือน</div>
+      <div class="hd">Azure AI, LINE, Microsoft Graph/Teams, อีเมล ACS, PeopleSoft HCM และระบบสลับ mock/real ทุกตัว</div>
+    </a>
+
+    <a class="hub-card" href="07-pricing.html">
+      <div class="hn">07 · PRICING</div>
+      <div class="ht">ประเมินราคา 3 Phase</div>
+      <div class="hd">แบ่ง Pool / Portal / ATS · ค่าพัฒนาคิดจาก man-day × rate (กรอกเอง) + ค่าคลาวด์รายเดือน คำนวณสดในหน้า</div>
+    </a>
+
+    <a class="hub-card" href="08-rbac-redesign.html">
+      <div class="hn">08 · RBAC REDESIGN</div>
+      <div class="ht">โมเดลสิทธิ์ใหม่ (Proposed)</div>
+      <div class="hd">2 แกน (มองเห็น × ทำได้), 7 roles, area แบบ dynamic, candidate pool + lock + timeout 3 วัน, แผน migrate role เดิม</div>
+    </a>
+
+  </div>
+
+  <div class="section-title">สรุประบบโดยย่อ</div>
+  <div class="card">
+    <div class="grid g2" style="gap:22px">
+      <div class="desc">
+        <p><strong>ระบบทำอะไร</strong> — รับใบสมัครจากหลายช่องทาง (career portal, อัปโหลดเป็นชุด, ฟอร์มภายนอก,
+        PeopleSoft) แล้วใช้ AI อ่านเรซูเม่ (OCR), แยกข้อมูล, ตรวจผู้สมัครซ้ำ, ให้คะแนนความเหมาะสมตามตำแหน่ง,
+        สัมภาษณ์เบื้องต้นด้วย AI, จัดสาขา/talent pool และส่งต่อให้ HR ทำขั้นตอนสัมภาษณ์ อนุมัติหลายระดับ
+        ออกข้อเสนอ และ onboarding จนถึงการ sync กลับ PeopleSoft เมื่อจ้างงาน</p>
+      </div>
+      <div class="desc">
+        <p><strong>เทคโนโลยีหลัก</strong></p>
+        <dl class="kv">
+          <dt>Backend</dt><dd>Go 1.26 + Fiber v2 (<code>github.com/nexto/hr-ats</code>)</dd>
+          <dt>Frontend</dt><dd>Next.js 16 × 2 (HR dashboard + career portal)</dd>
+          <dt>ฐานข้อมูล</dt><dd>PostgreSQL 16 (<code>hr_db</code>)</dd>
+          <dt>คิวงาน</dt><dd>asynq บน Redis</dd>
+          <dt>AI</dt><dd>Azure OpenAI + Document Intelligence + AI Search</dd>
+          <dt>คลาวด์</dt><dd>Azure Container Apps (RG <code>hrats-prod-rg</code>)</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  <footer class="foot">
+    <span>CP Axtra · AI HR Recruitment &amp; Screening System</span>
+    <span>แผนผังสร้างจากซอร์สโค้ดจริง · อัปเดต 2026-06-24</span>
+  </footer>
+
+</div>
+</body>
+</html>
