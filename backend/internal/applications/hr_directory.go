@@ -37,14 +37,31 @@ type HRDirectory interface {
 	HiringManagerForVacancy(ctx context.Context, vacancyID uuid.UUID) (email, fullName string, err error)
 }
 
+// legacyRoleFor maps each new role to the pre-cutover role it replaced. During the
+// split-deploy window (this code is live, but the cutover migration 000044 that
+// migrates users onto the new roles has not run yet), live users still hold the OLD
+// role strings — so notification resolution must reach holders of EITHER label, or
+// store HR silently stop receiving every alert. After cutover no user holds an old
+// role, so these entries become inert (no rows match). Mirrors 000044's mapping,
+// store-relevant subset.
+var legacyRoleFor = map[string]string{
+	"hr_store":             "hr_staff",
+	"area_hr":              "hr_manager",
+	"hiring_manager_store": "sgm",
+	"ta":                   "regional_director",
+}
+
 // hrNotifyRoles are the store-scoped roles that receive candidate notifications.
-// Remapped in the RBAC cutover (hr_staff->hr_store, hr_manager->area_hr,
-// sgm->hiring_manager_store).
-var hrNotifyRoles = []string{"hiring_manager_store", "area_hr", "hr_store"}
+// Includes both the new roles (post-cutover) AND their pre-cutover equivalents so
+// the split-deploy window stays clean (see legacyRoleFor).
+var hrNotifyRoles = []string{
+	"hiring_manager_store", "area_hr", "hr_store", // new
+	"sgm", "hr_manager", "hr_staff", // pre-cutover equivalents (transition)
+}
 
 // lineManagerRoles are the roles that act as the store's line manager
-// (sgm->hiring_manager_store in the cutover).
-var lineManagerRoles = []string{"hiring_manager_store"}
+// (sgm->hiring_manager_store in the cutover; both kept for the transition window).
+var lineManagerRoles = []string{"hiring_manager_store", "sgm"}
 
 type pgHRDirectory struct {
 	pool *pgxpool.Pool
@@ -67,11 +84,32 @@ func roleIsStoreScoped(role string) bool {
 	return rbac.New(role, nil, "").Kind() == rbac.KindStore
 }
 
+// EmailsForRoleStore resolves the responsible approver(s) for a chain role. During
+// the split-deploy window it also resolves the role's pre-cutover equivalent (each
+// resolved under its OWN scope, since old/new roles differ in scope kind) and unions
+// the result, so SLA/next-level approval nudges reach users not yet migrated.
 func (d *pgHRDirectory) EmailsForRoleStore(ctx context.Context, role string, storeID *int) ([]string, error) {
+	emails, err := d.emailsForExactRole(ctx, role, storeID)
+	if err != nil {
+		return nil, err
+	}
+	if legacy, ok := legacyRoleFor[role]; ok {
+		le, err := d.emailsForExactRole(ctx, legacy, storeID)
+		if err != nil {
+			return nil, err
+		}
+		emails = dedupStrings(append(emails, le...))
+	}
+	return emails, nil
+}
+
+// emailsForExactRole resolves active emails for a single role, store-filtered when
+// the role's RBAC visibility is store-scoped, store-agnostic otherwise.
+func (d *pgHRDirectory) emailsForExactRole(ctx context.Context, role string, storeID *int) ([]string, error) {
 	if roleIsStoreScoped(role) {
 		return d.emailsForStoreRoles(ctx, storeID, []string{role})
 	}
-	// All-scope role (e.g. regional_director): every active holder, store-agnostic.
+	// All-scope role (e.g. ta / regional_director): every active holder, store-agnostic.
 	const q = `
 		SELECT email FROM users
 		WHERE is_active AND role = $1 AND COALESCE(email,'') <> ''`
@@ -93,6 +131,20 @@ func (d *pgHRDirectory) EmailsForRoleStore(ctx context.Context, role string, sto
 		return nil, fmt.Errorf("applications: iterate role emails: %w", err)
 	}
 	return out, nil
+}
+
+// dedupStrings returns xs with duplicates removed, preserving first-seen order.
+func dedupStrings(xs []string) []string {
+	seen := make(map[string]struct{}, len(xs))
+	out := make([]string, 0, len(xs))
+	for _, x := range xs {
+		if _, ok := seen[x]; ok {
+			continue
+		}
+		seen[x] = struct{}{}
+		out = append(out, x)
+	}
+	return out
 }
 
 func (d *pgHRDirectory) HiringManagerForVacancy(ctx context.Context, vacancyID uuid.UUID) (string, string, error) {
