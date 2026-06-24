@@ -39,11 +39,13 @@ var legacyRolePerms = map[string][]string{
 	"sgm":                {PermReportsView, PermBulkUpload, PermAssignmentWrite, PermOnboardingWrite, PermLetterWrite, PermScorecardLM, PermApprovalDecideL3},
 	"hr_manager":         {PermMembersAdmin, PermReportsView, PermBulkUpload, PermAssignmentWrite, PermOfferWrite, PermOnboardingWrite, PermLetterWrite, PermScorecardTA, PermApprovalDecideL2},
 	"hr_staff":           {PermReportsView, PermBulkUpload, PermOnboardingWrite, PermLetterWrite, PermScorecardTA, PermApprovalSubmit, PermApprovalDecideL1},
-	// New role model (mirrors migration 000042's seed). hiring_manager_* are
-	// read-only (scope only, no permissions until the approval-chain remap).
-	"hr_store": {PermReportsView, PermBulkUpload, PermAssignmentWrite, PermOfferWrite, PermOnboardingWrite, PermLetterWrite, PermScorecardTA},
-	"area_hr":  {PermReportsView, PermBulkUpload, PermAssignmentWrite, PermOfferWrite, PermOnboardingWrite, PermLetterWrite, PermScorecardTA},
-	"ta":       {PermReportsView, PermReportsExport, PermBulkUpload, PermAssignmentWrite, PermOfferWrite, PermOnboardingWrite, PermLetterWrite, PermScorecardTA},
+	// New role model (mirrors migrations 000042 + 000043's seed). hiring_manager_*
+	// are read-only on operations but ARE the hire approver (approval.decide only).
+	"hr_store":             {PermReportsView, PermBulkUpload, PermAssignmentWrite, PermOfferWrite, PermOnboardingWrite, PermLetterWrite, PermScorecardTA, PermApprovalSubmit, PermApprovalDecideL1},
+	"area_hr":              {PermReportsView, PermBulkUpload, PermAssignmentWrite, PermOfferWrite, PermOnboardingWrite, PermLetterWrite, PermScorecardTA, PermApprovalDecideL2},
+	"hiring_manager_store": {PermApprovalDecideL3},
+	"hiring_manager_ho":    {PermApprovalDecideL3},
+	"ta":                   {PermReportsView, PermReportsExport, PermBulkUpload, PermAssignmentWrite, PermOfferWrite, PermOnboardingWrite, PermLetterWrite, PermScorecardTA, PermApprovalDecideL4},
 }
 
 func legacyCan(role, perm string) bool {
