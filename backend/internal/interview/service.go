@@ -309,6 +309,35 @@ func (s *Service) advanceToInterviewed(ctx context.Context, applicationID uuid.U
 	}
 	if serr := s.apps.SetStatus(ctx, applicationID, applications.StatusAIInterviewed); serr != nil {
 		log.Warn().Err(serr).Str("application", applicationID.String()).Msg("interview complete: set ai_interviewed status failed (non-fatal)")
+		return
+	}
+	// Tell the candidate their AI interview was received (best-effort; LINE + email).
+	// Without this the ai_interviewed transition was silent even though it has
+	// candidate-facing copy. Mirrors notifyInvite's best-effort shape.
+	s.notifyCandidateStatus(ctx, app, applications.StatusAIInterviewed)
+}
+
+// notifyCandidateStatus sends a best-effort candidate status update (LINE +
+// email) carrying the /status?token= deep link. No-op when deps are unset or the
+// candidate has no contact handle.
+func (s *Service) notifyCandidateStatus(ctx context.Context, app *applications.Application, status string) {
+	if s.notifier == nil || s.cands == nil {
+		return
+	}
+	cand, err := s.cands.FindByID(ctx, app.CandidateID)
+	if err != nil {
+		log.Warn().Err(err).Str("application", app.ID.String()).Msg("ai-interviewed notify: load candidate failed (non-fatal)")
+		return
+	}
+	if msg := notify.StatusMessage(cand.LineUserID, cand.FullName, status, s.portalBaseURL, app.PublicToken, app.ID); msg.Recipient != "" {
+		if serr := s.notifier.Send(ctx, msg); serr != nil {
+			log.Warn().Err(serr).Str("application", app.ID.String()).Msg("ai-interviewed notify: line send failed (non-fatal)")
+		}
+	}
+	if em := notify.StatusEmailMessage(cand.Email, cand.FullName, status, s.portalBaseURL, app.PublicToken, app.ID); em.Recipient != "" {
+		if serr := s.notifier.Send(ctx, em); serr != nil {
+			log.Warn().Err(serr).Str("application", app.ID.String()).Msg("ai-interviewed notify: email send failed (non-fatal)")
+		}
 	}
 }
 

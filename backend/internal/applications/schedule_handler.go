@@ -149,7 +149,10 @@ func (h *ScheduleHandler) Schedule(c *fiber.Ctx) error {
 	}
 
 	// Online: book the Teams meeting + calendar invite (best-effort — a Graph
-	// failure must not lose the schedule; the join link just stays empty).
+	// failure must not lose the schedule; the join link just stays empty). A
+	// failure is surfaced to HR via the response `warning` so they don't silently
+	// send the candidate a linkless invite.
+	var warning string
 	if req.Mode == ModeOnline {
 		res, calErr := h.cal.CreateInterview(c.UserContext(), calendar.Appointment{
 			Subject:       h.subject(c.UserContext(), app, cand),
@@ -166,6 +169,9 @@ func (h *ScheduleHandler) Schedule(c *fiber.Ctx) error {
 		}
 		appt.OnlineJoinURL = res.JoinURL
 		appt.CalendarEventID = res.EventID
+		if appt.OnlineJoinURL == "" {
+			warning = "ไม่สามารถสร้างลิงก์ Teams ได้ นัดหมายถูกบันทึกแล้วแต่ยังไม่มีลิงก์เข้าร่วม กรุณาตรวจสอบการตั้งค่าปฏิทิน/สิทธิ์ แล้วส่งลิงก์ให้ผู้สมัครเอง"
+		}
 	}
 
 	saved, err := h.apps.CreateAppointment(c.UserContext(), appt)
@@ -179,7 +185,17 @@ func (h *ScheduleHandler) Schedule(c *fiber.Ctx) error {
 	// (date/time, mode, place/online link, round). Supersedes the generic status
 	// message for this transition — do NOT also call notifyStatusChange.
 	h.notifyDeps.notifyInterviewScheduled(c.UserContext(), h.apps, id, saved)
-	return httpx.OK(c, saved)
+	// Embed the saved appointment (fields stay top-level for the existing client)
+	// plus an optional warning when the online link could not be created.
+	return httpx.OK(c, scheduleResponse{Appointment: &saved, Warning: warning})
+}
+
+// scheduleResponse flattens the saved appointment (so existing clients read its
+// fields unchanged) and adds an optional warning when an online interview was
+// booked but the Teams link could not be created.
+type scheduleResponse struct {
+	*Appointment
+	Warning string `json:"warning,omitempty"`
 }
 
 // subject builds the calendar event title, including the position when available.

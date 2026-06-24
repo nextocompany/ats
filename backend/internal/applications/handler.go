@@ -201,7 +201,8 @@ func (h *Handler) UpdateStatus(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, "transition not allowed from "+app.Status)
 	}
 
-	// Reject: mandatory reason, stored internally; the candidate is NOT notified.
+	// Reject: mandatory reason, stored internally (never sent to the candidate). The
+	// candidate IS notified of the rejection itself — statusDoc has "rejected" copy.
 	if req.Status == StatusRejected {
 		if strings.TrimSpace(req.Reason) == "" {
 			return fiber.NewError(fiber.StatusBadRequest, "a rejection reason is required")
@@ -210,6 +211,9 @@ func (h *Handler) UpdateStatus(c *fiber.Ctx) error {
 			return err
 		}
 		h.recordStatusChange(c, id, app.Status, StatusRejected)
+		// Best-effort candidate notification — previously skipped by an early return,
+		// so single-update rejections never told the candidate (bulk already did).
+		h.notifyDeps.notifyStatusChange(c.UserContext(), h.apps, id, StatusRejected)
 		return httpx.OK(c, fiber.Map{"id": id, "status": StatusRejected})
 	}
 
@@ -217,8 +221,8 @@ func (h *Handler) UpdateStatus(c *fiber.Ctx) error {
 		return err
 	}
 	h.recordStatusChange(c, id, app.Status, req.Status)
-	// Best-effort candidate notification (only shortlisted produces a message today;
-	// offer/interviewed have none defined — the seam is a no-op for those).
+	// Best-effort candidate notification — notifiable statuses produce a message
+	// (statusDoc); others are a no-op for the seam.
 	h.notifyDeps.notifyStatusChange(c.UserContext(), h.apps, id, req.Status)
 	return httpx.OK(c, fiber.Map{"id": id, "status": req.Status})
 }

@@ -69,8 +69,14 @@ export function ScheduleInterviewDialog({ applicationId, open, onClose }: Props)
         location_text: location.trim() || undefined,
       },
       {
-        onSuccess: () => {
-          toast.success(mode === "online" ? t("schedOkTeams") : t("schedOk"));
+        onSuccess: (appt) => {
+          // The backend books the appointment even when the Teams link could not
+          // be created; surface that so HR knows to send a link manually.
+          if (appt?.warning) {
+            toast.warning(appt.warning);
+          } else {
+            toast.success(mode === "online" ? t("schedOkTeams") : t("schedOk"));
+          }
           close();
         },
         onError: (err) => toast.error(err instanceof Error ? err.message : t("schedFailed")),

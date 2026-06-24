@@ -65,6 +65,10 @@ type Application struct {
 	AISummary            string          `json:"ai_summary,omitempty"`
 	AIRedFlags           string          `json:"ai_red_flags,omitempty"`
 	AISuggestedPositions []string        `json:"ai_suggested_positions,omitempty"`
+	// PublicToken is the opaque status-page token (set at portal apply; empty for
+	// bulk/PeopleSoft/legacy rows). Used to build the candidate deep link
+	// /status?token=…; never the application UUID (that page is public).
+	PublicToken string `json:"-"`
 	// Display fields — human-readable joins populated by the inbox List query so
 	// the UI can lead with a person (name + role + store) instead of a UUID.
 	// omitempty keeps single-record responses (Get/Intake) unchanged.

@@ -54,6 +54,47 @@ func TestFindByID_Explainability(t *testing.T) {
 	}
 }
 
+// TestFindByID_PublicToken verifies the public_token projection: a row that went
+// through SetPublicToken returns it (so notifications can deep-link), while a row
+// without one (bulk/PeopleSoft/legacy) returns an empty string (→ /status fallback).
+func TestFindByID_PublicToken(t *testing.T) {
+	r, pos, cand := setupList(t)
+	ctx := context.Background()
+
+	// With a token.
+	var withTok uuid.UUID
+	if err := r.pool.QueryRow(ctx,
+		`INSERT INTO applications (candidate_id, position_id, status) VALUES ($1,$2,'pending') RETURNING id`,
+		cand, pos).Scan(&withTok); err != nil {
+		t.Fatalf("insert app: %v", err)
+	}
+	if err := r.SetPublicToken(ctx, withTok, "tok-abc"); err != nil {
+		t.Fatalf("set public token: %v", err)
+	}
+	app, err := r.FindByID(ctx, withTok)
+	if err != nil {
+		t.Fatalf("FindByID: %v", err)
+	}
+	if app.PublicToken != "tok-abc" {
+		t.Errorf("PublicToken = %q, want tok-abc", app.PublicToken)
+	}
+
+	// Without a token (legacy/bulk) → empty, not an error.
+	var noTok uuid.UUID
+	if err := r.pool.QueryRow(ctx,
+		`INSERT INTO applications (candidate_id, position_id, status) VALUES ($1,$2,'pending') RETURNING id`,
+		cand, pos).Scan(&noTok); err != nil {
+		t.Fatalf("insert app: %v", err)
+	}
+	app2, err := r.FindByID(ctx, noTok)
+	if err != nil {
+		t.Fatalf("FindByID: %v", err)
+	}
+	if app2.PublicToken != "" {
+		t.Errorf("PublicToken = %q, want empty", app2.PublicToken)
+	}
+}
+
 // An unscored application has NULL explainability columns; FindByID must leave
 // the pointer/slice nil rather than erroring on the scan.
 func TestFindByID_UnscoredHasNilExplainability(t *testing.T) {

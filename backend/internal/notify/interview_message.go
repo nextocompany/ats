@@ -68,7 +68,7 @@ func InterviewInviteEmailMessage(emailAddr, fullName, portalBaseURL, token strin
 // Bangkok date/time, round label, and either the onsite location or the online
 // join link). Like the other builders it takes primitives and returns a zero
 // Message (skipped by callers) when the candidate has no LINE handle.
-func InterviewScheduledMessage(lineUserID, fullName string, roundNo, durationMin int, scheduledAt time.Time, mode, locationText, onlineJoinURL, portalBaseURL string) Message {
+func InterviewScheduledMessage(lineUserID, fullName string, roundNo, durationMin int, scheduledAt time.Time, mode, locationText, onlineJoinURL, portalBaseURL, token string) Message {
 	if lineUserID == "" {
 		return Message{}
 	}
@@ -76,18 +76,18 @@ func InterviewScheduledMessage(lineUserID, fullName string, roundNo, durationMin
 		Channel:   ChannelLINE,
 		Recipient: lineUserID,
 		Subject:   "นัดหมายสัมภาษณ์",
-		Body:      interviewScheduledDoc(fullName, roundNo, durationMin, scheduledAt, mode, locationText, onlineJoinURL, portalBaseURL).PlainText(),
+		Body:      interviewScheduledDoc(fullName, roundNo, durationMin, scheduledAt, mode, locationText, onlineJoinURL, portalBaseURL, token).PlainText(),
 	}
 }
 
 // InterviewScheduledEmailMessage is the email twin of InterviewScheduledMessage,
 // reusing the same Doc so the LINE and email copy never drift. Returns a zero
 // Message when the address is empty.
-func InterviewScheduledEmailMessage(emailAddr, fullName string, roundNo, durationMin int, scheduledAt time.Time, mode, locationText, onlineJoinURL, portalBaseURL string) Message {
+func InterviewScheduledEmailMessage(emailAddr, fullName string, roundNo, durationMin int, scheduledAt time.Time, mode, locationText, onlineJoinURL, portalBaseURL, token string) Message {
 	if emailAddr == "" {
 		return Message{}
 	}
-	doc := interviewScheduledDoc(fullName, roundNo, durationMin, scheduledAt, mode, locationText, onlineJoinURL, portalBaseURL)
+	doc := interviewScheduledDoc(fullName, roundNo, durationMin, scheduledAt, mode, locationText, onlineJoinURL, portalBaseURL, token)
 	return Message{
 		Channel:   ChannelEmail,
 		Recipient: emailAddr,
@@ -97,7 +97,7 @@ func InterviewScheduledEmailMessage(emailAddr, fullName string, roundNo, duratio
 	}
 }
 
-func interviewScheduledDoc(fullName string, roundNo, durationMin int, scheduledAt time.Time, mode, locationText, onlineJoinURL, portalBaseURL string) emailtmpl.Doc {
+func interviewScheduledDoc(fullName string, roundNo, durationMin int, scheduledAt time.Time, mode, locationText, onlineJoinURL, portalBaseURL, token string) emailtmpl.Doc {
 	lead := "นัดสัมภาษณ์ของคุณ"
 	if roundNo > 1 {
 		lead = fmt.Sprintf("นัดสัมภาษณ์ (รอบ %d) ของคุณ", roundNo)
@@ -125,7 +125,7 @@ func interviewScheduledDoc(fullName string, roundNo, durationMin int, scheduledA
 		Greeting:   emailtmpl.Greeting(fullName),
 		Paragraphs: []string{lead},
 		Details:    details,
-		CTA:        &emailtmpl.CTA{Label: "ดูรายละเอียดการนัดหมาย", URL: portalBaseURL + "/status"},
+		CTA:        &emailtmpl.CTA{Label: "ดูรายละเอียดการนัดหมาย", URL: statusPath(portalBaseURL, token)},
 	}
 }
 

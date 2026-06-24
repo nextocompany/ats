@@ -96,7 +96,7 @@ func (h *Handler) SetNotifier(n notify.Notifier, portalBaseURL string) *Handler 
 
 // notifyApplicationReceived tells the candidate (LINE + email, best-effort) that
 // their application for a position was received. No-op when the notifier is unset.
-func (h *Handler) notifyApplicationReceived(ctx context.Context, lineUserID, emailAddr, fullName string, positionID uuid.UUID) {
+func (h *Handler) notifyApplicationReceived(ctx context.Context, lineUserID, emailAddr, fullName string, positionID uuid.UUID, token string) {
 	if h.notifier == nil {
 		return
 	}
@@ -104,12 +104,12 @@ func (h *Handler) notifyApplicationReceived(ctx context.Context, lineUserID, ema
 	if p, err := h.pos.FindByID(ctx, positionID); err == nil {
 		title = p.TitleTH
 	}
-	if msg := notify.ApplicationReceivedMessage(lineUserID, fullName, title, h.portalBaseURL); msg.Recipient != "" {
+	if msg := notify.ApplicationReceivedMessage(lineUserID, fullName, title, h.portalBaseURL, token); msg.Recipient != "" {
 		if err := h.notifier.Send(ctx, msg); err != nil {
 			log.Warn().Err(err).Msg("apply-received notify: line send failed (non-fatal)")
 		}
 	}
-	if em := notify.ApplicationReceivedEmailMessage(emailAddr, fullName, title, h.portalBaseURL); em.Recipient != "" {
+	if em := notify.ApplicationReceivedEmailMessage(emailAddr, fullName, title, h.portalBaseURL, token); em.Recipient != "" {
 		if err := h.notifier.Send(ctx, em); err != nil {
 			log.Warn().Err(err).Msg("apply-received notify: email send failed (non-fatal)")
 		}
@@ -289,8 +289,14 @@ func (h *Handler) Apply(c *fiber.Ctx) error {
 			log.Warn().Err(err).Str("account_id", accountID.String()).Msg("failed to backfill account contact")
 		}
 	}
-	h.notifyApplicationReceived(c.UserContext(), lineUserID, email, name, positionID)
-	return h.finalizeApplication(c, result, consentVersion, accountID)
+	// Mint the status token BEFORE notifying so the apply notification carries the
+	// /status?token=… deep link (notify previously ran before the token existed).
+	token, err := h.issuePublicToken(c.UserContext(), result.ApplicationID)
+	if err != nil {
+		return err
+	}
+	h.notifyApplicationReceived(c.UserContext(), lineUserID, email, name, positionID, token)
+	return h.finalizeApplication(c, result, token, consentVersion, accountID)
 }
 
 // QuickApply handles POST /api/v1/public/apply/quick (RequireCandidate). A member
@@ -365,22 +371,33 @@ func (h *Handler) QuickApply(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	h.notifyApplicationReceived(c.UserContext(), acct.LineUserID, acct.Email, acct.FullName, positionID)
-	return h.finalizeApplication(c, result, consentVersion, &id)
+	token, err := h.issuePublicToken(c.UserContext(), result.ApplicationID)
+	if err != nil {
+		return err
+	}
+	h.notifyApplicationReceived(c.UserContext(), acct.LineUserID, acct.Email, acct.FullName, positionID, token)
+	return h.finalizeApplication(c, result, token, consentVersion, &id)
 }
 
 // finalizeApplication issues the opaque status token and records PDPA consent.
 // accountID is the applying member's portal account (nil for guest/LINE-only
 // applies); it is stamped on the ledger row so the apply consent correlates to
 // the account without a join through candidates.
-func (h *Handler) finalizeApplication(c *fiber.Ctx, result applications.IntakeResult, consentVersion string, accountID *uuid.UUID) error {
+// issuePublicToken mints the opaque status-page token and stores it on the
+// application. Called by Apply/QuickApply BEFORE the apply notification so the
+// notification's CTA can carry the /status?token=… deep link.
+func (h *Handler) issuePublicToken(ctx context.Context, appID uuid.UUID) (string, error) {
 	token, err := newPublicToken()
 	if err != nil {
-		return err
+		return "", err
 	}
-	if err := h.apps.SetPublicToken(c.UserContext(), result.ApplicationID, token); err != nil {
-		return err
+	if err := h.apps.SetPublicToken(ctx, appID, token); err != nil {
+		return "", err
 	}
+	return token, nil
+}
+
+func (h *Handler) finalizeApplication(c *fiber.Ctx, result applications.IntakeResult, token, consentVersion string, accountID *uuid.UUID) error {
 	// Record PDPA consent against the candidate (+ account when known). A failure
 	// here must not lose the application — log and continue (consent is retryable).
 	if err := h.consent.Record(c.UserContext(), pdpa.Consent{

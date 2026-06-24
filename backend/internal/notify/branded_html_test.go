@@ -3,6 +3,8 @@ package notify
 import (
 	"strings"
 	"testing"
+
+	"github.com/google/uuid"
 )
 
 // These tests cover the branded-HTML additions: email twins carry HTML, LINE/Teams
@@ -10,7 +12,7 @@ import (
 
 func TestEmailTwin_CarriesBrandedHTML_LineDoesNot(t *testing.T) {
 	const portal = "https://careers.example.com"
-	em := ApplicationReceivedEmailMessage("c@x.com", "สมชาย", "แคชเชียร์", portal)
+	em := ApplicationReceivedEmailMessage("c@x.com", "สมชาย", "แคชเชียร์", portal, "")
 	if em.HTML == "" {
 		t.Fatal("email twin must carry HTML")
 	}
@@ -19,7 +21,7 @@ func TestEmailTwin_CarriesBrandedHTML_LineDoesNot(t *testing.T) {
 			t.Errorf("branded HTML missing %q", want)
 		}
 	}
-	ln := ApplicationReceivedMessage("U1", "สมชาย", "แคชเชียร์", portal)
+	ln := ApplicationReceivedMessage("U1", "สมชาย", "แคชเชียร์", portal, "")
 	if ln.HTML != "" {
 		t.Errorf("LINE message must not carry HTML, got %q", ln.HTML)
 	}
@@ -30,7 +32,7 @@ func TestEmailTwin_CarriesBrandedHTML_LineDoesNot(t *testing.T) {
 }
 
 func TestStatusEmail_EscapesUserValue(t *testing.T) {
-	em := StatusEmailMessage("c@x.com", "สมชาย<script>alert(1)</script>", "scored", "https://x.com")
+	em := StatusEmailMessage("c@x.com", "สมชาย<script>alert(1)</script>", "scored", "https://x.com", "", uuid.Nil)
 	if strings.Contains(em.HTML, "<script>") {
 		t.Error("XSS: raw <script> from candidate name leaked into HTML")
 	}
