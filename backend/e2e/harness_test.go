@@ -121,6 +121,9 @@ func applyMultipart(t *testing.T, positionID uuid.UUID, fullName string) string 
 	w := multipart.NewWriter(&buf)
 	_ = w.WriteField("position_id", positionID.String())
 	_ = w.WriteField("full_name", fullName)
+	// phone + email are required on apply since #165 (UAT bug #6).
+	_ = w.WriteField("phone", "0810000000")
+	_ = w.WriteField("email", "e2e.fullflow@example.com")
 	_ = w.WriteField("consent_given", "true")
 	_ = w.WriteField("consent_version", "1.0")
 	// Explicit part Content-Type — the API maps it to a file type; the multipart
