@@ -52,7 +52,7 @@ export default function ApplicationDetailPage() {
               <p className="eyebrow">{t("sourceDocument")}</p>
               <span className="font-mono text-xs text-muted-foreground">{app.id.slice(0, 8)}</span>
             </div>
-            <ResumeViewer applicationId={app.id} />
+            <ResumeViewer applicationId={app.id} fileType={app.raw_file_type} />
           </section>
           <aside
             aria-label={t("actionsAria")}
