@@ -102,6 +102,12 @@ type Config struct {
 	// = off). Requires the Login channel to be linked to the Messaging API channel
 	// in the LINE console; ignored by LINE otherwise.
 	LINELoginBotPrompt string
+	// LINERequestEmailScope adds "email" to the LINE Login scope. Default OFF: only
+	// enable AFTER "Email address permission" is granted on the Login channel in the
+	// LINE console, otherwise LINE may reject the authorize request (invalid_scope)
+	// and break login. The receive side already stores any email LINE returns, so no
+	// redeploy is needed beyond flipping this flag once the permission lands.
+	LINERequestEmailScope bool
 
 	// Notifications (re-engagement, report delivery) — "mock" (default) or "real".
 	NotifyProvider  string
@@ -295,11 +301,12 @@ func Load() (*Config, error) {
 		PSCSVFallbackContainer: getenv("PS_CSV_FALLBACK_CONTAINER", "ps-export"),
 		PSWebhookSecret:        os.Getenv("PS_WEBHOOK_SECRET"),
 
-		LINEProvider:         getenv("LINE_PROVIDER", "mock"),
-		LINEChannelID:        os.Getenv("LINE_CHANNEL_ID"),
-		LINEChannelSecret:    os.Getenv("LINE_CHANNEL_SECRET"),
-		LINELoginCallbackURL: os.Getenv("LINE_LOGIN_CALLBACK_URL"),
-		LINELoginBotPrompt:   getenv("LINE_LOGIN_BOT_PROMPT", "aggressive"),
+		LINEProvider:          getenv("LINE_PROVIDER", "mock"),
+		LINEChannelID:         os.Getenv("LINE_CHANNEL_ID"),
+		LINEChannelSecret:     os.Getenv("LINE_CHANNEL_SECRET"),
+		LINELoginCallbackURL:  os.Getenv("LINE_LOGIN_CALLBACK_URL"),
+		LINELoginBotPrompt:    getenv("LINE_LOGIN_BOT_PROMPT", "aggressive"),
+		LINERequestEmailScope: getenvBool("LINE_REQUEST_EMAIL_SCOPE", false),
 
 		NotifyProvider:  getenv("NOTIFY_PROVIDER", "mock"),
 		NotifyLINEToken: os.Getenv("NOTIFY_LINE_TOKEN"),

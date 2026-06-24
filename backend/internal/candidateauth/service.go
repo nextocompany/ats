@@ -230,9 +230,28 @@ func (s *Service) Logout(ctx context.Context, token string) error {
 	return s.repo.RevokeSession(ctx, hashSecret(token))
 }
 
-// UpdateProfile applies sparse profile edits.
+// UpdateProfile applies sparse profile edits. A non-empty email is normalized and
+// validated here; the repo enforces set-once + collision (ErrEmailTaken).
 func (s *Service) UpdateProfile(ctx context.Context, accountID uuid.UUID, p ProfileUpdate) error {
+	if strings.TrimSpace(p.Email) != "" {
+		addr, ok := normalizeEmail(p.Email)
+		if !ok {
+			return ErrInvalidEmail
+		}
+		p.Email = addr
+	}
 	return s.repo.UpdateProfile(ctx, accountID, p)
+}
+
+// BackfillContact best-effort fills phone/email onto an account from an apply.
+// The email is normalized; an invalid one is dropped (the apply already validated
+// it for the candidate row, but normalize defensively) so backfill never fails.
+func (s *Service) BackfillContact(ctx context.Context, accountID uuid.UUID, phone, rawEmail string) error {
+	email := ""
+	if addr, ok := normalizeEmail(rawEmail); ok {
+		email = addr
+	}
+	return s.repo.BackfillContact(ctx, accountID, phone, email)
 }
 
 // SaveResume stores the resume under an account-scoped blob key and records it.

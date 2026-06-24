@@ -218,6 +218,23 @@ func (f *fakeRepo) UpdateProfile(_ context.Context, id uuid.UUID, p ProfileUpdat
 	if p.LineDisplayID != "" {
 		a.LineDisplayID = p.LineDisplayID
 	}
+	if p.Email != "" && a.Email == "" {
+		a.Email = p.Email
+	}
+	return nil
+}
+
+func (f *fakeRepo) BackfillContact(_ context.Context, id uuid.UUID, phone, email string) error {
+	a, ok := f.accounts[id]
+	if !ok {
+		return ErrNotFound
+	}
+	if phone != "" && a.Phone == "" {
+		a.Phone = phone
+	}
+	if email != "" && a.Email == "" {
+		a.Email = email
+	}
 	return nil
 }
 

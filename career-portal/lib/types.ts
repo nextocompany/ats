@@ -178,6 +178,9 @@ export interface AccountResume {
 export interface ProfileInput {
   full_name?: string;
   phone?: string;
+  // email is set-once: only accepted by the server when the account has none yet
+  // (LINE accounts start without one). A colliding email returns 409.
+  email?: string;
   line_display_id?: string;
   province?: string;
   consent_given?: boolean;

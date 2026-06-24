@@ -6,6 +6,7 @@ import { ConsentStep } from "@/components/ConsentStep";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ApiError } from "@/lib/api";
 import { updateProfile } from "@/lib/auth";
 import { useCandidate } from "@/lib/session";
 import type { Account } from "@/lib/types";
@@ -28,6 +29,10 @@ export function ProfileForm({ account, requireConsent, submitLabel, onSaved }: P
   const { refresh } = useCandidate();
   const [fullName, setFullName] = useState(account.full_name);
   const [phone, setPhone] = useState(account.phone);
+  // Email is set-once. Show the field only when the account has none yet (LINE
+  // signups), so an identity email is never edited away here.
+  const canSetEmail = !account.email;
+  const [email, setEmail] = useState(account.email);
   const [lineId, setLineId] = useState(account.line_display_id);
   const [province, setProvince] = useState(account.province);
   const [consent, setConsent] = useState(account.pdpa_consent);
@@ -45,6 +50,7 @@ export function ProfileForm({ account, requireConsent, submitLabel, onSaved }: P
       await updateProfile({
         full_name: fullName.trim(),
         phone: phone.trim(),
+        email: canSetEmail && email.trim() ? email.trim() : undefined,
         line_display_id: lineId.trim(),
         province: province.trim(),
         consent_given: requireConsent ? consent : undefined,
@@ -52,8 +58,14 @@ export function ProfileForm({ account, requireConsent, submitLabel, onSaved }: P
       });
       await refresh();
       onSaved();
-    } catch {
-      setError("บันทึกข้อมูลไม่สำเร็จ กรุณาลองใหม่");
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409) {
+        setError("อีเมลนี้ถูกใช้กับบัญชีอื่นแล้ว");
+      } else if (e instanceof ApiError && e.status === 400) {
+        setError("อีเมลไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง");
+      } else {
+        setError("บันทึกข้อมูลไม่สำเร็จ กรุณาลองใหม่");
+      }
     } finally {
       setBusy(false);
     }
@@ -72,6 +84,13 @@ export function ProfileForm({ account, requireConsent, submitLabel, onSaved }: P
           <Label htmlFor="phone">เบอร์โทรศัพท์</Label>
           <Input id="phone" type="tel" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" />
         </div>
+        {canSetEmail ? (
+          <div className="space-y-2">
+            <Label htmlFor="email">อีเมล</Label>
+            <Input id="email" type="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" placeholder="you@example.com" />
+            <p className="text-xs text-muted-foreground">ใช้สำหรับรับการแจ้งเตือนสถานะใบสมัคร</p>
+          </div>
+        ) : null}
         {!account.line_linked ? (
           <div className="space-y-2">
             <Label htmlFor="line_id">LINE ID</Label>
