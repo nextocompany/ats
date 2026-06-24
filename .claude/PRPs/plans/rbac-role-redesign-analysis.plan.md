@@ -248,12 +248,27 @@ CandidatesClause / AccountsClause / VacanciesClause ต้องอัปเด�
 - ✅ **P2b** (`73332df`) `internal/candidatelock` — atomic acquire/refresh/release + 30-min TTL, holder resolved by email, GET/POST/DELETE `/candidates/:id/lock`. Unit + PG16 integration tests (block-other/force/expired-takeover).
 - ✅ **P2c** (`6e13d29`) 3-day pool-release sweep — queue task + `PoolReleaseService` + repo `ReleaseStalePoolCandidates` + scheduler/worker wiring + config. **DISABLED by default** until picked_up_at stamping lands. PG16 integration test proves selective release.
 
-**ยังไม่ทำ (P2 เหลือ / P3):**
-- **picked_up_at stamping** on first store-HR action (REQUIRED before enabling the sweep) + **lock enforcement** wiring into operate handlers (lock package + endpoints exist; consumers not yet gated)
-- **area CRUD admin API + UI** (`internal/areas` + manage areas/area_stores/user_areas)
-- **wiring `Scope.UserID`** into list/detail call sites (scopeFrom helpers) so area/requisition scopes actually receive the user id
-- **HM notification** on new candidate in their req
-- **P3:** read-only HM frontend + approval-chain remap (HM as approver — `approval.decide` for HM roles), **old-role cutover + user migration**, role/area-assign UI, lock UI
+- ✅ **P2d** (`4c0f43a`) `LocalID` (local users.id) on Identity/DevUser + `.WithUserID(u.LocalID)` wired into all 8 scopeFrom helpers → area/requisition scopes receive a real users.id (fail-closed when unprovisioned).
+- ✅ **P2e** (`7124c6c`) `internal/areas` admin API (CRUD + transactional SetStores/SetMembers, gated area.admin). PG16 integration test incl. end-to-end scope resolution.
+- ✅ **P2f** (`b980796`) `picked_up_at` stamped on lock acquire (lock = "I'm taking this candidate") → arms the pool-release sweep. `MarkPickedUp` idempotent. PG16 test.
+- ✅ **P3a** (`12725df`) new roles granted approval-chain perms (HM = read-only ops + `approval.decide.l3` approver; hr_store submit+l1, area_hr l2, ta l4). Additive — no chain-code churn. 043 up/down verified.
+
+### ⛔ REMAINING — large + reviewed work, deliberately NOT crammed (faithful split)
+
+**built-not-verified / not-started backend:**
+- **Lock HARD enforcement** — gate every mutating candidate handler to require the actor holds the lock. Currently advisory (acquire/display/pickup work; mutations not yet rejected without a lock). Cross-cutting retrofit.
+- **HM notification** on new candidate in their requisition.
+
+**THE CUTOVER (code-coupled + touches prod identities — advisor: "write carefully, needs review", do NOT auto-run unreviewed):**
+- Remap hardcoded role labels old→new: `internal/applications/approval.go` chain `{hr_staff,hr_manager,sgm,regional_director}`, `hr_directory.go` `hrNotifyRoles`/`lineManagerRoles`.
+- **Update ~14 test files** that assert behaviour keyed on old role strings.
+- **Data migration**: reassign users old→new (hr_staff→hr_store, hr_manager/operation_director→area_hr, sgm→hiring_manager_store, regional_director→ta, auditor→auditor); sequence reassign-FIRST then retire old roles (free-text role → unknown = fail-closed lockout if reversed); reversible down.
+- ⚠️ `area_hr` users see NOTHING until an admin defines areas + assigns them (ops setup) — fail-closed, but "done pending ops", not "done".
+
+**FRONTEND (two Next.js apps — built-not-verified at best; needs visual UAT):**
+- read-only HM gating (hide operate, show approve), lock UI ("being processed by X" + claim/release), admin UI for area management + role/scope/area assignment, nav/permission gating for the 7-role set.
+
+**needs-human / ops:** exact prod user→role map sign-off, area definitions, enabling `POOL_RELEASE_ENABLED` after pickup wiring (now safe), browser UAT of all flows.
 
 ## 11. Effort & Phasing (ประมาณการ)
 
