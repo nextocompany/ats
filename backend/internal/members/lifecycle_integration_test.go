@@ -8,12 +8,14 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+
+	"github.com/nexto/hr-ats/internal/rbac"
 )
 
 // m1ID returns the seeded "somchai" member (has resume + 2 apps + 1 session).
 func m1ID(t *testing.T, r *pgRepository) uuid.UUID {
 	t.Helper()
-	items, _, err := r.List(context.Background(), ListFilter{Search: "somchai@example.com"})
+	items, _, err := r.List(context.Background(), ListFilter{Search: "somchai@example.com"}, rbac.AllScope())
 	if err != nil || len(items) != 1 {
 		t.Fatalf("setup: expected 1 m1, got %d (err %v)", len(items), err)
 	}
