@@ -21,7 +21,8 @@
     "requisitions": "Requisitions",
     "pdpa": "PDPA / DPO",
     "scoring": "Scoring weights",
-    "privacy": "Privacy"
+    "privacy": "Privacy",
+    "areas": "Areas"
   },
   "scoring": {
     "eyebrow": "Settings",
@@ -1071,5 +1072,33 @@
     "signedInAs": "Signed in as",
     "signOut": "Sign out",
     "checking": "Checking your access…"
+  },
+  "areas": {
+    "title": "Area management",
+    "subtitle": "Group stores into areas and assign the area HR who cover them.",
+    "denied": "You do not have permission to manage areas.",
+    "namePlaceholder": "New area name",
+    "created": "Area created",
+    "createFailed": "Could not create area",
+    "confirmDelete": "Delete this area? Store and member assignments will be removed.",
+    "deleted": "Area deleted",
+    "deleteFailed": "Could not delete area",
+    "empty": "No areas yet. Create one above.",
+    "selectPrompt": "Select an area to manage its stores and members.",
+    "storeCount": "{n} stores",
+    "saved": "Saved",
+    "saveFailed": "Could not save",
+    "rename": "Rename",
+    "active": "Active",
+    "delete": "Delete",
+    "stores": "Stores",
+    "filterStores": "Filter stores...",
+    "saveStores": "Save stores",
+    "members": "Area HR",
+    "saveMembers": "Save members",
+    "storesSaved": "Stores updated",
+    "membersSaved": "Members updated",
+    "noAreaHr": "No area_hr users available.",
+    "eyebrow": "Access control"
   }
 }

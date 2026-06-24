@@ -69,6 +69,17 @@ export interface StoreOption {
   province: string;
 }
 
+// Area mirrors internal/areas.Area — a dynamic grouping of stores backing the
+// area visibility scope. store_nos / member_ids are populated on the detail GET.
+export interface Area {
+  id: string;
+  name: string;
+  active: boolean;
+  store_count: number;
+  store_nos?: number[];
+  member_ids?: string[];
+}
+
 export interface InterviewAppointment {
   id: string;
   application_id: string;
