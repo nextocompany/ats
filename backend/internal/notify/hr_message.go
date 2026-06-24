@@ -27,6 +27,24 @@ func NewScoredHR(toEmails []string, teamsEnabled bool, candName, positionTitle s
 	return hrMessages(toEmails, teamsEnabled, doc)
 }
 
+// NewCandidateHM notifies a hiring manager that a new candidate has entered a
+// requisition they own (a position they opened). The hiring manager is read-only
+// on operations but is the hire approver, so this is their cue to review. dashURL
+// deep-links the application.
+func NewCandidateHM(toEmails []string, teamsEnabled bool, candName, positionTitle string, score int, dashURL string) []Message {
+	doc := emailtmpl.Doc{
+		Title:      "ผู้สมัครใหม่ในตำแหน่งที่คุณเปิด",
+		Paragraphs: []string{"มีผู้สมัครใหม่เข้ามาในตำแหน่งที่คุณเป็นผู้เปิดรับ รอการพิจารณาของคุณ"},
+		Details: []emailtmpl.DetailRow{
+			{Label: "ผู้สมัคร", Value: fallback(candName, "ผู้สมัคร")},
+			{Label: "ตำแหน่ง", Value: fallback(positionTitle, "-")},
+			{Label: "คะแนน AI", Value: fmt.Sprintf("%d/100", score)},
+		},
+		CTA: &emailtmpl.CTA{Label: "ดูรายละเอียด", URL: dashURL},
+	}
+	return hrMessages(toEmails, teamsEnabled, doc)
+}
+
 // AIInterviewPassedHR notifies store HR that a candidate completed the AI
 // pre-interview with an actionable score (>= threshold). recommendation is the
 // evaluator's verdict (e.g. "strong_recommend"); dashURL deep-links the application.

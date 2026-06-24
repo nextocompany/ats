@@ -2,8 +2,11 @@ package applications
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/nexto/hr-ats/internal/rbac"
@@ -24,6 +27,11 @@ type HRDirectory interface {
 	// none) and ignoring the store for all-scope roles (regional_director). Used to
 	// reach the responsible approver(s) for an approval step's SLA escalation.
 	EmailsForRoleStore(ctx context.Context, role string, storeID *int) ([]string, error)
+	// HiringManagerForVacancy resolves the active hiring manager (email + full name)
+	// who owns the vacancy. Returns empty strings and no error when the vacancy has
+	// no in-app hiring manager (talent-pool routing, or PeopleSoft openings without
+	// an owner) — the caller treats that as "nobody to notify".
+	HiringManagerForVacancy(ctx context.Context, vacancyID uuid.UUID) (email, fullName string, err error)
 }
 
 // hrNotifyRoles are the store-scoped roles that receive candidate notifications.
@@ -79,6 +87,23 @@ func (d *pgHRDirectory) EmailsForRoleStore(ctx context.Context, role string, sto
 		return nil, fmt.Errorf("applications: iterate role emails: %w", err)
 	}
 	return out, nil
+}
+
+func (d *pgHRDirectory) HiringManagerForVacancy(ctx context.Context, vacancyID uuid.UUID) (string, string, error) {
+	const q = `
+		SELECT COALESCE(u.email, ''), COALESCE(u.full_name, '')
+		FROM vacancies v
+		JOIN users u ON u.id = v.hiring_manager_user_id
+		WHERE v.id = $1 AND u.is_active AND COALESCE(u.email, '') <> ''`
+	var email, fullName string
+	err := d.pool.QueryRow(ctx, q, vacancyID).Scan(&email, &fullName)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", "", nil // no in-app hiring manager — nobody to notify (not an error)
+	}
+	if err != nil {
+		return "", "", fmt.Errorf("applications: hiring manager for vacancy: %w", err)
+	}
+	return email, fullName, nil
 }
 
 func (d *pgHRDirectory) emailsForStoreRoles(ctx context.Context, storeID *int, roles []string) ([]string, error) {

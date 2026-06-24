@@ -383,7 +383,34 @@ func (pr *Processor) run(ctx context.Context, p queue.ProcessApplicationPayload,
 
 	// Step 7 — best-effort HR notification (email + Teams) for store-assigned hires.
 	pr.notifyScored(ctx, appID, cand.FullName, pos.TitleTH, result.Total, assignment.StoreNo)
+	// Step 7b — best-effort: ping the hiring manager who owns the matched
+	// requisition (the position they opened) so they can review + approve.
+	pr.notifyHiringManager(ctx, appID, assignment.VacancyID, cand.FullName, pos.TitleTH, result.Total)
 	return canonicalID, nil
+}
+
+// notifyHiringManager pings the hiring manager who owns the matched requisition
+// that a new candidate has entered the position they opened. No-op when deps are
+// unset, the candidate routed to the talent pool (no vacancy), or the vacancy has
+// no in-app hiring manager (e.g. PeopleSoft openings without an owner). Sent
+// email-only: the recipient is one specific owner, and the shared Teams channel is
+// already covered by the store-HR card above.
+func (pr *Processor) notifyHiringManager(ctx context.Context, appID uuid.UUID, vacancyID *uuid.UUID, candName, positionTitle string, score int) {
+	d := pr.hrNotify
+	if d.notifier == nil || d.hr == nil || vacancyID == nil {
+		return
+	}
+	email, _, err := d.hr.HiringManagerForVacancy(ctx, *vacancyID)
+	if err != nil || email == "" {
+		return // no owner to notify (or a read failure, logged at the repo layer)
+	}
+	dashURL := d.dashboardBaseURL + "/applications/" + appID.String()
+	msgs := notify.NewCandidateHM([]string{email}, false, candName, positionTitle, score, dashURL)
+	for _, m := range msgs {
+		if err := d.notifier.Send(ctx, m); err != nil {
+			log.Warn().Err(err).Str("application", appID.String()).Msg("hiring-manager notify: send failed (non-fatal)")
+		}
+	}
 }
 
 // notifyScored pings store HR that a new candidate was screened, scored, and
