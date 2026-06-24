@@ -26,11 +26,14 @@ type HRDirectory interface {
 	EmailsForRoleStore(ctx context.Context, role string, storeID *int) ([]string, error)
 }
 
-// hrNotifyRoles are the store-scoped roles that receive candidate notifications.
-var hrNotifyRoles = []string{"sgm", "hr_manager", "hr_staff"}
+// hrNotifyRoles are the roles that receive store candidate notifications. Union of
+// the legacy roles and the new model (hr_store/area_hr + hiring_manager_store)
+// during the cutover, so notifications reach holders of either set.
+var hrNotifyRoles = []string{"sgm", "hr_manager", "hr_staff", "hr_store", "area_hr", "hiring_manager_store"}
 
-// lineManagerRoles are the roles that act as the store's line manager (sgm).
-var lineManagerRoles = []string{"sgm"}
+// lineManagerRoles are the roles that act as the store's line manager (sgm →
+// hiring_manager_store in the new model).
+var lineManagerRoles = []string{"sgm", "hiring_manager_store"}
 
 type pgHRDirectory struct {
 	pool *pgxpool.Pool

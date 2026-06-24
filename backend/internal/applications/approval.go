@@ -40,14 +40,17 @@ const (
 const approvalMaxLevel = 4
 
 // approvalChain is the ordered level -> role mapping seeded into approval_steps.
+// The role is a label used for SLA-reminder targeting + display; decide authZ is
+// by permission (canDecideLevel), so both the legacy and new role at a level can
+// approve. Labels use the new role model (hr_store/area_hr/hiring_manager_store/ta).
 var approvalChain = []struct {
 	Level int
 	Role  string
 }{
-	{1, "hr_staff"},
-	{2, "hr_manager"},
-	{3, "sgm"},
-	{4, "regional_director"},
+	{1, "hr_store"},
+	{2, "area_hr"},
+	{3, "hiring_manager_store"},
+	{4, "ta"},
 }
 
 // canDecideLevel reports whether role may decide the given approval level —
