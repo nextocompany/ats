@@ -457,7 +457,9 @@ func main() {
 	// Requisition management (HR dashboard): open/approve/close manual position
 	// openings as rows in the shared `vacancies` table (source='manual'), RBAC-scoped.
 	// Approved requisitions flow into branch assignment + executive + portal automatically.
-	requisitions.RegisterRoutes(app, requisitions.NewHandler(requisitions.NewRepository(pool)))
+	reqHandler := requisitions.NewHandler(requisitions.NewRepository(pool))
+	reqHandler.SetUserResolver(hrUserResolver{svc: hrAuthSvc})
+	requisitions.RegisterRoutes(app, reqHandler)
 	// PDPA breach register (DPO/legal): record personal-data breaches, drive the
 	// s.37(4) 72h PDPC-notification countdown, and generate the notification
 	// content. Gated to breach.manage; company-wide (no RBAC data-scope). The DPO

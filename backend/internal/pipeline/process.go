@@ -363,6 +363,13 @@ func (pr *Processor) run(ctx context.Context, p queue.ProcessApplicationPayload,
 	if err := pr.apps.SetAssignment(ctx, appID, assignment.StoreNo, assignment.TalentPool); err != nil {
 		return canonicalID, fmt.Errorf("pipeline: set assignment: %w", err)
 	}
+	// Link the application to the matched vacancy so the requisition scope can
+	// resolve it to the owning hiring manager (nil for talent-pool routing).
+	if assignment.VacancyID != nil {
+		if err := pr.apps.SetVacancy(ctx, appID, assignment.VacancyID); err != nil {
+			return canonicalID, fmt.Errorf("pipeline: set vacancy: %w", err)
+		}
+	}
 	if err := pr.persistScore(ctx, appID, applications.StatusScored, result); err != nil {
 		return canonicalID, err
 	}

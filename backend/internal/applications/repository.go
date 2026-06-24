@@ -54,6 +54,9 @@ type Repository interface {
 	SetDedupState(ctx context.Context, id uuid.UUID, state string, confidence float64) error
 	SetScore(ctx context.Context, id uuid.UUID, s Score) error
 	SetAssignment(ctx context.Context, id uuid.UUID, storeNo *int, talentPool bool) error
+	// SetVacancy links an application to the open vacancy it was matched to, so the
+	// requisition scope can resolve application → vacancy → owning hiring manager.
+	SetVacancy(ctx context.Context, id uuid.UUID, vacancyID *uuid.UUID) error
 	// Sprint 3:
 	SetHired(ctx context.Context, id uuid.UUID) error
 	SetPSSynced(ctx context.Context, id uuid.UUID) error
@@ -522,6 +525,14 @@ func (r *pgRepository) SetAssignment(ctx context.Context, id uuid.UUID, storeNo 
 	const q = `UPDATE applications SET assigned_store_id = $2, talent_pool = $3, updated_at = NOW() WHERE id = $1`
 	if _, err := r.pool.Exec(ctx, q, id, storeNo, talentPool); err != nil {
 		return fmt.Errorf("applications: set assignment: %w", err)
+	}
+	return nil
+}
+
+func (r *pgRepository) SetVacancy(ctx context.Context, id uuid.UUID, vacancyID *uuid.UUID) error {
+	const q = `UPDATE applications SET vacancy_id = $2, updated_at = NOW() WHERE id = $1`
+	if _, err := r.pool.Exec(ctx, q, id, vacancyID); err != nil {
+		return fmt.Errorf("applications: set vacancy: %w", err)
 	}
 	return nil
 }
