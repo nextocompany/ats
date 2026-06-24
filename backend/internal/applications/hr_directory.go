@@ -23,9 +23,12 @@ type HRDirectory interface {
 	// store, for the Top-5 shortlist-ready notification. nil storeID → none.
 	LineManagerEmailsForStore(ctx context.Context, storeID *int) ([]string, error)
 	// EmailsForRoleStore returns active emails for a single role, scoped to the
-	// store when the role is store-scoped (hr_staff/hr_manager/sgm — nil storeID →
-	// none) and ignoring the store for all-scope roles (regional_director). Used to
-	// reach the responsible approver(s) for an approval step's SLA escalation.
+	// store when the role is store-scoped (hr_store — nil storeID → none) and
+	// ignoring the store for non-store-scoped roles (area_hr / hiring_manager_* /
+	// ta resolve store-agnostically). Used to reach the responsible approver(s) for
+	// an approval step's SLA escalation. NOTE: area/requisition-scoped approver
+	// levels therefore email every holder of that role, not just the area/req
+	// subset — acceptable for best-effort SLA nudges; tighten if it gets noisy.
 	EmailsForRoleStore(ctx context.Context, role string, storeID *int) ([]string, error)
 	// HiringManagerForVacancy resolves the active hiring manager (email + full name)
 	// who owns the vacancy. Returns empty strings and no error when the vacancy has
@@ -35,10 +38,13 @@ type HRDirectory interface {
 }
 
 // hrNotifyRoles are the store-scoped roles that receive candidate notifications.
-var hrNotifyRoles = []string{"sgm", "hr_manager", "hr_staff"}
+// Remapped in the RBAC cutover (hr_staff->hr_store, hr_manager->area_hr,
+// sgm->hiring_manager_store).
+var hrNotifyRoles = []string{"hiring_manager_store", "area_hr", "hr_store"}
 
-// lineManagerRoles are the roles that act as the store's line manager (sgm).
-var lineManagerRoles = []string{"sgm"}
+// lineManagerRoles are the roles that act as the store's line manager
+// (sgm->hiring_manager_store in the cutover).
+var lineManagerRoles = []string{"hiring_manager_store"}
 
 type pgHRDirectory struct {
 	pool *pgxpool.Pool

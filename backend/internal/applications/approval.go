@@ -17,10 +17,13 @@ var ErrApprovalConflict = errors.New("applications: approval request conflict")
 
 // Multi-level hiring approval chain (Module-3 3.5). A request is opened from the
 // interviewed stage and signed off by a fixed four-level chain in order:
-// Staff (hr_staff) -> HR Manager -> SGM -> Regional Director. The creator is the
-// Staff-level sign-off (level 1 is recorded approved at creation); levels 2..4 are
-// the remaining approvals. Any reject (with a reason) is terminal. The state lives
-// in the approval_requests / approval_steps tables (migration 000022).
+// Store HR (hr_store) -> Area HR (area_hr) -> Hiring Manager (hiring_manager_store)
+// -> Talent Acquisition (ta). The creator is the Store-HR sign-off (level 1 is
+// recorded approved at creation); levels 2..4 are the remaining approvals. Any
+// reject (with a reason) is terminal. The state lives in the approval_requests /
+// approval_steps tables (migration 000022). Roles were remapped from the old
+// single-axis model (hr_staff/hr_manager/sgm/regional_director) in the RBAC
+// cutover; the per-level decide permission (approval.decide.lN) is unchanged.
 
 // Approval request / step lifecycle states.
 const (
@@ -35,19 +38,22 @@ const (
 	DecisionReject  = "reject"
 )
 
-// approvalMaxLevel is the final (Regional Director) level; approving it completes
+// approvalMaxLevel is the final (Talent Acquisition) level; approving it completes
 // the chain and advances the application to offer.
 const approvalMaxLevel = 4
 
 // approvalChain is the ordered level -> role mapping seeded into approval_steps.
+// L3 is hiring_manager_store (the store-side hiring manager, mapped from the old
+// sgm). hiring_manager_ho also holds approval.decide.l3 and CAN decide, but the
+// store-scoped notification/SLA targeting uses one role per level.
 var approvalChain = []struct {
 	Level int
 	Role  string
 }{
-	{1, "hr_staff"},
-	{2, "hr_manager"},
-	{3, "sgm"},
-	{4, "regional_director"},
+	{1, "hr_store"},
+	{2, "area_hr"},
+	{3, "hiring_manager_store"},
+	{4, "ta"},
 }
 
 // canDecideLevel reports whether role may decide the given approval level —
@@ -85,13 +91,13 @@ func roleForLevel(level int) string {
 func levelLabel(level int) string {
 	switch level {
 	case 1:
-		return "Staff"
+		return "Store HR"
 	case 2:
-		return "HR Manager"
+		return "Area HR"
 	case 3:
-		return "SGM"
+		return "Hiring Manager"
 	case 4:
-		return "Regional Director"
+		return "Talent Acquisition"
 	default:
 		return ""
 	}
