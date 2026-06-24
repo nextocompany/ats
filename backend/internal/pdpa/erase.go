@@ -52,24 +52,32 @@ func (s *RetentionService) eraseAccountDirect(ctx context.Context, accountID uui
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
+	// See eraseAccountIfOrphan: capture the pre-erase resume/email from a MATERIALIZED
+	// `old` CTE + UPDATE-as-CTE, NOT a scalar sub-SELECT in RETURNING (which reads the
+	// post-update NULLs and silently skips otp + blob cleanup).
 	const eraseAccount = `
-		WITH old AS (SELECT resume_blob_url, email FROM candidate_accounts WHERE id = $1 FOR UPDATE)
-		UPDATE candidate_accounts SET
-			full_name        = $2,
-			email            = NULL,
-			email_verified   = FALSE,
-			phone            = NULL,
-			line_user_id     = NULL,
-			line_display_id  = NULL,
-			google_sub       = NULL,
-			province         = NULL,
-			resume_blob_url   = NULL,
-			resume_file_type  = NULL,
-			status            = 'anonymized',
-			anonymized_at     = NOW(),
-			updated_at        = NOW()
-		WHERE id = $1 AND status <> 'anonymized'
-		RETURNING (SELECT resume_blob_url FROM old), (SELECT email FROM old)`
+		WITH old AS MATERIALIZED (
+			SELECT id, resume_blob_url, email FROM candidate_accounts WHERE id = $1 FOR UPDATE
+		), upd AS (
+			UPDATE candidate_accounts t SET
+				full_name        = $2,
+				email            = NULL,
+				email_verified   = FALSE,
+				phone            = NULL,
+				line_user_id     = NULL,
+				line_display_id  = NULL,
+				google_sub       = NULL,
+				province         = NULL,
+				resume_blob_url   = NULL,
+				resume_file_type  = NULL,
+				status            = 'anonymized',
+				anonymized_at     = NOW(),
+				updated_at        = NOW()
+			FROM old
+			WHERE t.id = old.id AND t.status <> 'anonymized'
+			RETURNING t.id
+		)
+		SELECT old.resume_blob_url, old.email FROM old JOIN upd ON upd.id = old.id`
 
 	var oldResume, oldEmail *string
 	err = tx.QueryRow(ctx, eraseAccount, accountID, redactedName).Scan(&oldResume, &oldEmail)
@@ -427,33 +435,43 @@ func (s *RetentionService) eraseAccountIfOrphan(ctx context.Context, tx pgx.Tx, 
 		return "", nil
 	}
 
-	// The CTE snapshots the pre-erase resume blob URL and email before the UPDATE
-	// nulls them; RETURNING reads from that snapshot. RETURNING yields a row only
-	// when the UPDATE matched (last un-erased candidate), so ErrNoRows means the
-	// account was kept (active sibling) or already anonymized.
+	// `old` MATERIALIZED snapshots the pre-erase resume blob URL + email; the UPDATE
+	// runs as its own CTE and the final SELECT reads the snapshot, returning a row
+	// only when the UPDATE matched (last un-erased candidate). ErrNoRows therefore
+	// means the account was kept (active sibling) or already anonymized.
+	//
+	// Do NOT collapse this back to `RETURNING (SELECT x FROM old)` on the UPDATE: a
+	// scalar sub-SELECT in a RETURNING clause is evaluated against the POST-update
+	// row, so it returned NULL for both values — leaving email_otps + the account
+	// resume blob un-erased (a PDPA completeness gap).
 	const eraseAccount = `
-		WITH old AS (SELECT resume_blob_url, email FROM candidate_accounts WHERE id = $1 FOR UPDATE)
-		UPDATE candidate_accounts SET
-			full_name        = $3,
-			email            = NULL,
-			email_verified   = FALSE,
-			phone            = NULL,
-			line_user_id     = NULL,
-			line_display_id  = NULL,
-			google_sub       = NULL,
-			province         = NULL,
-			resume_blob_url   = NULL,
-			resume_file_type  = NULL,
-			status            = 'anonymized',
-			anonymized_at     = NOW(),
-			updated_at        = NOW()
-		WHERE id = $1
-		  AND status <> 'anonymized'
-		  AND NOT EXISTS (
-			SELECT 1 FROM candidates c
-			WHERE c.account_id = $1 AND c.id <> $2 AND c.pdpa_anonymized_at IS NULL
-		  )
-		RETURNING (SELECT resume_blob_url FROM old), (SELECT email FROM old)`
+		WITH old AS MATERIALIZED (
+			SELECT id, resume_blob_url, email FROM candidate_accounts WHERE id = $1 FOR UPDATE
+		), upd AS (
+			UPDATE candidate_accounts t SET
+				full_name        = $3,
+				email            = NULL,
+				email_verified   = FALSE,
+				phone            = NULL,
+				line_user_id     = NULL,
+				line_display_id  = NULL,
+				google_sub       = NULL,
+				province         = NULL,
+				resume_blob_url   = NULL,
+				resume_file_type  = NULL,
+				status            = 'anonymized',
+				anonymized_at     = NOW(),
+				updated_at        = NOW()
+			FROM old
+			WHERE t.id = old.id
+			  AND t.status <> 'anonymized'
+			  AND NOT EXISTS (
+				SELECT 1 FROM candidates c
+				WHERE c.account_id = $1 AND c.id <> $2 AND c.pdpa_anonymized_at IS NULL
+			  )
+			RETURNING t.id
+		)
+		SELECT old.resume_blob_url, old.email FROM old JOIN upd ON upd.id = old.id`
 
 	var oldResume, oldEmail *string
 	err := tx.QueryRow(ctx, eraseAccount, *accountID, candidateID, redactedName).Scan(&oldResume, &oldEmail)
