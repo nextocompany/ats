@@ -26,6 +26,7 @@ import (
 	"github.com/nexto/hr-ats/internal/breach"
 	"github.com/nexto/hr-ats/internal/calendar"
 	"github.com/nexto/hr-ats/internal/candidateauth"
+	"github.com/nexto/hr-ats/internal/candidatelock"
 	"github.com/nexto/hr-ats/internal/candidates"
 	"github.com/nexto/hr-ats/internal/dsar"
 	"github.com/nexto/hr-ats/internal/executive"
@@ -460,6 +461,11 @@ func main() {
 	reqHandler := requisitions.NewHandler(requisitions.NewRepository(pool))
 	reqHandler.SetUserResolver(hrUserResolver{svc: hrAuthSvc})
 	requisitions.RegisterRoutes(app, reqHandler)
+
+	// Candidate processing lock (one operator at a time over the shared pool).
+	candidatelock.RegisterRoutes(app, candidatelock.NewHandler(
+		candidatelock.NewService(candidatelock.NewRepository(pool), 0),
+		hrUserResolver{svc: hrAuthSvc}))
 	// PDPA breach register (DPO/legal): record personal-data breaches, drive the
 	// s.37(4) 72h PDPC-notification countdown, and generate the notification
 	// content. Gated to breach.manage; company-wide (no RBAC data-scope). The DPO
