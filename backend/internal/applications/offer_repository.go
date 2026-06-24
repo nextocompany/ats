@@ -107,7 +107,7 @@ func (r *pgRepository) RespondOffer(ctx context.Context, offerID, accountID uuid
 	if err != nil {
 		return Offer{}, fmt.Errorf("applications: begin respond offer: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	var (
 		appID     uuid.UUID
