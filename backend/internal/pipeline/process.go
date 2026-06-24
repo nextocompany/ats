@@ -350,7 +350,7 @@ func (pr *Processor) run(ctx context.Context, p queue.ProcessApplicationPayload,
 		if err := pr.persistScore(ctx, appID, applications.StatusRejected, result); err != nil {
 			return canonicalID, err
 		}
-		pr.notifyCandidateStatus(ctx, cand, applications.StatusRejected)
+		pr.notifyCandidateStatus(ctx, appID, cand, applications.StatusRejected)
 		logger.Info().Int("score", result.Total).Msg("auto-rejected (must-have gate)")
 		return canonicalID, nil
 	}
@@ -366,7 +366,7 @@ func (pr *Processor) run(ctx context.Context, p queue.ProcessApplicationPayload,
 	if err := pr.persistScore(ctx, appID, applications.StatusScored, result); err != nil {
 		return canonicalID, err
 	}
-	pr.notifyCandidateStatus(ctx, cand, applications.StatusScored)
+	pr.notifyCandidateStatus(ctx, appID, cand, applications.StatusScored)
 
 	logger.Info().
 		Int("score", result.Total).
@@ -417,12 +417,13 @@ func (pr *Processor) notifyInvalidResume(ctx context.Context, appID, candID uuid
 		log.Warn().Err(err).Str("candidate", candID.String()).Msg("invalid-resume notify: load candidate failed")
 		return
 	}
-	if msg := notify.InvalidResumeMessage(cand.LineUserID, cand.FullName, d.portalBaseURL); msg.Recipient != "" {
+	token := pr.publicToken(ctx, appID)
+	if msg := notify.InvalidResumeMessage(cand.LineUserID, cand.FullName, d.portalBaseURL, token); msg.Recipient != "" {
 		if err := d.notifier.Send(ctx, msg); err != nil {
 			log.Warn().Err(err).Str("application", appID.String()).Msg("invalid-resume notify: line send failed (non-fatal)")
 		}
 	}
-	if em := notify.InvalidResumeEmailMessage(cand.Email, cand.FullName, d.portalBaseURL); em.Recipient != "" {
+	if em := notify.InvalidResumeEmailMessage(cand.Email, cand.FullName, d.portalBaseURL, token); em.Recipient != "" {
 		if err := d.notifier.Send(ctx, em); err != nil {
 			log.Warn().Err(err).Str("application", appID.String()).Msg("invalid-resume notify: email send failed (non-fatal)")
 		}
@@ -441,12 +442,13 @@ func (pr *Processor) notifyNameMismatch(ctx context.Context, appID, candID uuid.
 		log.Warn().Err(err).Str("candidate", candID.String()).Msg("name-mismatch notify: load candidate failed")
 		return
 	}
-	if msg := notify.NameMismatchMessage(cand.LineUserID, cand.FullName, d.portalBaseURL); msg.Recipient != "" {
+	token := pr.publicToken(ctx, appID)
+	if msg := notify.NameMismatchMessage(cand.LineUserID, cand.FullName, d.portalBaseURL, token); msg.Recipient != "" {
 		if err := d.notifier.Send(ctx, msg); err != nil {
 			log.Warn().Err(err).Str("application", appID.String()).Msg("name-mismatch notify: line send failed (non-fatal)")
 		}
 	}
-	if em := notify.NameMismatchEmailMessage(cand.Email, cand.FullName, d.portalBaseURL); em.Recipient != "" {
+	if em := notify.NameMismatchEmailMessage(cand.Email, cand.FullName, d.portalBaseURL, token); em.Recipient != "" {
 		if err := d.notifier.Send(ctx, em); err != nil {
 			log.Warn().Err(err).Str("application", appID.String()).Msg("name-mismatch notify: email send failed (non-fatal)")
 		}
@@ -457,21 +459,33 @@ func (pr *Processor) notifyNameMismatch(ctx context.Context, appID, candID uuid.
 // email) for a pipeline auto-transition (scored / auto-rejected), so they hear
 // about every meaningful change. No-op when the notifier is unset, the status has
 // no candidate-facing copy, or the candidate has no contact handle.
-func (pr *Processor) notifyCandidateStatus(ctx context.Context, cand *candidates.Candidate, status string) {
+func (pr *Processor) notifyCandidateStatus(ctx context.Context, appID uuid.UUID, cand *candidates.Candidate, status string) {
 	d := pr.candNotify
 	if d.notifier == nil || cand == nil {
 		return
 	}
-	if msg := notify.StatusMessage(cand.LineUserID, cand.FullName, status, d.portalBaseURL); msg.Recipient != "" {
+	token := pr.publicToken(ctx, appID)
+	if msg := notify.StatusMessage(cand.LineUserID, cand.FullName, status, d.portalBaseURL, token, appID); msg.Recipient != "" {
 		if err := d.notifier.Send(ctx, msg); err != nil {
 			log.Warn().Err(err).Str("status", status).Msg("candidate status notify: line send failed (non-fatal)")
 		}
 	}
-	if em := notify.StatusEmailMessage(cand.Email, cand.FullName, status, d.portalBaseURL); em.Recipient != "" {
+	if em := notify.StatusEmailMessage(cand.Email, cand.FullName, status, d.portalBaseURL, token, appID); em.Recipient != "" {
 		if err := d.notifier.Send(ctx, em); err != nil {
 			log.Warn().Err(err).Str("status", status).Msg("candidate status notify: email send failed (non-fatal)")
 		}
 	}
+}
+
+// publicToken returns the application's status-page token (best-effort: a load
+// failure yields "" → the notification falls back to a bare /status link).
+func (pr *Processor) publicToken(ctx context.Context, appID uuid.UUID) string {
+	app, err := pr.apps.FindByID(ctx, appID)
+	if err != nil {
+		log.Warn().Err(err).Str("application", appID.String()).Msg("notify: load public token failed (link will be generic)")
+		return ""
+	}
+	return app.PublicToken
 }
 
 // persistScore maps a scoring.Result into the repository's pre-serialized Score.

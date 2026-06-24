@@ -39,12 +39,12 @@ func (d statusNotifyDeps) notifyStatusChange(ctx context.Context, apps Repositor
 	}
 	// LINE and email are independent best-effort channels: a candidate with only
 	// one of the two must still be reached. Same notifiable status set for both.
-	if msg := notify.StatusMessage(cand.LineUserID, cand.FullName, status, d.portalBaseURL); msg.Recipient != "" {
+	if msg := notify.StatusMessage(cand.LineUserID, cand.FullName, status, d.portalBaseURL, app.PublicToken, app.ID); msg.Recipient != "" {
 		if err := d.notifier.Send(ctx, msg); err != nil {
 			log.Warn().Err(err).Str("application", appID.String()).Msg("status notify: line send failed (non-fatal)")
 		}
 	}
-	if em := notify.StatusEmailMessage(cand.Email, cand.FullName, status, d.portalBaseURL); em.Recipient != "" {
+	if em := notify.StatusEmailMessage(cand.Email, cand.FullName, status, d.portalBaseURL, app.PublicToken, app.ID); em.Recipient != "" {
 		if err := d.notifier.Send(ctx, em); err != nil {
 			log.Warn().Err(err).Str("application", appID.String()).Msg("status notify: email send failed (non-fatal)")
 		}
@@ -71,12 +71,12 @@ func (d statusNotifyDeps) notifyInterviewScheduled(ctx context.Context, apps Rep
 		log.Warn().Err(err).Str("candidate", app.CandidateID.String()).Msg("interview notify: load candidate failed")
 		return
 	}
-	if msg := notify.InterviewScheduledMessage(cand.LineUserID, cand.FullName, appt.RoundNo, appt.DurationMin, appt.ScheduledAt, appt.Mode, appt.LocationText, appt.OnlineJoinURL, d.portalBaseURL); msg.Recipient != "" {
+	if msg := notify.InterviewScheduledMessage(cand.LineUserID, cand.FullName, appt.RoundNo, appt.DurationMin, appt.ScheduledAt, appt.Mode, appt.LocationText, appt.OnlineJoinURL, d.portalBaseURL, app.PublicToken); msg.Recipient != "" {
 		if err := d.notifier.Send(ctx, msg); err != nil {
 			log.Warn().Err(err).Str("application", appID.String()).Msg("interview notify: line send failed (non-fatal)")
 		}
 	}
-	if em := notify.InterviewScheduledEmailMessage(cand.Email, cand.FullName, appt.RoundNo, appt.DurationMin, appt.ScheduledAt, appt.Mode, appt.LocationText, appt.OnlineJoinURL, d.portalBaseURL); em.Recipient != "" {
+	if em := notify.InterviewScheduledEmailMessage(cand.Email, cand.FullName, appt.RoundNo, appt.DurationMin, appt.ScheduledAt, appt.Mode, appt.LocationText, appt.OnlineJoinURL, d.portalBaseURL, app.PublicToken); em.Recipient != "" {
 		if err := d.notifier.Send(ctx, em); err != nil {
 			log.Warn().Err(err).Str("application", appID.String()).Msg("interview notify: email send failed (non-fatal)")
 		}

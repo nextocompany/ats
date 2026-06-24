@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/nexto/hr-ats/pkg/email"
 )
 
@@ -106,7 +108,7 @@ func TestStatusEmailMessage_Gating(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			m := StatusEmailMessage(tc.addr, "Somchai", tc.status, "https://portal")
+			m := StatusEmailMessage(tc.addr, "Somchai", tc.status, "https://portal", "", uuid.Nil)
 			if (m.Recipient != "") != tc.wantRecipient {
 				t.Fatalf("recipient=%q, wantRecipient=%v", m.Recipient, tc.wantRecipient)
 			}

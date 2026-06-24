@@ -2,9 +2,37 @@ package notify
 
 import (
 	"fmt"
+	"net/url"
+
+	"github.com/google/uuid"
 
 	"github.com/nexto/hr-ats/pkg/emailtmpl"
 )
+
+// statusPath builds the public status-page URL. The page is token-scoped; an
+// empty token (bulk/PeopleSoft/legacy rows that never went through portal apply)
+// falls back to the bare path rather than a broken "?token=" so the link still works.
+func statusPath(portalBaseURL, token string) string {
+	if token == "" {
+		return portalBaseURL + "/status"
+	}
+	return portalBaseURL + "/status?token=" + url.QueryEscape(token)
+}
+
+// statusURL returns the candidate destination for a status notification. Public
+// status views are token-scoped (/status?token=); authed actions deep-link to the
+// resource: an offer to /offers/<appID> (accept/decline) and a hire to /account
+// (onboarding upload). All others fall back to the token status page.
+func statusURL(portalBaseURL, status, token string, appID uuid.UUID) string {
+	switch status {
+	case "offer":
+		return fmt.Sprintf("%s/offers/%s", portalBaseURL, appID)
+	case "hired":
+		return portalBaseURL + "/account"
+	default:
+		return statusPath(portalBaseURL, token)
+	}
+}
 
 // Candidate-facing builders. Each event has a LINE builder and an `...EmailMessage`
 // twin; both source their content from one shared `...Doc()` so the channels never
@@ -18,11 +46,11 @@ import (
 // Returns a zero Message (empty Recipient) — which callers skip — when:
 //   - the status is not candidate-notifiable, or
 //   - the candidate has no LINE handle (legacy/demo, or never logged in via LINE).
-func StatusMessage(lineUserID, fullName, status, portalBaseURL string) Message {
+func StatusMessage(lineUserID, fullName, status, portalBaseURL, token string, appID uuid.UUID) Message {
 	if lineUserID == "" {
 		return Message{}
 	}
-	doc, ok := statusDoc(fullName, status, portalBaseURL)
+	doc, ok := statusDoc(fullName, status, portalBaseURL, token, appID)
 	if !ok {
 		return Message{}
 	}
@@ -38,11 +66,11 @@ func StatusMessage(lineUserID, fullName, status, portalBaseURL string) Message {
 // candidate-notifiable status set, reusing statusDoc so the LINE and email copy
 // never drift. Returns a zero Message (empty Recipient) when the address is empty
 // or the status is not notifiable.
-func StatusEmailMessage(emailAddr, fullName, status, portalBaseURL string) Message {
+func StatusEmailMessage(emailAddr, fullName, status, portalBaseURL, token string, appID uuid.UUID) Message {
 	if emailAddr == "" {
 		return Message{}
 	}
-	doc, ok := statusDoc(fullName, status, portalBaseURL)
+	doc, ok := statusDoc(fullName, status, portalBaseURL, token, appID)
 	if !ok {
 		return Message{}
 	}
@@ -114,7 +142,7 @@ func DocumentReviewedEmailMessage(emailAddr, fullName, docType string, approved 
 // uploaded file is detected as not being a resume/CV. Gentle + recoverable: the
 // detection can be wrong, so the copy says "อาจไม่ใช่" and points to re-upload.
 // Returns a zero Message (skipped by callers) when the candidate has no LINE handle.
-func InvalidResumeMessage(lineUserID, fullName, portalBaseURL string) Message {
+func InvalidResumeMessage(lineUserID, fullName, portalBaseURL, token string) Message {
 	if lineUserID == "" {
 		return Message{}
 	}
@@ -122,18 +150,18 @@ func InvalidResumeMessage(lineUserID, fullName, portalBaseURL string) Message {
 		Channel:   ChannelLINE,
 		Recipient: lineUserID,
 		Subject:   "กรุณาอัปโหลดเรซูเม่อีกครั้ง",
-		Body:      invalidResumeDoc(fullName, portalBaseURL).PlainText(),
+		Body:      invalidResumeDoc(fullName, portalBaseURL, token).PlainText(),
 	}
 }
 
 // InvalidResumeEmailMessage is the email equivalent of InvalidResumeMessage,
 // reusing the same Doc so the LINE and email copy never drift. Returns a zero
 // Message when the address is empty.
-func InvalidResumeEmailMessage(emailAddr, fullName, portalBaseURL string) Message {
+func InvalidResumeEmailMessage(emailAddr, fullName, portalBaseURL, token string) Message {
 	if emailAddr == "" {
 		return Message{}
 	}
-	doc := invalidResumeDoc(fullName, portalBaseURL)
+	doc := invalidResumeDoc(fullName, portalBaseURL, token)
 	return Message{
 		Channel:   ChannelEmail,
 		Recipient: emailAddr,
@@ -146,7 +174,7 @@ func InvalidResumeEmailMessage(emailAddr, fullName, portalBaseURL string) Messag
 // ApplicationReceivedMessage is sent right after a successful apply: it confirms
 // which position the candidate applied to and the current status. position is the
 // human-readable title (may be empty). Zero Message when there is no LINE handle.
-func ApplicationReceivedMessage(lineUserID, fullName, position, portalBaseURL string) Message {
+func ApplicationReceivedMessage(lineUserID, fullName, position, portalBaseURL, token string) Message {
 	if lineUserID == "" {
 		return Message{}
 	}
@@ -154,16 +182,16 @@ func ApplicationReceivedMessage(lineUserID, fullName, position, portalBaseURL st
 		Channel:   ChannelLINE,
 		Recipient: lineUserID,
 		Subject:   "ได้รับใบสมัครของคุณแล้ว",
-		Body:      applicationReceivedDoc(fullName, position, portalBaseURL).PlainText(),
+		Body:      applicationReceivedDoc(fullName, position, portalBaseURL, token).PlainText(),
 	}
 }
 
 // ApplicationReceivedEmailMessage is the email equivalent, sharing the Doc.
-func ApplicationReceivedEmailMessage(emailAddr, fullName, position, portalBaseURL string) Message {
+func ApplicationReceivedEmailMessage(emailAddr, fullName, position, portalBaseURL, token string) Message {
 	if emailAddr == "" {
 		return Message{}
 	}
-	doc := applicationReceivedDoc(fullName, position, portalBaseURL)
+	doc := applicationReceivedDoc(fullName, position, portalBaseURL, token)
 	return Message{
 		Channel:   ChannelEmail,
 		Recipient: emailAddr,
@@ -173,7 +201,7 @@ func ApplicationReceivedEmailMessage(emailAddr, fullName, position, portalBaseUR
 	}
 }
 
-func applicationReceivedDoc(fullName, position, portalBaseURL string) emailtmpl.Doc {
+func applicationReceivedDoc(fullName, position, portalBaseURL, token string) emailtmpl.Doc {
 	pos := position
 	if pos == "" {
 		pos = "ที่คุณสมัคร"
@@ -183,7 +211,7 @@ func applicationReceivedDoc(fullName, position, portalBaseURL string) emailtmpl.
 		Greeting:   emailtmpl.Greeting(fullName),
 		Paragraphs: []string{fmt.Sprintf("เราได้รับใบสมัครงานตำแหน่ง \"%s\" ของคุณเรียบร้อยแล้ว", pos)},
 		Details:    []emailtmpl.DetailRow{{Label: "สถานะปัจจุบัน", Value: "รอการตรวจสอบ"}},
-		CTA:        &emailtmpl.CTA{Label: "ติดตามสถานะใบสมัคร", URL: portalBaseURL + "/status"},
+		CTA:        &emailtmpl.CTA{Label: "ติดตามสถานะใบสมัคร", URL: statusPath(portalBaseURL, token)},
 	}
 }
 
@@ -191,7 +219,7 @@ func applicationReceivedDoc(fullName, position, portalBaseURL string) emailtmpl.
 // parsed from the uploaded resume does not match the account holder's name.
 // Gentle + recoverable (the match can be imperfect): asks them to re-upload their
 // own CV. Zero Message (skipped) when there is no LINE handle.
-func NameMismatchMessage(lineUserID, fullName, portalBaseURL string) Message {
+func NameMismatchMessage(lineUserID, fullName, portalBaseURL, token string) Message {
 	if lineUserID == "" {
 		return Message{}
 	}
@@ -199,17 +227,17 @@ func NameMismatchMessage(lineUserID, fullName, portalBaseURL string) Message {
 		Channel:   ChannelLINE,
 		Recipient: lineUserID,
 		Subject:   "กรุณาอัปโหลดเรซูเม่ของคุณเอง",
-		Body:      nameMismatchDoc(fullName, portalBaseURL).PlainText(),
+		Body:      nameMismatchDoc(fullName, portalBaseURL, token).PlainText(),
 	}
 }
 
 // NameMismatchEmailMessage is the email equivalent of NameMismatchMessage,
 // reusing the same Doc so the two channels never drift.
-func NameMismatchEmailMessage(emailAddr, fullName, portalBaseURL string) Message {
+func NameMismatchEmailMessage(emailAddr, fullName, portalBaseURL, token string) Message {
 	if emailAddr == "" {
 		return Message{}
 	}
-	doc := nameMismatchDoc(fullName, portalBaseURL)
+	doc := nameMismatchDoc(fullName, portalBaseURL, token)
 	return Message{
 		Channel:   ChannelEmail,
 		Recipient: emailAddr,
@@ -219,7 +247,7 @@ func NameMismatchEmailMessage(emailAddr, fullName, portalBaseURL string) Message
 	}
 }
 
-func nameMismatchDoc(fullName, portalBaseURL string) emailtmpl.Doc {
+func nameMismatchDoc(fullName, portalBaseURL, token string) emailtmpl.Doc {
 	return emailtmpl.Doc{
 		Title:    "กรุณาอัปโหลดเรซูเม่ของคุณเอง",
 		Greeting: emailtmpl.Greeting(fullName),
@@ -227,11 +255,11 @@ func nameMismatchDoc(fullName, portalBaseURL string) emailtmpl.Doc {
 			"ชื่อในไฟล์เรซูเม่ที่อัปโหลดดูเหมือนจะไม่ตรงกับชื่อบัญชีของคุณ จึงยังไม่สามารถพิจารณาใบสมัครได้ " +
 				"กรุณาตรวจสอบและอัปโหลดเรซูเม่ของคุณเองอีกครั้ง",
 		},
-		CTA: &emailtmpl.CTA{Label: "อัปโหลดเรซูเม่อีกครั้ง", URL: portalBaseURL + "/status"},
+		CTA: &emailtmpl.CTA{Label: "อัปโหลดเรซูเม่อีกครั้ง", URL: statusPath(portalBaseURL, token)},
 	}
 }
 
-func invalidResumeDoc(fullName, portalBaseURL string) emailtmpl.Doc {
+func invalidResumeDoc(fullName, portalBaseURL, token string) emailtmpl.Doc {
 	return emailtmpl.Doc{
 		Title:    "กรุณาอัปโหลดเรซูเม่อีกครั้ง",
 		Greeting: emailtmpl.Greeting(fullName),
@@ -239,7 +267,7 @@ func invalidResumeDoc(fullName, portalBaseURL string) emailtmpl.Doc {
 			"ไฟล์ที่คุณอัปโหลดอาจไม่ใช่เรซูเม่/CV จึงยังไม่สามารถพิจารณาใบสมัครของคุณได้ " +
 				"กรุณาตรวจสอบและอัปโหลดไฟล์เรซูเม่ของคุณอีกครั้ง",
 		},
-		CTA: &emailtmpl.CTA{Label: "อัปโหลดเรซูเม่อีกครั้ง", URL: portalBaseURL + "/status"},
+		CTA: &emailtmpl.CTA{Label: "อัปโหลดเรซูเม่อีกครั้ง", URL: statusPath(portalBaseURL, token)},
 	}
 }
 
@@ -266,13 +294,13 @@ func documentReviewedDoc(fullName, docType string, approved bool, reason, portal
 // "received" message; the invalid_resume / name_mismatch gates send their own).
 // The Message.Subject stays "อัปเดตสถานะใบสมัคร" across statuses; Doc.Title is the
 // per-status HTML heading (it does not affect the plain body, so no drift).
-func statusDoc(fullName, status, portalBaseURL string) (emailtmpl.Doc, bool) {
+func statusDoc(fullName, status, portalBaseURL, token string, appID uuid.UUID) (emailtmpl.Doc, bool) {
 	base := func(title string, paras ...string) emailtmpl.Doc {
 		return emailtmpl.Doc{
 			Title:      title,
 			Greeting:   emailtmpl.Greeting(fullName),
 			Paragraphs: paras,
-			CTA:        &emailtmpl.CTA{Label: "ตรวจสอบสถานะใบสมัคร", URL: portalBaseURL + "/status"},
+			CTA:        &emailtmpl.CTA{Label: "ตรวจสอบสถานะใบสมัคร", URL: statusURL(portalBaseURL, status, token, appID)},
 		}
 	}
 	switch status {
@@ -300,12 +328,12 @@ func statusDoc(fullName, status, portalBaseURL string) (emailtmpl.Doc, bool) {
 	case "offer":
 		d := base("คุณได้รับข้อเสนอการจ้างงาน",
 			"คุณได้รับข้อเสนอการจ้างงาน! เข้าสู่ระบบเพื่อดูรายละเอียดและตอบรับข้อเสนอ")
-		d.CTA = &emailtmpl.CTA{Label: "ดูข้อเสนอการจ้างงาน", URL: portalBaseURL + "/offers"}
+		d.CTA = &emailtmpl.CTA{Label: "ดูข้อเสนอการจ้างงาน", URL: statusURL(portalBaseURL, "offer", token, appID)}
 		return d, true
 	case "hired":
 		d := base("ยินดีด้วย คุณได้รับการคัดเลือก",
 			"ยินดีด้วย! คุณได้รับการคัดเลือก กรุณาอัปโหลดเอกสารเริ่มงานของคุณ ทีม HR จะติดต่อกลับเรื่องวันเริ่มงาน")
-		d.CTA = &emailtmpl.CTA{Label: "อัปโหลดเอกสารเริ่มงาน", URL: portalBaseURL + "/account"}
+		d.CTA = &emailtmpl.CTA{Label: "อัปโหลดเอกสารเริ่มงาน", URL: statusURL(portalBaseURL, "hired", token, appID)}
 		return d, true
 	case "rejected":
 		d := base("อัปเดตสถานะใบสมัคร",

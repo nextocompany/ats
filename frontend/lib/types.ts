@@ -79,6 +79,9 @@ export interface InterviewAppointment {
   location_text?: string;
   online_join_url?: string;
   created_at: string;
+  // Set by the schedule endpoint when an online interview was booked but the Teams
+  // link could not be created — HR should send a link manually.
+  warning?: string;
 }
 
 // InterviewCompetencies mirrors applications.InterviewCompetencies — per-dimension
