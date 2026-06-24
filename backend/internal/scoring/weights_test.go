@@ -88,7 +88,7 @@ func TestWeightedTotal_RankingPreservedVsFlatSum(t *testing.T) {
 	b := Breakdown{Experience: 20, Skills: 20, Education: 5, Language: 10, Location: 20}  // flat 75
 	wa := WeightedTotal(a, DefaultWeights())
 	wb := WeightedTotal(b, DefaultWeights())
-	if !(wa > wb) {
+	if wa <= wb {
 		t.Fatalf("ranking not preserved: a=%d b=%d", wa, wb)
 	}
 }

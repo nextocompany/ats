@@ -164,7 +164,7 @@ func (r *pgRepository) replace(ctx context.Context, table, valCol string, areaID
 	if err != nil {
 		return fmt.Errorf("areas: begin: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	if _, err := tx.Exec(ctx, fmt.Sprintf("DELETE FROM %s WHERE area_id = $1", table), areaID); err != nil {
 		return fmt.Errorf("areas: clear %s: %w", table, err)
 	}
@@ -200,7 +200,7 @@ func (r *pgRepository) SetUserAreas(ctx context.Context, userID uuid.UUID, areaI
 	if err != nil {
 		return fmt.Errorf("areas: begin user areas: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	if _, err := tx.Exec(ctx, `DELETE FROM user_areas WHERE user_id = $1`, userID); err != nil {
 		return fmt.Errorf("areas: clear user areas: %w", err)
 	}

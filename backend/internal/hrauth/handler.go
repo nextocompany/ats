@@ -112,10 +112,7 @@ func (h *Handler) CreateUser(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return httpx.Fail(c, fiber.StatusBadRequest, "invalid request body")
 	}
-	user, err := h.svc.CreateUser(c.UserContext(), NewUserInput{
-		Email: req.Email, FullName: req.FullName, Role: req.Role,
-		StoreID: req.StoreID, Subregion: req.Subregion, Password: req.Password,
-	})
+	user, err := h.svc.CreateUser(c.UserContext(), NewUserInput(req))
 	if err != nil {
 		return h.writeUserError(c, err)
 	}
@@ -148,12 +145,7 @@ func (h *Handler) UpdateUser(c *fiber.Ctx) error {
 		return httpx.Fail(c, fiber.StatusBadRequest, "invalid request body")
 	}
 	caller, _ := c.Locals(middleware.UserContextKey).(middleware.DevUser)
-	user, err := h.svc.UpdateUser(c.UserContext(), id, caller.ID, UpdateUserInput{
-		FullName: req.FullName, Role: req.Role, StoreID: req.StoreID,
-		Subregion: req.Subregion, IsActive: req.IsActive,
-		Phone: req.Phone, IsDPO: req.IsDPO, IsPrimaryDPO: req.IsPrimaryDPO,
-		Password: req.Password,
-	})
+	user, err := h.svc.UpdateUser(c.UserContext(), id, caller.ID, UpdateUserInput(req))
 	if err != nil {
 		return h.writeUserError(c, err)
 	}

@@ -124,7 +124,7 @@ func Compare(file string, ocrConfidence float64, p ai.Profile, exp Expected) CVS
 		add("name", boolScore(normText(p.Personal.Name) == normText(exp.Name)), p.Personal.Name, exp.Name)
 	}
 	if exp.Email != "" {
-		add("email", boolScore(strings.ToLower(strings.TrimSpace(p.Personal.Email)) == strings.ToLower(strings.TrimSpace(exp.Email))), p.Personal.Email, exp.Email)
+		add("email", boolScore(strings.EqualFold(strings.TrimSpace(p.Personal.Email), strings.TrimSpace(exp.Email))), p.Personal.Email, exp.Email)
 	}
 	if exp.Phone != "" {
 		add("phone", boolScore(digitsOnly(p.Personal.Phone) == digitsOnly(exp.Phone)), p.Personal.Phone, exp.Phone)
