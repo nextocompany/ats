@@ -50,6 +50,10 @@ type AccountResolver interface {
 	// MarkConsented flips the account consent snapshot (no ledger row); the
 	// apply's candidate-keyed consent row is the authoritative ledger entry.
 	MarkConsented(ctx context.Context, accountID uuid.UUID, version string) error
+	// BackfillContact fills the applying member's account phone/email from the
+	// apply form when the account lacks them (set-once, collision-safe). LINE
+	// accounts in particular start with no email; this is how they acquire one.
+	BackfillContact(ctx context.Context, accountID uuid.UUID, phone, email string) error
 }
 
 const maxResumeBytes = 10 * 1024 * 1024
@@ -276,6 +280,14 @@ func (h *Handler) Apply(c *fiber.Ctx) error {
 	})
 	if err != nil {
 		return err
+	}
+	// Persist the typed phone/email back onto the applying member's account when it
+	// lacks them (LINE accounts start with no email). Best-effort: a failure must
+	// not lose the application — the candidate row already carries the contact.
+	if accountID != nil {
+		if err := h.accounts.BackfillContact(c.UserContext(), *accountID, phone, email); err != nil {
+			log.Warn().Err(err).Str("account_id", accountID.String()).Msg("failed to backfill account contact")
+		}
 	}
 	h.notifyApplicationReceived(c.UserContext(), lineUserID, email, name, positionID)
 	return h.finalizeApplication(c, result, consentVersion, accountID)

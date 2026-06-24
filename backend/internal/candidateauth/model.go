@@ -38,6 +38,14 @@ var (
 	// this distinctly so the user knows to log in with that LINE (merging accounts
 	// is a separate, deliberate flow — not done here).
 	ErrLineLinkedToOther = errors.New("candidateauth: line already linked to another account")
+	// ErrEmailTaken is returned when a profile edit tries to set an email that
+	// already belongs to a DIFFERENT account (email is unique). The editor surfaces
+	// this as a 409 so the user knows to log in with that email instead (merging
+	// accounts is a separate, deliberate flow — not done here).
+	ErrEmailTaken = errors.New("candidateauth: email already in use")
+	// ErrInvalidEmail is returned when a profile edit supplies a syntactically
+	// invalid email; the editor surfaces it as a 400.
+	ErrInvalidEmail = errors.New("candidateauth: invalid email")
 )
 
 // MaxResumes caps the per-account resume library (the portal blocks the 6th
@@ -91,6 +99,7 @@ func (a *Account) GoogleLinked() bool { return a.GoogleSub != "" }
 type ProfileUpdate struct {
 	FullName      string
 	Phone         string
+	Email         string // set-once: only writes when the account has no email yet
 	LineDisplayID string
 	Province      string
 }

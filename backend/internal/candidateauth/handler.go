@@ -211,6 +211,7 @@ func (h *Handler) UpdateProfile(c *fiber.Ctx) error {
 	var body struct {
 		FullName       string `json:"full_name"`
 		Phone          string `json:"phone"`
+		Email          string `json:"email"`
 		LineDisplayID  string `json:"line_display_id"`
 		Province       string `json:"province"`
 		ConsentGiven   bool   `json:"consent_given"`
@@ -220,9 +221,16 @@ func (h *Handler) UpdateProfile(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, "invalid request body")
 	}
 	if err := h.svc.UpdateProfile(c.UserContext(), acct.ID, ProfileUpdate{
-		FullName: body.FullName, Phone: body.Phone, LineDisplayID: body.LineDisplayID, Province: body.Province,
+		FullName: body.FullName, Phone: body.Phone, Email: body.Email, LineDisplayID: body.LineDisplayID, Province: body.Province,
 	}); err != nil {
-		return err
+		switch {
+		case errors.Is(err, ErrEmailTaken):
+			return fiber.NewError(fiber.StatusConflict, "อีเมลนี้ถูกใช้กับบัญชีอื่นแล้ว")
+		case errors.Is(err, ErrInvalidEmail):
+			return fiber.NewError(fiber.StatusBadRequest, "อีเมลไม่ถูกต้อง")
+		default:
+			return err
+		}
 	}
 	if body.ConsentGiven {
 		version := body.ConsentVersion

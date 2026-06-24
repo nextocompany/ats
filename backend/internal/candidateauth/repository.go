@@ -5,6 +5,7 @@ import (
 	"crypto/subtle"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -37,6 +38,9 @@ type Repository interface {
 	// LinkLine attaches a verified LINE sub (+ optional @id) to an existing account.
 	LinkLine(ctx context.Context, accountID uuid.UUID, sub, displayID string) error
 	UpdateProfile(ctx context.Context, accountID uuid.UUID, p ProfileUpdate) error
+	// BackfillContact fills phone/email from an apply when the account lacks them
+	// (set-once, collision-safe on email, never errors on an email already taken).
+	BackfillContact(ctx context.Context, accountID uuid.UUID, phone, email string) error
 	SetResume(ctx context.Context, accountID uuid.UUID, blobURL, fileType string) error
 
 	// Resume library (CV history, capped at MaxResumes, exactly one default).
@@ -241,16 +245,76 @@ func (r *pgRepository) LinkLine(ctx context.Context, accountID uuid.UUID, sub, d
 }
 
 func (r *pgRepository) UpdateProfile(ctx context.Context, accountID uuid.UUID, p ProfileUpdate) error {
+	// When a (set-once) email is supplied, pre-check so the editor can surface a
+	// distinct 409 on a genuine collision. The CASE-guarded UPDATE below is the
+	// final race-safe authority; this only improves the error for the common case.
+	if strings.TrimSpace(p.Email) != "" {
+		var cur string
+		var taken bool
+		err := r.pool.QueryRow(ctx,
+			`SELECT COALESCE(a.email,''),
+			        EXISTS(SELECT 1 FROM candidate_accounts b WHERE b.email = $2 AND b.id <> $1)
+			   FROM candidate_accounts a WHERE a.id = $1`,
+			accountID, p.Email).Scan(&cur, &taken)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrNotFound
+		}
+		if err != nil {
+			return fmt.Errorf("candidateauth: update profile precheck: %w", err)
+		}
+		if cur == "" && taken {
+			return ErrEmailTaken
+		}
+	}
+	// Email is set-once and collision-guarded (the column is UNIQUE): it only
+	// writes when this account has no email yet AND no other account owns it.
+	// email_verified is never touched — a typed email is not a verified one.
 	const q = `
 		UPDATE candidate_accounts SET
 			full_name       = COALESCE(NULLIF($2,''), full_name),
 			phone           = COALESCE(NULLIF($3,''), phone),
+			email           = CASE
+			                     WHEN COALESCE(email,'') = ''
+			                      AND NULLIF($6,'') IS NOT NULL
+			                      AND NOT EXISTS (SELECT 1 FROM candidate_accounts b WHERE b.email = $6 AND b.id <> $1)
+			                     THEN $6 ELSE email END,
 			line_display_id = COALESCE(NULLIF($4,''), line_display_id),
 			province        = COALESCE(NULLIF($5,''), province),
 			updated_at      = NOW()
 		WHERE id = $1`
-	if _, err := r.pool.Exec(ctx, q, accountID, p.FullName, p.Phone, p.LineDisplayID, p.Province); err != nil {
+	if _, err := r.pool.Exec(ctx, q, accountID, p.FullName, p.Phone, p.LineDisplayID, p.Province, p.Email); err != nil {
+		if isUnique(err) { // concurrent insert claimed the email between the guard and the write
+			return ErrEmailTaken
+		}
 		return fmt.Errorf("candidateauth: update profile: %w", err)
+	}
+	return nil
+}
+
+// BackfillContact best-effort fills an account's phone and/or email from an
+// apply submission, but ONLY when the field is currently empty (it never
+// overwrites). Email is additionally collision-guarded against the UNIQUE column
+// and skipped (not errored) when another account owns it, so an apply never
+// fails on a contact-backfill. email_verified is never flipped. The caller
+// passes a normalized (lower+trim) email or "" to skip it.
+func (r *pgRepository) BackfillContact(ctx context.Context, accountID uuid.UUID, phone, email string) error {
+	// Fill-once for BOTH fields: keep an existing value, only set when empty. (This
+	// differs from UpdateProfile, where phone is a user-driven overwrite.)
+	const q = `
+		UPDATE candidate_accounts SET
+			phone      = COALESCE(NULLIF(phone,''), NULLIF($2,'')),
+			email      = CASE
+			               WHEN COALESCE(email,'') = ''
+			                AND NULLIF($3,'') IS NOT NULL
+			                AND NOT EXISTS (SELECT 1 FROM candidate_accounts b WHERE b.email = $3 AND b.id <> $1)
+			               THEN $3 ELSE email END,
+			updated_at = NOW()
+		WHERE id = $1`
+	if _, err := r.pool.Exec(ctx, q, accountID, phone, email); err != nil {
+		if isUnique(err) { // lost a race for the email — leave it unset, keep the phone fill
+			return nil
+		}
+		return fmt.Errorf("candidateauth: backfill contact: %w", err)
 	}
 	return nil
 }

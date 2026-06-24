@@ -57,6 +57,7 @@ type Handler struct {
 	callbackURL   string
 	portalBaseURL string
 	botPrompt     string
+	emailScope    bool
 	real          bool
 	secureCookie  bool
 	http          *http.Client
@@ -77,6 +78,7 @@ func NewHandler(cfg *config.Config, issuer SessionIssuer, verifier auth.Verifier
 		callbackURL:       cfg.LINELoginCallbackURL,
 		portalBaseURL:     strings.TrimRight(cfg.PortalBaseURL, "/"),
 		botPrompt:         cfg.LINELoginBotPrompt,
+		emailScope:        cfg.LINERequestEmailScope,
 		real:              cfg.UsesRealLINE(),
 		secureCookie:      !cfg.IsDevelopment(),
 		http:              &http.Client{Timeout: 10 * time.Second},
@@ -128,7 +130,7 @@ func (h *Handler) Login(c *fiber.Ctx) error {
 		"client_id":     {h.channelID},
 		"redirect_uri":  {h.callbackURL},
 		"state":         {state},
-		"scope":         {"openid profile"},
+		"scope":         {h.scope()},
 	}
 	// Prompt the candidate to add the linked Official Account as a friend during
 	// login, so status/interview LINE pushes can actually reach them. Requires the
@@ -137,6 +139,18 @@ func (h *Handler) Login(c *fiber.Ctx) error {
 		q.Set("bot_prompt", h.botPrompt)
 	}
 	return c.Redirect(authorizeURL+"?"+q.Encode(), fiber.StatusFound)
+}
+
+// scope returns the LINE OAuth scope. "email" is added only when explicitly
+// enabled (LINE_REQUEST_EMAIL_SCOPE) — request it before the channel's "Email
+// address permission" is granted and LINE may reject the authorize request,
+// breaking login. The receive side already stores any returned email, so flipping
+// this flag on (after the console permission lands) needs no further change.
+func (h *Handler) scope() string {
+	if h.emailScope {
+		return "openid profile email"
+	}
+	return "openid profile"
 }
 
 // Callback completes the flow: validate state, exchange the code, then either
