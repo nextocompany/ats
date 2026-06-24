@@ -6,6 +6,7 @@ import { api, ApiError, buildQuery } from "./api";
 import type {
   AdminSettings,
   Area,
+  CandidateLock,
   Application,
   ApplicationFilter,
   ApprovalDecisionInput,
@@ -389,6 +390,34 @@ export function useStores() {
     queryKey: ["stores"],
     queryFn: () => api.get<StoreOption[]>("/api/v1/stores").then((r) => r.data),
     staleTime: 5 * 60_000, // reference data — rarely changes
+  });
+}
+
+// --- Candidate processing lock ---
+
+export function useCandidateLock(candidateId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["candidate-lock", candidateId],
+    queryFn: () => api.get<CandidateLock | null>(`/api/v1/candidates/${candidateId}/lock`).then((r) => r.data ?? null),
+    enabled: !!candidateId,
+    refetchInterval: 60_000, // keep the "being processed" state reasonably fresh
+  });
+}
+
+export function useAcquireLock() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (candidateId: string) =>
+      api.post<CandidateLock>(`/api/v1/candidates/${candidateId}/lock`).then((r) => r.data),
+    onSuccess: (_d, candidateId) => qc.invalidateQueries({ queryKey: ["candidate-lock", candidateId] }),
+  });
+}
+
+export function useReleaseLock() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (candidateId: string) => api.del(`/api/v1/candidates/${candidateId}/lock`),
+    onSuccess: (_d, candidateId) => qc.invalidateQueries({ queryKey: ["candidate-lock", candidateId] }),
   });
 }
 

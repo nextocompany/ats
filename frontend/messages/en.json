@@ -1100,5 +1100,19 @@
     "membersSaved": "Members updated",
     "noAreaHr": "No area_hr users available.",
     "eyebrow": "Access control"
+  },
+  "lock": {
+    "unlocked": "No one is processing this candidate",
+    "claim": "Start processing",
+    "claimed": "You are now processing this candidate",
+    "claimFailed": "Could not claim this candidate",
+    "youAreProcessing": "You are processing this candidate",
+    "processingBy": "Being processed by {name}",
+    "anotherUser": "another user",
+    "until": "until {time}",
+    "release": "Release",
+    "released": "Lock released",
+    "releaseFailed": "Could not release",
+    "forceRelease": "Force release"
   }
 }

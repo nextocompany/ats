@@ -119,7 +119,8 @@ const memberSelect = `
 	       (SELECT COUNT(*) FROM applications ap JOIN candidates c ON c.id = ap.candidate_id WHERE c.account_id = a.id) AS applications_count,
 	       (SELECT COUNT(*) FROM candidate_sessions s WHERE s.account_id = a.id AND s.revoked_at IS NULL AND s.expires_at > NOW()) AS active_sessions,
 	       (SELECT MAX(created_at) FROM candidate_sessions s WHERE s.account_id = a.id) AS last_login_at,
-	       a.created_at
+	       a.created_at,
+	       (SELECT c.id FROM candidates c WHERE c.account_id = a.id AND c.is_duplicate_of IS NULL ORDER BY c.created_at LIMIT 1) AS candidate_id
 	FROM candidate_accounts a`
 
 func scanMember(row pgx.Row) (*Member, error) {
@@ -128,7 +129,7 @@ func scanMember(row pgx.Row) (*Member, error) {
 		&m.ID, &m.FullName, &m.Email, &m.Phone, &m.Province,
 		&m.EmailVerified, &m.LineLinked, &m.GoogleLinked, &m.EmailLinked,
 		&m.HasResume, &m.ResumeType, &m.Status, &m.PDPAConsent, &m.PDPAVersion,
-		&m.AppsCount, &m.ActiveSessions, &m.LastLoginAt, &m.CreatedAt,
+		&m.AppsCount, &m.ActiveSessions, &m.LastLoginAt, &m.CreatedAt, &m.CandidateID,
 	); err != nil {
 		return nil, err
 	}
