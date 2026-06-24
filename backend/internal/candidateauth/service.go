@@ -180,6 +180,13 @@ func (s *Service) VerifyEmailOTP(ctx context.Context, rawEmail, code string) (*A
 // LoginWithLine implements lineauth.SessionIssuer: find-or-create by LINE sub and
 // issue a session. Returns the raw session token + expiry for the cookie.
 func (s *Service) LoginWithLine(ctx context.Context, sub, name, email string) (string, time.Time, error) {
+	// Normalize the LINE email (lower+trim, drop if invalid) so it matches stored
+	// emails for unify/backfill — mirrors the Google path, which already lowercases.
+	if e, ok := normalizeEmail(email); ok {
+		email = e
+	} else {
+		email = ""
+	}
 	acct, err := s.repo.FindOrCreateByLineSub(ctx, sub, name, email)
 	if err != nil {
 		return "", time.Time{}, err

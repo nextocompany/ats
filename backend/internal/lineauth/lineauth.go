@@ -216,6 +216,9 @@ func (h *Handler) finalize(c *fiber.Ctx, ret, mode string, lineUser auth.LineUse
 		return c.Redirect(ret+"#line_linked=1", fiber.StatusFound)
 	}
 
+	// Diagnostic (no PII): records whether LINE actually returned an email, so a
+	// "no email" report can be told apart from a backfill bug. Drop once verified.
+	log.Info().Bool("line_email_present", lineUser.Email != "").Msg("lineauth: login")
 	tok, exp, err := h.issuer.LoginWithLine(c.UserContext(), lineUser.Subject, lineUser.Name, lineUser.Email)
 	if errors.Is(err, candidateauth.ErrAccountSuspended) {
 		// Suspended/anonymized account: login is refused server-side; tell the portal

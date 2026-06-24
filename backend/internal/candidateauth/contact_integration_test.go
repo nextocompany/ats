@@ -98,6 +98,64 @@ func TestBackfillContact_SkipsTakenEmail(t *testing.T) {
 	}
 }
 
+// TestFindOrCreateByLineSub_BackfillsEmailOnExisting proves a LINE account first
+// created WITHOUT an email (email scope off) gets the email backfilled when the
+// same sub logs in again WITH an email — the found-by-sub short-circuit must not
+// drop it. This is the exact prod bug: accounts predating the email scope.
+func TestFindOrCreateByLineSub_BackfillsEmailOnExisting(t *testing.T) {
+	ctx := context.Background()
+	pool := freshAuthDB(t)
+	repo := NewRepository(pool)
+
+	// First login: no email (scope was off).
+	first, err := repo.FindOrCreateByLineSub(ctx, "U-relogin", "LINE User", "")
+	if err != nil {
+		t.Fatalf("first login: %v", err)
+	}
+	if first.Email != "" {
+		t.Fatalf("expected empty email, got %q", first.Email)
+	}
+
+	// Second login: same sub, now LINE returns an email.
+	second, err := repo.FindOrCreateByLineSub(ctx, "U-relogin", "LINE User", "relogin@example.com")
+	if err != nil {
+		t.Fatalf("second login: %v", err)
+	}
+	if second.ID != first.ID {
+		t.Fatalf("expected same account, got %s vs %s", second.ID, first.ID)
+	}
+	if second.Email != "relogin@example.com" {
+		t.Errorf("email = %q, want relogin@example.com (backfilled on re-login)", second.Email)
+	}
+	if !second.EmailVerified {
+		t.Error("email_verified should be TRUE — the provider (LINE) vouches for the address, matching the new-account path")
+	}
+}
+
+// TestFindOrCreateByLineSub_BackfillSkipsTakenEmail proves the re-login backfill is
+// collision-safe: if the LINE email already belongs to another account, it is left
+// unset rather than violating the UNIQUE constraint.
+func TestFindOrCreateByLineSub_BackfillSkipsTakenEmail(t *testing.T) {
+	ctx := context.Background()
+	pool := freshAuthDB(t)
+	repo := NewRepository(pool)
+
+	if _, err := repo.FindOrCreateByEmail(ctx, "owned@example.com"); err != nil {
+		t.Fatalf("seed other: %v", err)
+	}
+	if _, err := repo.FindOrCreateByLineSub(ctx, "U-collide", "LINE User", ""); err != nil {
+		t.Fatalf("first login: %v", err)
+	}
+
+	got, err := repo.FindOrCreateByLineSub(ctx, "U-collide", "LINE User", "owned@example.com")
+	if err != nil {
+		t.Fatalf("re-login must not error on a taken email: %v", err)
+	}
+	if got.Email != "" {
+		t.Errorf("email = %q, want empty (belongs to another account)", got.Email)
+	}
+}
+
 // TestUpdateProfile_SetsEmailOnce proves the editor sets an email on an empty
 // account, and a later edit with a different email is ignored (set-once).
 func TestUpdateProfile_SetsEmailOnce(t *testing.T) {

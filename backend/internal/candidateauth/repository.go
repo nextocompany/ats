@@ -188,6 +188,22 @@ func (r *pgRepository) FindOrCreateUnverifiedByEmail(ctx context.Context, email 
 // provider sub; else link onto an existing email account; else insert a fresh one.
 func (r *pgRepository) findOrCreateBySub(ctx context.Context, subCol, sub, name, email string) (*Account, error) {
 	if a, err := r.findByColumn(ctx, subCol, sub); err == nil {
+		// The account already exists for this provider sub. Backfill a newly-available
+		// email onto it (set-once, collision-safe) — e.g. a LINE account created before
+		// the email scope was granted now logs in with an email. Without this the
+		// found-by-sub short-circuit would silently drop it. Marked verified: the
+		// provider (LINE/Google) vouches for the address, matching the insert below.
+		if a.Email == "" && email != "" {
+			_, uerr := r.pool.Exec(ctx, `
+				UPDATE candidate_accounts SET email = $2, email_verified = TRUE, updated_at = NOW()
+				WHERE id = $1 AND COALESCE(email,'') = ''
+				  AND NOT EXISTS (SELECT 1 FROM candidate_accounts b WHERE b.email = $2 AND b.id <> $1)`,
+				a.ID, email)
+			if uerr != nil && !isUnique(uerr) { // unique race ⇒ another account owns it; leave unset
+				return nil, fmt.Errorf("candidateauth: backfill %s email: %w", subCol, uerr)
+			}
+			return r.GetByID(ctx, a.ID)
+		}
 		return a, nil
 	} else if !errors.Is(err, ErrNotFound) {
 		return nil, err

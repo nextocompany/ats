@@ -144,7 +144,12 @@ func (f *fakeRepo) FindOrCreateUnverifiedByEmail(_ context.Context, email string
 
 func (f *fakeRepo) findOrCreateSub(m map[string]uuid.UUID, sub, name, email string) (*Account, error) {
 	if id, ok := m[sub]; ok {
-		return f.accounts[id], nil
+		a := f.accounts[id]
+		if a.Email == "" && email != "" { // backfill a newly-available email (set-once)
+			a.Email = email
+			f.byEmail[email] = a.ID
+		}
+		return a, nil
 	}
 	if email != "" {
 		if id, ok := f.byEmail[email]; ok {
