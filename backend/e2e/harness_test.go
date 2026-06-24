@@ -93,6 +93,38 @@ func patchJSON(t *testing.T, path string, body any) *http.Response {
 	return resp
 }
 
+// postEnvelope POSTs JSON and decodes the {success,data,meta} envelope's data into
+// out, returning the HTTP status. Pass body=nil for endpoints that take no payload.
+func postEnvelope(t *testing.T, path string, body, out any) int {
+	t.Helper()
+	resp := postJSON(t, path, body)
+	defer resp.Body.Close()
+	var env struct {
+		Data json.RawMessage `json:"data"`
+	}
+	_ = json.NewDecoder(resp.Body).Decode(&env)
+	if out != nil && len(env.Data) > 0 {
+		_ = json.Unmarshal(env.Data, out)
+	}
+	return resp.StatusCode
+}
+
+// postJSONCookie POSTs JSON carrying a candidate session cookie (cp_session) — used
+// to act as the authenticated candidate (e.g. accepting an offer), which MockJWT's
+// super_admin identity cannot do.
+func postJSONCookie(t *testing.T, path string, body any, sessionToken string) *http.Response {
+	t.Helper()
+	raw, _ := json.Marshal(body)
+	req, _ := http.NewRequest(http.MethodPost, apiBase()+path, bytes.NewReader(raw))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Cookie", "cp_session="+sessionToken)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("POST %s (cookie): %v", path, err)
+	}
+	return resp
+}
+
 // getEnvelope GETs a path and decodes the {success,data,meta} envelope's data into out.
 func getEnvelope(t *testing.T, path string, out any) (int, json.RawMessage) {
 	t.Helper()
