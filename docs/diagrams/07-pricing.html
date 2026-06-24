@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>07 ประเมินราคา 3 Phase — CP Axtra HR ATS</title>
+<link rel="stylesheet" href="styles.css" />
+<style>
+  .ctrl { display: flex; flex-wrap: wrap; gap: 18px 28px; align-items: flex-end; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-size: 12px; font-weight: 700; letter-spacing: .04em; color: var(--ink-soft); text-transform: uppercase; }
+  .field .hint { font-size: 11.5px; color: var(--ink-faint); }
+  input.rate, input.cloud {
+    font-family: var(--mono); font-size: 15px; color: var(--brand-deep);
+    border: 1px solid var(--line-strong); border-radius: 9px; padding: 9px 12px;
+    background: var(--surface); width: 160px; transition: .15s; text-align: right;
+  }
+  input.rate:focus, input.cloud:focus { outline: 0; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
+  input.cloud { width: 110px; font-size: 13px; padding: 6px 9px; }
+
+  .phase-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .pc { background: var(--surface); border: 1px solid var(--line); border-left: 5px solid var(--brand); border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow-sm); }
+  .pc.p2 { border-left-color: var(--teal); }
+  .pc.p3 { border-left-color: var(--amber); }
+  .pc .pcn { font-size: 11px; font-weight: 700; letter-spacing: .14em; color: var(--ink-faint); text-transform: uppercase; }
+  .pc .pct { font-size: 20px; font-weight: 800; margin: 4px 0 10px; }
+  .pc .pcrow { display: flex; justify-content: space-between; font-size: 13px; padding: 4px 0; border-top: 1px dashed var(--line); }
+  .pc .pcrow:first-of-type { border-top: 0; }
+  .pc .pcrow b { font-family: var(--mono); color: var(--brand-deep); }
+  .pc .pcrow.cloud b { color: var(--teal); }
+
+  table.ptable { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  table.ptable th { text-align: left; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); padding: 8px 10px; border-bottom: 2px solid var(--line-strong); }
+  table.ptable th.num, table.ptable td.num { text-align: right; font-family: var(--mono); white-space: nowrap; }
+  table.ptable td { padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.ptable tr:hover td { background: var(--brand-tint); }
+  table.ptable .grp td { background: var(--brand-soft); font-weight: 700; color: var(--brand-deep); font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
+  table.ptable .grp:hover td { background: var(--brand-soft); }
+  table.ptable tfoot td { padding: 11px 10px; border-top: 2px solid var(--line-strong); font-weight: 800; font-size: 14px; }
+  table.ptable .wt { color: var(--ink); }
+  table.ptable .wd { color: var(--ink-soft); font-size: 12.5px; }
+  .cost { color: var(--brand-deep); font-weight: 600; }
+  .grand { background: var(--ink); color: #fff; border-radius: var(--radius); padding: 20px 24px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 18px; box-shadow: var(--shadow-md); }
+  .grand .gx { display: flex; flex-direction: column; gap: 2px; }
+  .grand .gl { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: #9fb0d6; }
+  .grand .gv { font-size: 24px; font-weight: 800; font-family: var(--mono); }
+  .grand .gv.teal { color: #7fe0d8; }
+  @media (max-width: 760px){ .phase-cards { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="brandmark"><b>CP AXTRA</b><span>AI HR ATS · System Diagrams</span></div>
+    <a class="backlink" href="index.html">← กลับหน้ารวม</a>
+  </div>
+
+  <span class="eyebrow">07 · Cost Estimation</span>
+  <h1 class="page-title">ประเมินราคา แบ่ง 3 Phase</h1>
+  <p class="page-sub">
+    ประเมินขอบเขตงานและราคาแยกเป็น 3 ระยะ: <strong>Pool</strong> (เครื่องยนต์ข้อมูล + AI คัดกรอง),
+    <strong>Portal</strong> (ช่องทางผู้สมัคร), <strong>ATS</strong> (workflow HR เต็มรูปแบบ + การกำกับดูแล)
+    ค่าพัฒนาคิดจาก man-day × rate ที่คุณกรอกเอง ส่วนค่าคลาวด์เป็นประมาณการรายเดือนที่แก้ไขได้
+  </p>
+
+  <hr class="rule" />
+
+  <!-- CONTROL -->
+  <div class="card">
+    <div class="ctrl">
+      <div class="field">
+        <label for="rate">ค่า man-day (THB / คน-วัน)</label>
+        <input class="rate" id="rate" type="text" inputmode="numeric" placeholder="เช่น 8,000" />
+        <span class="hint">กรอกอัตราของทีมคุณ แล้วราคาค่าพัฒนาจะคำนวณให้ทันที</span>
+      </div>
+      <div class="field">
+        <label>สกุลเงิน</label>
+        <span class="pill" style="font-size:13px;padding:8px 14px">บาท (THB)</span>
+      </div>
+      <div class="field">
+        <label>รวมทุก Phase</label>
+        <span class="pill--live pill" id="grand-md" style="font-size:13px;padding:8px 14px">— man-day</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SUMMARY CARDS -->
+  <div class="section-title">สรุปต่อ Phase</div>
+  <div class="phase-cards">
+    <div class="pc p1">
+      <div class="pcn">Phase 1</div>
+      <div class="pct">🗃️ Pool</div>
+      <div class="pcrow"><span>แรงงานพัฒนา</span><b id="pool-md">— md</b></div>
+      <div class="pcrow"><span>ค่าพัฒนา (one-time)</span><b id="pool-dev">—</b></div>
+      <div class="pcrow cloud"><span>ค่าคลาวด์ / เดือน</span><b id="pool-cloud">—</b></div>
+    </div>
+    <div class="pc p2">
+      <div class="pcn">Phase 2</div>
+      <div class="pct">🌐 Portal</div>
+      <div class="pcrow"><span>แรงงานพัฒนา</span><b id="portal-md">— md</b></div>
+      <div class="pcrow"><span>ค่าพัฒนา (one-time)</span><b id="portal-dev">—</b></div>
+      <div class="pcrow cloud"><span>ค่าคลาวด์ / เดือน</span><b id="portal-cloud">—</b></div>
+    </div>
+    <div class="pc p3">
+      <div class="pcn">Phase 3</div>
+      <div class="pct">⚙️ ATS</div>
+      <div class="pcrow"><span>แรงงานพัฒนา</span><b id="ats-md">— md</b></div>
+      <div class="pcrow"><span>ค่าพัฒนา (one-time)</span><b id="ats-dev">—</b></div>
+      <div class="pcrow cloud"><span>ค่าคลาวด์ / เดือน</span><b id="ats-cloud">—</b></div>
+    </div>
+  </div>
+
+  <!-- GRAND TOTAL -->
+  <div class="grand" style="margin-top:22px">
+    <div class="gx"><span class="gl">รวมแรงงานพัฒนา</span><span class="gv" id="g-md">— man-day</span></div>
+    <div class="gx"><span class="gl">รวมค่าพัฒนา (one-time)</span><span class="gv" id="g-dev">—</span></div>
+    <div class="gx"><span class="gl">รวมค่าคลาวด์ / เดือน</span><span class="gv teal" id="g-cloud">—</span></div>
+    <div class="gx"><span class="gl">ค่าคลาวด์ / ปี (×12)</span><span class="gv teal" id="g-cloud-y">—</span></div>
+  </div>
+
+  <!-- ============ PHASE 1: POOL ============ -->
+  <div class="section-title">Phase 1 · Pool — เครื่องยนต์ข้อมูล + AI คัดกรอง</div>
+  <div class="card">
+    <table class="ptable" data-phase="pool">
+      <thead><tr><th>งาน</th><th>รายละเอียด</th><th class="num">man-day</th><th class="num">ราคา (THB)</th></tr></thead>
+      <tbody>
+        <tr class="grp"><td colspan="4">Backend &amp; Data</td></tr>
+        <tr data-md="12"><td class="wt">โมเดลข้อมูลผู้สมัคร/ใบสมัคร + migrations</td><td class="wd">schema, 40+ migrations, pgx</td><td class="num md">12</td><td class="num cost">—</td></tr>
+        <tr data-md="8"><td class="wt">Repository + status state machine</td><td class="wd">การคงสถานะใบสมัคร, transition rules</td><td class="num md">8</td><td class="num cost">—</td></tr>
+        <tr class="grp"><td colspan="4">AI Screening Pipeline</td></tr>
+        <tr data-md="10"><td class="wt">คิวงาน async + worker</td><td class="wd">asynq บน Redis, retry, concurrency</td><td class="num md">10</td><td class="num cost">—</td></tr>
+        <tr data-md="8"><td class="wt">OCR อ่านเรซูเม่</td><td class="wd">Azure Document Intelligence, confidence gate</td><td class="num md">8</td><td class="num cost">—</td></tr>
+        <tr data-md="12"><td class="wt">แยกข้อมูล CV ด้วย LLM + ปรับ prompt</td><td class="wd">Azure OpenAI parse → structured profile</td><td class="num md">12</td><td class="num cost">—</td></tr>
+        <tr data-md="8"><td class="wt">เครื่องตรวจผู้สมัครซ้ำ (dedup)</td><td class="wd">เทียบชื่อ/เบอร์/อีเมล/บัตร, canonical merge</td><td class="num md">8</td><td class="num cost">—</td></tr>
+        <tr data-md="14"><td class="wt">เครื่องให้คะแนน (scoring)</td><td class="wd">rules + AI ถ่วงน้ำหนักต่อตำแหน่ง, must-have gate</td><td class="num md">14</td><td class="num cost">—</td></tr>
+        <tr data-md="6"><td class="wt">จัดสาขา/ทำเล</td><td class="wd">จังหวัด→subregion→store, location score</td><td class="num md">6</td><td class="num cost">—</td></tr>
+        <tr class="grp"><td colspan="4">Talent Pool &amp; Search</td></tr>
+        <tr data-md="8"><td class="wt">Talent pool + re-engage</td><td class="wd">งานกวาดตามรอบ (scheduler), การติดต่อกลับ</td><td class="num md">8</td><td class="num cost">—</td></tr>
+        <tr data-md="12"><td class="wt">ค้นหา hybrid semantic</td><td class="wd">Azure AI Search keyword+vector (RRF) + embeddings</td><td class="num md">12</td><td class="num cost">—</td></tr>
+        <tr data-md="5"><td class="wt">อัปโหลด CV เป็นชุด (bulk)</td><td class="wd">นำเข้าหลายไฟล์เข้า pool</td><td class="num md">5</td><td class="num cost">—</td></tr>
+        <tr data-md="7"><td class="wt">Directory ผู้สมัคร (มุม HR)</td><td class="wd">members — รายชื่อ pool ที่ HR ดูได้</td><td class="num md">7</td><td class="num cost">—</td></tr>
+        <tr class="grp"><td colspan="4">Platform &amp; QA</td></tr>
+        <tr data-md="14"><td class="wt">โครงสร้างคลาวด์ (IaC)</td><td class="wd">Bicep: ACA, PostgreSQL, Redis, Blob, ACR, Key Vault, logs</td><td class="num md">14</td><td class="num cost">—</td></tr>
+        <tr data-md="6"><td class="wt">CI/CD</td><td class="wd">OIDC, az acr build, deploy workflow, /health</td><td class="num md">6</td><td class="num cost">—</td></tr>
+        <tr data-md="10"><td class="wt">ทดสอบ integration</td><td class="wd">pipeline end-to-end บน PG จริง</td><td class="num md">10</td><td class="num cost">—</td></tr>
+        <tr data-md="9"><td class="wt">สถาปัตยกรรม + บริหารโครงการ</td><td class="wd">ออกแบบ, ประสานงาน</td><td class="num md">9</td><td class="num cost">—</td></tr>
+      </tbody>
+      <tfoot><tr><td colspan="2">รวม Phase 1 · Pool</td><td class="num" data-md-total>—</td><td class="num cost" data-cost-total>—</td></tr></tfoot>
+    </table>
+  </div>
+
+  <!-- ============ PHASE 2: PORTAL ============ -->
+  <div class="section-title">Phase 2 · Portal — ช่องทางผู้สมัคร (Career Portal)</div>
+  <div class="card">
+    <table class="ptable" data-phase="portal">
+      <thead><tr><th>งาน</th><th>รายละเอียด</th><th class="num">man-day</th><th class="num">ราคา (THB)</th></tr></thead>
+      <tbody>
+        <tr class="grp"><td colspan="4">เว็บผู้สมัคร (Next.js / PWA)</td></tr>
+        <tr data-md="12"><td class="wt">วาง scaffold + design system + PWA</td><td class="wd">Next.js 16, theme CP Axtra, service worker, offline</td><td class="num md">12</td><td class="num cost">—</td></tr>
+        <tr data-md="9"><td class="wt">Landing + รายการงาน + รายละเอียดงาน</td><td class="wd">OG tags แชร์ LINE/FB, JobDetail</td><td class="num md">9</td><td class="num cost">—</td></tr>
+        <tr data-md="9"><td class="wt">ขั้นตอนสมัคร (ApplyStepper)</td><td class="wd">account-first, อัปโหลด/เลือกเรซูเม่, ยินยอม PDPA</td><td class="num md">9</td><td class="num cost">—</td></tr>
+        <tr class="grp"><td colspan="4">ตัวตนผู้สมัคร</td></tr>
+        <tr data-md="9"><td class="wt">เข้าสู่ระบบด้วย LINE</td><td class="wd">LINE OAuth 2.1, verify id-token, cp_session</td><td class="num md">9</td><td class="num cost">—</td></tr>
+        <tr data-md="7"><td class="wt">Google + Email OTP</td><td class="wd">ทางเลือก login เพิ่มเติม</td><td class="num md">7</td><td class="num cost">—</td></tr>
+        <tr data-md="8"><td class="wt">บัญชี + คลังเรซูเม่</td><td class="wd">โปรไฟล์, resume library, ตั้งค่า default</td><td class="num md">8</td><td class="num cost">—</td></tr>
+        <tr class="grp"><td colspan="4">ติดตามสถานะ &amp; แจ้งเตือน</td></tr>
+        <tr data-md="6"><td class="wt">ติดตามสถานะ + deep-link</td><td class="wd">/status?token=, ประวัติใบสมัคร</td><td class="num md">6</td><td class="num cost">—</td></tr>
+        <tr data-md="10"><td class="wt">ระบบแจ้งเตือน</td><td class="wd">LINE push + อีเมล branded (emailtmpl) ทุกสถานะ</td><td class="num md">10</td><td class="num cost">—</td></tr>
+        <tr data-md="6"><td class="wt">Public API</td><td class="wd">apply, status, me/applications (RequireCandidate)</td><td class="num md">6</td><td class="num cost">—</td></tr>
+        <tr data-md="3"><td class="wt">i18n ไทย/อังกฤษ</td><td class="wd">next-intl, NEXT_LOCALE cookie</td><td class="num md">3</td><td class="num cost">—</td></tr>
+        <tr class="grp"><td colspan="4">QA &amp; PM</td></tr>
+        <tr data-md="8"><td class="wt">ทดสอบ + UAT</td><td class="wd">e2e flow สมัคร/login/status</td><td class="num md">8</td><td class="num cost">—</td></tr>
+        <tr data-md="5"><td class="wt">บริหารโครงการ</td><td class="wd">ประสานงาน, ออกแบบ UX</td><td class="num md">5</td><td class="num cost">—</td></tr>
+      </tbody>
+      <tfoot><tr><td colspan="2">รวม Phase 2 · Portal</td><td class="num" data-md-total>—</td><td class="num cost" data-cost-total>—</td></tr></tfoot>
+    </table>
+  </div>
+
+  <!-- ============ PHASE 3: ATS ============ -->
+  <div class="section-title">Phase 3 · ATS — workflow HR เต็มรูปแบบ + การกำกับดูแล</div>
+  <div class="card">
+    <table class="ptable" data-phase="ats">
+      <thead><tr><th>งาน</th><th>รายละเอียด</th><th class="num">man-day</th><th class="num">ราคา (THB)</th></tr></thead>
+      <tbody>
+        <tr class="grp"><td colspan="4">Dashboard &amp; การเข้าถึง</td></tr>
+        <tr data-md="12"><td class="wt">วาง scaffold + design system</td><td class="wd">Next.js 16 HR console, nav จาก permission</td><td class="num md">12</td><td class="num cost">—</td></tr>
+        <tr data-md="8"><td class="wt">Entra SSO + JIT provisioning</td><td class="wd">MSAL, OIDC verify, สร้าง user อัตโนมัติ</td><td class="num md">8</td><td class="num cost">—</td></tr>
+        <tr data-md="12"><td class="wt">RBAC แบบ dynamic</td><td class="wd">เมทริกซ์ role→permission→scope, admin matrix, fail-static</td><td class="num md">12</td><td class="num cost">—</td></tr>
+        <tr class="grp"><td colspan="4">คัดกรอง &amp; สัมภาษณ์</td></tr>
+        <tr data-md="12"><td class="wt">Inbox + รายละเอียด/รีวิวผู้สมัคร</td><td class="wd">applications, candidate detail, scorecard view</td><td class="num md">12</td><td class="num cost">—</td></tr>
+        <tr data-md="10"><td class="wt">สัมภาษณ์ AI เบื้องต้น</td><td class="wd">adaptive chat ผ่าน token</td><td class="num md">10</td><td class="num cost">—</td></tr>
+        <tr data-md="5"><td class="wt">วิเคราะห์ fit ข้ามตำแหน่ง</td><td class="wd">AI cross-position</td><td class="num md">5</td><td class="num cost">—</td></tr>
+        <tr data-md="4"><td class="wt">Shortlist (SGM Top-5)</td><td class="wd">คิวเลือกระดับสาขา</td><td class="num md">4</td><td class="num cost">—</td></tr>
+        <tr data-md="10"><td class="wt">นัดสัมภาษณ์ (Graph/Teams)</td><td class="wd">calendar + Teams meeting + HR attendee</td><td class="num md">10</td><td class="num cost">—</td></tr>
+        <tr data-md="6"><td class="wt">บันทึกผลสัมภาษณ์</td><td class="wd">scorecard TA + LM แบบมีโครงสร้าง</td><td class="num md">6</td><td class="num cost">—</td></tr>
+        <tr class="grp"><td colspan="4">อนุมัติ &amp; จ้างงาน</td></tr>
+        <tr data-md="10"><td class="wt">อนุมัติหลายระดับ L1–L4</td><td class="wd">approval chain + SLA sweep</td><td class="num md">10</td><td class="num cost">—</td></tr>
+        <tr data-md="12"><td class="wt">ข้อเสนอ + จดหมาย PDF</td><td class="wd">compose/send/respond, letters เรนเดอร์ PDF (ไทย)</td><td class="num md">12</td><td class="num cost">—</td></tr>
+        <tr data-md="6"><td class="wt">เอกสาร onboarding</td><td class="wd">onboarding documents → hired</td><td class="num md">6</td><td class="num cost">—</td></tr>
+        <tr class="grp"><td colspan="4">รายงาน &amp; การเปิดรับ</td></tr>
+        <tr data-md="9"><td class="wt">รายงาน &amp; analytics</td><td class="wd">funnel, KPI, ส่งออก CSV (RBAC-scoped)</td><td class="num md">9</td><td class="num cost">—</td></tr>
+        <tr data-md="6"><td class="wt">Executive dashboard</td><td class="wd">overview ผู้บริหาร, board pack พิมพ์ได้</td><td class="num md">6</td><td class="num cost">—</td></tr>
+        <tr data-md="9"><td class="wt">Requisitions</td><td class="wd">เปิดรับ + JD fields, ล็อกคอลัมน์ PS-owned</td><td class="num md">9</td><td class="num cost">—</td></tr>
+        <tr data-md="4"><td class="wt">ตั้งค่าน้ำหนักคะแนนต่อตำแหน่ง</td><td class="wd">scoring config UI</td><td class="num md">4</td><td class="num cost">—</td></tr>
+        <tr class="grp"><td colspan="4">เชื่อมต่อ &amp; การกำกับดูแล</td></tr>
+        <tr data-md="14"><td class="wt">เชื่อมต่อ PeopleSoft HCM</td><td class="wd">webhook เข้า (HMAC) + sync ออก (Integration Broker OAuth)</td><td class="num md">14</td><td class="num cost">—</td></tr>
+        <tr data-md="22"><td class="wt">โปรแกรม PDPA ครบชุด</td><td class="wd">consent v2, DSAR, breach register, DPO console, retention, audit</td><td class="num md">22</td><td class="num cost">—</td></tr>
+        <tr class="grp"><td colspan="4">QA &amp; PM</td></tr>
+        <tr data-md="14"><td class="wt">ทดสอบ + UAT</td><td class="wd">ครอบคลุม workflow + security/RBAC</td><td class="num md">14</td><td class="num cost">—</td></tr>
+        <tr data-md="11"><td class="wt">สถาปัตยกรรม + บริหารโครงการ</td><td class="wd">ออกแบบ, ประสานงาน, ฝึกอบรม</td><td class="num md">11</td><td class="num cost">—</td></tr>
+      </tbody>
+      <tfoot><tr><td colspan="2">รวม Phase 3 · ATS</td><td class="num" data-md-total>—</td><td class="num cost" data-cost-total>—</td></tr></tfoot>
+    </table>
+  </div>
+
+  <!-- ============ CLOUD COST ============ -->
+  <div class="section-title">ค่าคลาวด์ (Azure) — ประมาณการรายเดือน · แก้ไขได้</div>
+  <div class="card">
+    <p class="desc" style="margin-bottom:14px">ตัวเลขเป็น<strong>ประมาณการ list-price</strong> โปรดยืนยันด้วย Azure Pricing Calculator
+    ตามปริมาณจริง · รายการ AI (OpenAI/OCR) คิดตามการใช้งานจึงผันแปรตามจำนวนใบสมัคร · คลิกแก้ไขช่องตัวเลขได้</p>
+    <table class="ptable" data-phase-cloud>
+      <thead><tr><th>ทรัพยากร</th><th>รายละเอียด / SKU</th><th>Phase</th><th class="num">THB / เดือน</th></tr></thead>
+      <tbody>
+        <tr><td class="wt">Container Apps × 3</td><td class="wd">api + worker + scheduler · 0.5 vCPU / 1 GiB</td><td>Pool</td><td class="num"><input class="cloud" data-cloud="pool" value="2500"></td></tr>
+        <tr><td class="wt">PostgreSQL Flexible</td><td class="wd">Standard_B1ms Burstable + 32 GB</td><td>Pool</td><td class="num"><input class="cloud" data-cloud="pool" value="900"></td></tr>
+        <tr><td class="wt">Azure Cache for Redis</td><td class="wd">Basic C0</td><td>Pool</td><td class="num"><input class="cloud" data-cloud="pool" value="600"></td></tr>
+        <tr><td class="wt">Storage Account</td><td class="wd">Standard_LRS · container resumes</td><td>Pool</td><td class="num"><input class="cloud" data-cloud="pool" value="250"></td></tr>
+        <tr><td class="wt">Azure OpenAI</td><td class="wd">chat + embeddings · <em>ตามปริมาณการใช้</em></td><td>Pool</td><td class="num"><input class="cloud" data-cloud="pool" value="3000"></td></tr>
+        <tr><td class="wt">Document Intelligence</td><td class="wd">OCR · <em>ตามปริมาณการใช้</em></td><td>Pool</td><td class="num"><input class="cloud" data-cloud="pool" value="1500"></td></tr>
+        <tr><td class="wt">ACR + Key Vault + Logs</td><td class="wd">Basic registry, KV, Log Analytics, App Insights</td><td>Pool</td><td class="num"><input class="cloud" data-cloud="pool" value="900"></td></tr>
+        <tr><td class="wt">Container App (Portal)</td><td class="wd">career-portal · 0.5 vCPU / 1 GiB</td><td>Portal</td><td class="num"><input class="cloud" data-cloud="portal" value="900"></td></tr>
+        <tr><td class="wt">Container App (Dashboard)</td><td class="wd">HR dashboard · 0.5 vCPU / 1 GiB</td><td>ATS</td><td class="num"><input class="cloud" data-cloud="ats" value="900"></td></tr>
+        <tr><td class="wt">Azure AI Search</td><td class="wd">free → Basic เมื่อสเกล</td><td>ATS</td><td class="num"><input class="cloud" data-cloud="ats" value="2600"></td></tr>
+        <tr><td class="wt">Microsoft Graph / Entra</td><td class="wd">รวมใน M365 ขององค์กร (ไม่มีค่าใช้จ่าย Azure เพิ่ม)</td><td>ATS</td><td class="num"><input class="cloud" data-cloud="ats" value="0"></td></tr>
+      </tbody>
+      <tfoot><tr><td colspan="3">รวมค่าคลาวด์ / เดือน</td><td class="num cost" id="cloud-grand">—</td></tr></tfoot>
+    </table>
+  </div>
+
+  <!-- ASSUMPTIONS -->
+  <div class="section-title">สมมติฐาน &amp; ขอบเขต</div>
+  <div class="grid g2">
+    <div class="card desc">
+      <p><strong>การแบ่ง phase</strong></p>
+      <ul>
+        <li><strong>Pool</strong> วางรากฐานก่อน: รับ CV → AI คัดกรอง → talent pool + ค้นหา (ใช้งานได้แม้ยังไม่มี portal/dashboard ครบ)</li>
+        <li><strong>Portal</strong> เปิดช่องทางให้ผู้สมัครสมัคร/ติดตามเองได้ ต่อยอดบน pool</li>
+        <li><strong>ATS</strong> เติม workflow HR เต็ม + การกำกับดูแล (PDPA) + เชื่อม PeopleSoft</li>
+      </ul>
+      <p>แต่ละ phase ส่งมอบใช้งานจริงได้ในตัว (incremental) ไม่ต้องรอครบทั้งหมด</p>
+    </div>
+    <div class="card desc">
+      <p><strong>หมายเหตุการประเมิน</strong></p>
+      <ul>
+        <li>man-day เป็น<strong>ประมาณการ effort</strong> จากขอบเขตจริงในซอร์สโค้ด อาจปรับตามรายละเอียด requirement</li>
+        <li>ค่าพัฒนา = man-day × rate ที่กรอก (ยังไม่รวม VAT, ค่า license, ค่า support หลังส่งมอบ)</li>
+        <li>ค่าคลาวด์เป็น list-price โดยประมาณ ค่า AI ผันแปรตามปริมาณใบสมัคร/เดือน</li>
+        <li>ยังไม่รวม: ค่า LINE Official Account, ค่า domain/cert, ค่าที่ปรึกษากฎหมาย PDPA, ค่าบำรุงรักษารายปี</li>
+      </ul>
+    </div>
+  </div>
+
+  <footer class="foot">
+    <span>07 · ประเมินราคา 3 Phase</span>
+    <span>กรอกค่า man-day ด้านบนเพื่อคำนวณราคาค่าพัฒนา · <a class="backlink" href="index.html" style="padding:4px 10px">กลับหน้ารวม</a></span>
+  </footer>
+
+</div>
+
+<script>
+  const THB = n => n.toLocaleString('th-TH', { maximumFractionDigits: 0 });
+  const rateEl = document.getElementById('rate');
+
+  function parseNum(v) { return parseFloat(String(v).replace(/[^0-9.]/g, '')) || 0; }
+
+  function recalc() {
+    const rate = parseNum(rateEl.value);
+    const phases = { pool: { md: 0, dev: 0 }, portal: { md: 0, dev: 0 }, ats: { md: 0, dev: 0 } };
+
+    document.querySelectorAll('table.ptable[data-phase]').forEach(tbl => {
+      const ph = tbl.dataset.phase;
+      let md = 0;
+      tbl.querySelectorAll('tr[data-md]').forEach(tr => {
+        const m = parseNum(tr.dataset.md);
+        md += m;
+        const cell = tr.querySelector('.cost');
+        cell.textContent = rate ? THB(m * rate) : '—';
+      });
+      const dev = md * rate;
+      phases[ph].md = md; phases[ph].dev = dev;
+      tbl.querySelector('[data-md-total]').textContent = md + ' md';
+      tbl.querySelector('[data-cost-total]').textContent = rate ? THB(dev) + ' ฿' : '—';
+    });
+
+    // cloud
+    const cloud = { pool: 0, portal: 0, ats: 0 };
+    document.querySelectorAll('input.cloud').forEach(inp => {
+      cloud[inp.dataset.cloud] += parseNum(inp.value);
+    });
+    const cloudTotal = cloud.pool + cloud.portal + cloud.ats;
+
+    // summary cards
+    const set = (id, v) => document.getElementById(id).textContent = v;
+    set('pool-md', phases.pool.md + ' md');
+    set('portal-md', phases.portal.md + ' md');
+    set('ats-md', phases.ats.md + ' md');
+    set('pool-dev', rate ? THB(phases.pool.dev) + ' ฿' : '—');
+    set('portal-dev', rate ? THB(phases.portal.dev) + ' ฿' : '—');
+    set('ats-dev', rate ? THB(phases.ats.dev) + ' ฿' : '—');
+    set('pool-cloud', THB(cloud.pool) + ' ฿');
+    set('portal-cloud', THB(cloud.portal) + ' ฿');
+    set('ats-cloud', THB(cloud.ats) + ' ฿');
+
+    const totalMd = phases.pool.md + phases.portal.md + phases.ats.md;
+    const totalDev = phases.pool.dev + phases.portal.dev + phases.ats.dev;
+    set('grand-md', totalMd + ' man-day');
+    set('g-md', totalMd + ' man-day');
+    set('g-dev', rate ? THB(totalDev) + ' ฿' : 'กรอก rate');
+    set('g-cloud', THB(cloudTotal) + ' ฿');
+    set('g-cloud-y', THB(cloudTotal * 12) + ' ฿');
+    document.getElementById('cloud-grand').textContent = THB(cloudTotal) + ' ฿';
+  }
+
+  rateEl.addEventListener('input', recalc);
+  document.querySelectorAll('input.cloud').forEach(i => i.addEventListener('input', recalc));
+  recalc();
+</script>
+</body>
+</html>

@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>02 เส้นทางผู้สมัคร End-to-End — CP Axtra HR ATS</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="brandmark"><b>CP AXTRA</b><span>AI HR ATS · System Diagrams</span></div>
+    <a class="backlink" href="index.html">← กลับหน้ารวม</a>
+  </div>
+
+  <span class="eyebrow">02 · End-to-End Flow</span>
+  <h1 class="page-title">เส้นทางผู้สมัคร (End-to-End)</h1>
+  <p class="page-sub">
+    เส้นทางสมบูรณ์ตั้งแต่ผู้สมัครยื่นใบสมัคร จนถึงการจ้างงานและ onboarding แบ่งเป็น 3 ช่วง:
+    (ก) รับเข้า → (ข) คัดกรองอัตโนมัติด้วย AI เบื้องหลัง → (ค) ขั้นตอนที่ HR ทำเอง
+  </p>
+
+  <hr class="rule" />
+
+  <!-- PHASE A: INTAKE -->
+  <div class="section-title">ช่วง ก · รับใบสมัคร (Intake)</div>
+  <div class="canvas-board">
+    <div class="row nowrap fill center">
+      <div class="node node--accent eq">
+        <div class="nt">1 · ยื่นใบสมัคร</div>
+        <div class="nm">ผู้สมัครเลือกตำแหน่งใน Portal แล้ว apply (เลือกเรซูเม่ที่บันทึกไว้ หรืออัปโหลดใหม่ PDF/DOCX/รูป ≤10MB) + ยินยอม PDPA</div>
+      </div>
+      <span class="arrow">→</span>
+      <div class="node eq">
+        <div class="nt">2 · สร้าง Application</div>
+        <div class="nm">API บันทึกใบสมัคร สถานะเริ่มต้น <code>pending</code> และอัปโหลดไฟล์เข้า Blob</div>
+      </div>
+      <span class="arrow">→</span>
+      <div class="node node--queue eq">
+        <div class="nt">3 · เข้าคิว</div>
+        <div class="nm">API enqueue งาน <code>application:process</code> เข้า Redis (asynq) แล้วตอบผู้สมัครทันที</div>
+      </div>
+    </div>
+    <div class="legend">
+      <div class="li">ช่องทางรับเข้าอื่นที่ลงสู่คิวเดียวกัน:</div>
+      <div class="li"><span class="pill">Portal apply</span></div>
+      <div class="li"><span class="pill">Bulk upload (HR)</span></div>
+      <div class="li"><span class="pill--amber pill">Webhook ภายนอก</span></div>
+      <div class="li"><span class="pill--amber pill">PeopleSoft pull</span></div>
+    </div>
+  </div>
+
+  <!-- PHASE B: AUTO PIPELINE -->
+  <div class="section-title">ช่วง ข · คัดกรองอัตโนมัติเบื้องหลัง (Worker Pipeline — intake → scored)</div>
+  <div class="canvas-board">
+    <div class="col">
+
+      <div class="row center"><span class="step-n">1</span>
+        <div class="node node--data eq">
+          <div class="nt">OCR — อ่านเรซูเม่</div>
+          <div class="nm">ดึงไฟล์จาก Blob → Azure Document Intelligence อ่านเป็นข้อความ · ถ้าความมั่นใจ &lt; 0.7 ตั้งธงให้ตรวจมือ (ไม่ล้มงาน)</div>
+        </div>
+      </div>
+      <div class="arrow down">↓</div>
+
+      <div class="row center"><span class="step-n">2</span>
+        <div class="node node--data eq">
+          <div class="nt">Parse — แยกข้อมูลด้วย LLM</div>
+          <div class="nm">Azure OpenAI แปลงข้อความเป็นโปรไฟล์มีโครงสร้าง (ชื่อ ทักษะ ประสบการณ์ ฯลฯ)</div>
+        </div>
+        <span class="arrow">→</span>
+        <div class="col eq" style="gap:8px">
+          <div class="node node--danger">
+            <div class="nt">⚠ ไม่ใช่เรซูเม่</div>
+            <div class="nm">→ สถานะ <code>invalid_resume</code> แจ้งผู้สมัครให้อัปโหลดใหม่ · จบงาน (ไม่ retry)</div>
+          </div>
+          <div class="node node--danger">
+            <div class="nt">⚠ ชื่อไม่ตรงบัญชี</div>
+            <div class="nm">(เฉพาะ portal) → <code>name_mismatch</code> แจ้งผู้สมัคร · จบงาน</div>
+          </div>
+        </div>
+      </div>
+      <div class="arrow down">↓</div>
+
+      <div class="row center"><span class="step-n">3</span>
+        <div class="node node--data eq">
+          <div class="nt">Dedup — ตรวจผู้สมัครซ้ำ</div>
+          <div class="nm">เทียบชื่อ/เบอร์/อีเมล/บัตรปชช. หาผู้สมัครตัวจริง (canonical) · ถ้าซ้ำ ย้ายใบสมัครไปรวม</div>
+        </div>
+        <span class="arrow">→</span>
+        <div class="node node--ghost eq">
+          <div class="nt">3b · สร้างบัญชี Portal เงียบๆ</div>
+          <div class="nm">ผูกบัญชี career-portal ให้ canonical อัตโนมัติ (ไม่มีการแจ้ง)</div>
+        </div>
+      </div>
+      <div class="arrow down">↓</div>
+
+      <div class="row center"><span class="step-n">4</span>
+        <div class="node node--data eq">
+          <div class="nt">Score — ให้คะแนนความเหมาะสม</div>
+          <div class="nm">โหลด Master JD → คะแนนทำเล (LocationScore) + คะแนนรวมแบบ rules + AI ถ่วงน้ำหนัก<strong>ต่อตำแหน่ง</strong> (ประสบการณ์/ทักษะ/วุฒิ/ภาษา/ทำเล)</div>
+        </div>
+      </div>
+      <div class="arrow down">↓</div>
+
+      <div class="row center"><span class="step-n">5</span>
+        <div class="node node--data eq">
+          <div class="nt">Must-have Gate — เกณฑ์บังคับ</div>
+          <div class="nm">ถ้าขาดคุณสมบัติบังคับ → ตัดออก</div>
+        </div>
+        <span class="arrow">→</span>
+        <div class="node node--danger eq">
+          <div class="nt">✕ ไม่ผ่านเกณฑ์</div>
+          <div class="nm">→ สถานะ <code>rejected</code> แจ้งผู้สมัคร · จบงาน</div>
+        </div>
+      </div>
+      <div class="arrow down">↓</div>
+
+      <div class="row center"><span class="step-n">6</span>
+        <div class="node node--data eq">
+          <div class="nt">Branch Assignment — จัดสาขา / talent pool</div>
+          <div class="nm">map จังหวัด→subregion→สาขา · บันทึกคะแนน · ตั้งสถานะ <code>scored</code> (= คัดกรองผ่าน) → แจ้งผู้สมัคร</div>
+        </div>
+      </div>
+      <div class="arrow down">↓</div>
+
+      <div class="row center"><span class="step-n">7</span>
+        <div class="node eq">
+          <div class="nt">แจ้ง HR + index ค้นหา (best-effort)</div>
+          <div class="nm">อีเมล/Teams แจ้งทีมสำหรับผู้ที่ถูกจัดเข้าสาขา · re-index ผู้สมัคร canonical เข้า AI Search</div>
+        </div>
+      </div>
+
+    </div>
+    <div class="legend">
+      <div class="li"><span class="swatch" style="background:var(--teal)"></span> ขั้นตอน pipeline (อัตโนมัติ)</div>
+      <div class="li"><span class="swatch" style="background:var(--clay)"></span> สาขาที่ตัดออก/แจ้งเตือน</div>
+      <div class="li"><span class="swatch" style="background:var(--violet)"></span> คิวงาน</div>
+      <div class="li">หากเกิด error ชั่วคราว → สถานะ <code>failed</code> และ asynq จะ retry</div>
+    </div>
+  </div>
+
+  <!-- PHASE C: HR FLOW -->
+  <div class="section-title">ช่วง ค · ขั้นตอนที่ HR ทำเอง (Synchronous — ทำใน API ไม่ผ่าน Worker)</div>
+  <div class="canvas-board">
+    <div class="grid g4">
+      <div class="node node--accent"><div class="nt">8 · สัมภาษณ์ AI</div><div class="nm">ผู้สมัครคุยกับ AI แบบ adaptive ผ่าน token</div></div>
+      <div class="node node--accent"><div class="nt">9 · วิเคราะห์ Fit</div><div class="nm">AI ประเมินความเหมาะข้ามตำแหน่ง</div></div>
+      <div class="node node--accent"><div class="nt">10 · Shortlist</div><div class="nm">SGM สาขาเลือก Top-5</div></div>
+      <div class="node node--accent"><div class="nt">11 · นัดสัมภาษณ์</div><div class="nm">สร้างนัด/Teams ผ่าน Graph · HR เป็น attendee</div></div>
+      <div class="node node--accent"><div class="nt">12 · บันทึกผล</div><div class="nm">Scorecard TA + LM แบบมีโครงสร้าง</div></div>
+      <div class="node node--accent"><div class="nt">13 · อนุมัติหลายระดับ</div><div class="nm">L1→L4: Staff→HRM→SGM→Regional</div></div>
+      <div class="node node--accent"><div class="nt">14 · ออกข้อเสนอ</div><div class="nm">ร่าง + ส่ง offer · ผู้สมัครตอบรับ/ปฏิเสธ + จดหมาย PDF</div></div>
+      <div class="node node--accent"><div class="nt">15 · Onboarding</div><div class="nm">เอกสารรับเข้า → จ้างงาน</div></div>
+    </div>
+    <div class="conn-down" style="margin-top:14px"><div class="ln"></div><div class="hd">▼</div></div>
+    <div class="node node--external" style="border-left-width:5px">
+      <div class="nt">🏢 Sync กลับ PeopleSoft HCM</div>
+      <div class="nm">เมื่อ HR ตั้งสถานะ <code>hired</code> หรือผู้สมัครตอบรับข้อเสนอ → push ข้อมูลพนักงานใหม่ออกไปยัง PeopleSoft (best-effort)</div>
+    </div>
+  </div>
+
+  <!-- STATUS MACHINE -->
+  <div class="section-title">Status Machine — วงจรสถานะใบสมัคร</div>
+  <div class="canvas-board plain">
+    <div class="row" style="gap:10px;align-items:center">
+      <span class="stat stat--start">pending</span><span class="arrow">→</span>
+      <span class="stat">parsed</span><span class="arrow">→</span>
+      <span class="stat">scored</span>
+      <span class="arrow-lbl">(คัดกรองผ่าน)</span>
+    </div>
+    <div class="arrow down">↓</div>
+    <div class="row" style="gap:10px;align-items:center">
+      <span class="stat">ai_interview</span><span class="arrow">→</span>
+      <span class="stat">ai_interviewed</span><span class="arrow">→</span>
+      <span class="stat">shortlisted</span><span class="arrow">→</span>
+      <span class="stat">interview</span><span class="arrow">→</span>
+      <span class="stat">interviewed</span>
+    </div>
+    <div class="arrow down">↓</div>
+    <div class="row" style="gap:10px;align-items:center">
+      <span class="stat">pending_approval</span><span class="arrow">→</span>
+      <span class="stat">offer</span><span class="arrow">→</span>
+      <span class="stat stat--end">hired ✓</span>
+    </div>
+    <hr class="rule" />
+    <div class="row" style="gap:10px;align-items:center">
+      <span class="arrow-lbl" style="font-weight:600">สถานะแยกออกจากเส้นทางหลัก:</span>
+      <span class="stat stat--branch">invalid_resume</span>
+      <span class="stat stat--branch">name_mismatch</span>
+      <span class="stat stat--branch">rejected</span>
+      <span class="stat stat--branch">failed (retry)</span>
+    </div>
+  </div>
+
+  <div class="section-title">คำอธิบาย</div>
+  <div class="grid g2">
+    <div class="card desc">
+      <p><strong>เส้นแบ่งสำคัญคือสถานะ <code>scored</code></strong> — ทุกอย่างก่อนหน้านี้ทำอัตโนมัติใน
+      Worker เบื้องหลัง หลังจากนั้นทุก transition เป็นการกระทำของ HR ผ่าน API โดยตรง (ไม่ผ่านคิว)</p>
+      <p><strong>เกตปลอดภัยตั้งแต่ต้นทาง</strong> — ไฟล์ที่ไม่ใช่เรซูเม่ ชื่อไม่ตรง หรือขาดคุณสมบัติบังคับ
+      จะถูกแยกออกตั้งแต่ต้น พร้อมแจ้งผู้สมัครอย่างสุภาพ และ<strong>ไม่</strong> retry (กันการวนซ้ำไม่จำเป็น)</p>
+    </div>
+    <div class="card desc">
+      <p><strong>การแจ้งเตือนทุกสถานะ</strong> — แต่ละการเปลี่ยนสถานะที่สำคัญจะแจ้งผู้สมัครผ่าน
+      LINE/อีเมล พร้อม deep-link กลับมาที่หน้าสถานะ (<code>/status?token=</code>) หรือหน้า offer</p>
+      <p><strong>หมายเหตุ end-state</strong> — ในโค้ดสถานะ <code>hired</code> ถูกระบุว่าเป็น legacy terminal
+      และ <code>offer</code> เป็นสถานะปลายทางอนาคต การ label ปลายทางกำลังอยู่ในช่วงเปลี่ยนผ่าน</p>
+    </div>
+  </div>
+
+  <footer class="foot">
+    <span>02 · เส้นทางผู้สมัคร End-to-End</span>
+    <span>ถัดไป → <a class="backlink" href="03-architecture.html" style="padding:4px 10px">03 สถาปัตยกรรม</a></span>
+  </footer>
+
+</div>
+</body>
+</html>

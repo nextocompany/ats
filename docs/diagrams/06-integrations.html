@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>06 การเชื่อมต่อภายนอก &amp; การแจ้งเตือน — CP Axtra HR ATS</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="brandmark"><b>CP AXTRA</b><span>AI HR ATS · System Diagrams</span></div>
+    <a class="backlink" href="index.html">← กลับหน้ารวม</a>
+  </div>
+
+  <span class="eyebrow">06 · Integrations &amp; Notifications</span>
+  <h1 class="page-title">การเชื่อมต่อภายนอกและการแจ้งเตือน</h1>
+  <p class="page-sub">
+    ทุกบริการภายนอกซ่อนหลัง interface + factory ที่สลับ mock/real ตาม env (<code>*_PROVIDER</code>)
+    ค่าเริ่มต้นเป็น mock เพื่อพัฒนา/ทดสอบ แล้วเปิด real ใน production
+  </p>
+
+  <hr class="rule" />
+
+  <!-- INTEGRATION MAP -->
+  <div class="canvas-board">
+    <div class="node node--accent" style="border-left-width:5px;margin-bottom:16px">
+      <div class="nt">⚙️ Go API / Worker — ทุกการเชื่อมต่อผ่าน provider seam</div>
+      <div class="nm">เลือก implementation ตาม env ใน <code>pkg/config</code> · interface เดียวกัน mock หรือ real ก็ใช้แทนกันได้</div>
+    </div>
+
+    <div class="grid g3">
+
+      <div class="node node--external">
+        <div class="nt">🤖 Azure OpenAI <span class="pill--live pill">real (prod)</span></div>
+        <div class="nm">LLM แยกข้อมูล CV + สัมภาษณ์ AI + fit · embeddings semantic search</div>
+        <div style="margin-top:8px"><span class="pill">AI_PROVIDER</span> mock·azure·gemini</div>
+      </div>
+
+      <div class="node node--external">
+        <div class="nt">📄 Document Intelligence <span class="pill--live pill">real</span></div>
+        <div class="nm">OCR อ่านเรซูเม่ (prebuilt-layout) · เปิดเมื่อ AI_PROVIDER=azure</div>
+      </div>
+
+      <div class="node node--external">
+        <div class="nt">🧠 Gemini <span class="pill--mock pill">ทางเลือก</span></div>
+        <div class="nm">OCR+parse ผ่าน Google Gemini REST (provider ที่ 3)</div>
+      </div>
+
+      <div class="node node--external">
+        <div class="nt">🔎 Azure AI Search <span class="pill--mock pill">phase-2</span></div>
+        <div class="nm">hybrid keyword+vector (RRF) · mock = Postgres trigram</div>
+        <div style="margin-top:8px"><span class="pill">AI_SEARCH_PROVIDER</span></div>
+      </div>
+
+      <div class="node node--external">
+        <div class="nt">💬 LINE Login <span class="pill--live pill">real</span></div>
+        <div class="nm">OAuth ผู้สมัคร + verify id-token</div>
+        <div style="margin-top:8px"><span class="pill">LINE_PROVIDER</span> mock·real</div>
+      </div>
+
+      <div class="node node--external">
+        <div class="nt">🔐 Microsoft Entra ID <span class="pill--live pill">real</span></div>
+        <div class="nm">SSO ของ HR (OIDC) · จำกัด tenant</div>
+        <div style="margin-top:8px"><span class="pill">AUTH_PROVIDER</span></div>
+      </div>
+
+      <div class="node node--external">
+        <div class="nt">📅 Microsoft Graph <span class="pill--mock pill">mock (prod)</span></div>
+        <div class="nm">สร้างนัด/Teams meeting (app-only) · โค้ด HR-attendee พร้อมแต่ยัง dormant</div>
+        <div style="margin-top:8px"><span class="pill">GRAPH_PROVIDER</span></div>
+      </div>
+
+      <div class="node node--external">
+        <div class="nt">✉️ ACS Email <span class="pill--live pill">real</span></div>
+        <div class="nm">OTP + แจ้งเตือนทุกสถานะ (branded HTML) · HMAC shared-key</div>
+        <div style="margin-top:8px"><span class="pill">EMAIL_PROVIDER</span></div>
+      </div>
+
+      <div class="node node--external">
+        <div class="nt">🔵 Google Login <span class="pill--mock pill">opt</span></div>
+        <div class="nm">OAuth ผู้สมัครทางเลือก</div>
+        <div style="margin-top:8px"><span class="pill">GOOGLE_PROVIDER</span></div>
+      </div>
+
+      <div class="node node--external">
+        <div class="nt">👥 Teams Webhook</div>
+        <div class="nm">แจ้งช่อง HR · ปิดอัตโนมัติถ้า <code>TEAMS_WEBHOOK_URL</code> ว่าง</div>
+      </div>
+
+      <div class="node node--external">
+        <div class="nt">🏢 PeopleSoft HCM</div>
+        <div class="nm">A: webhook เข้า (HMAC) · B: sync ออก (Integration Broker OAuth)</div>
+        <div style="margin-top:8px"><span class="pill">PS_PROVIDER</span></div>
+      </div>
+
+      <div class="node node--external">
+        <div class="nt">📊 Executive data</div>
+        <div class="nm">ตัวเลข overview ผู้บริหาร (mock หรือ ดึงจาก ATS)</div>
+        <div style="margin-top:8px"><span class="pill">EXECUTIVE_PROVIDER</span></div>
+      </div>
+
+    </div>
+    <div class="legend">
+      <div class="li"><span class="pill--live pill">real</span> เปิดใช้จริงบน production</div>
+      <div class="li"><span class="pill--mock pill">mock</span> ยังเป็น mock / phase-2 / dormant</div>
+      <div class="li">ทุกตัวมี env toggle เปิด real ได้โดยไม่ต้องแก้โค้ด</div>
+    </div>
+  </div>
+
+  <!-- NOTIFICATION CHANNELS -->
+  <div class="section-title">ช่องทางแจ้งเตือน (internal/notify)</div>
+  <div class="canvas-board plain">
+    <div class="row center fill">
+      <div class="node node--accent eq">
+        <div class="nt">เหตุการณ์เปลี่ยนสถานะ</div>
+        <div class="nm">ทุก transition สำคัญในวงจรใบสมัคร trigger การแจ้งเตือน</div>
+      </div>
+      <span class="arrow">→</span>
+      <div class="col eq" style="gap:10px">
+        <div class="node node--data">
+          <div class="nt">👤 ถึงผู้สมัคร</div>
+          <div class="nm"><strong>LINE push</strong> + <strong>อีเมล branded</strong> พร้อม deep-link กลับ <code>/status?token=</code> หรือหน้า offer</div>
+        </div>
+        <div class="node node--data">
+          <div class="nt">🧑‍💼 ถึงทีม HR</div>
+          <div class="nm"><strong>อีเมล</strong> + <strong>Teams</strong> เมื่อมีผู้สมัครคะแนนสูงถูกจัดเข้าสาขา</div>
+        </div>
+      </div>
+    </div>
+    <div class="legend">
+      <div class="li">notify เป็น seam เดียว: render ข้อความครั้งเดียวเป็น plain (LINE/Teams) + HTML (อีเมล) ไม่ให้เนื้อหา drift</div>
+      <div class="li">อีเมลใช้ <code>pkg/emailtmpl</code> · brand <code>#0B47B8</code> · Noto Sans Thai</div>
+    </div>
+  </div>
+
+  <div class="section-title">คำอธิบาย</div>
+  <div class="grid g2">
+    <div class="card desc">
+      <p><strong>ทำไมต้อง mock-by-default</strong> — ทุกการเชื่อมต่อภายนอกเริ่มต้นเป็น mock
+      ทำให้รัน/ทดสอบ/พัฒนาได้โดยไม่ต้องมี credential จริงหรือเสียค่า API แล้วค่อยพลิกเป็น real
+      ทีละตัวด้วย env เมื่อพร้อม (ไม่ต้อง redeploy code)</p>
+      <p><strong>ฝั่งเข้า vs ฝั่งออก</strong> — PeopleSoft เป็นสองทิศ: รับใบสมัคร/ตำแหน่งเข้ามา (Direction A,
+      ตรวจ HMAC) และ sync พนักงานใหม่ออก (Direction B, OAuth Integration Broker)</p>
+    </div>
+    <div class="card desc">
+      <p><strong>สถานะ provider บน production ปัจจุบัน</strong></p>
+      <ul>
+        <li><span class="pill--live pill">real</span> OpenAI, Doc Intelligence, LINE, Entra SSO, ACS Email</li>
+        <li><span class="pill--mock pill">mock</span> Microsoft Graph (Teams meeting จริงรอ Azure AD app + admin consent) · AI Search (phase-2)</li>
+      </ul>
+      <p>โค้ด HR-as-attendee สำหรับนัดสัมภาษณ์พร้อมแล้ว แต่จะ active เมื่อเปิด <code>GRAPH_PROVIDER=real</code></p>
+    </div>
+  </div>
+
+  <footer class="foot">
+    <span>06 · การเชื่อมต่อภายนอก &amp; การแจ้งเตือน</span>
+    <span><a class="backlink" href="index.html" style="padding:4px 10px">← กลับหน้ารวม</a></span>
+  </footer>
+
+</div>
+</body>
+</html>

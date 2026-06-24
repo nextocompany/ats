@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>03 สถาปัตยกรรมแอปพลิเคชัน — CP Axtra HR ATS</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="brandmark"><b>CP AXTRA</b><span>AI HR ATS · System Diagrams</span></div>
+    <a class="backlink" href="index.html">← กลับหน้ารวม</a>
+  </div>
+
+  <span class="eyebrow">03 · Application Architecture</span>
+  <h1 class="page-title">สถาปัตยกรรมแอปพลิเคชัน</h1>
+  <p class="page-sub">
+    โครงสร้างภายในแบ่งเป็นชั้น: client → ชั้นบริการ (api / worker / scheduler ที่สร้างจาก
+    codebase Go เดียวกัน) → คิวงาน → ชั้นข้อมูล โดยมีโมดูล (internal packages) จัดกลุ่มตามโดเมน
+  </p>
+
+  <hr class="rule" />
+
+  <div class="canvas-board">
+
+    <!-- CLIENT -->
+    <div class="layer">
+      <span class="layer-label">ชั้น Client (Next.js 16)</span>
+      <div class="grid g2">
+        <div class="node node--accent">
+          <div class="nt">🌐 Career Portal</div>
+          <div class="nm">PWA ผู้สมัคร · เรียก API ตรงผ่าน <code>NEXT_PUBLIC_API_URL</code> · session cookie <code>cp_session</code> · i18n ไทย/อังกฤษ (next-intl)</div>
+        </div>
+        <div class="node node--accent">
+          <div class="nt">🖥️ HR Dashboard</div>
+          <div class="nm">คอนโซล HR · MSAL/Entra SSO หรือ password · nav สร้างจาก permission set · i18n ไทย/อังกฤษ</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="conn-down"><div class="ln"></div><div class="hd">▼ HTTPS (REST, envelope {success,data,error,meta})</div></div>
+
+    <!-- SERVICE LAYER -->
+    <div class="layer layer--brand">
+      <span class="layer-label">ชั้นบริการ · Go 1.26 / Fiber — 3 binary จาก codebase เดียว</span>
+      <div class="grid g3">
+        <div class="node node--accent">
+          <div class="nt">⚙️ cmd/api</div>
+          <div class="nm">HTTP server (public :8080) · mount ~40 route groups · RBAC authorizer แบบ dynamic · ทำงาน HR แบบ sync + enqueue งาน pipeline</div>
+        </div>
+        <div class="node node--queue">
+          <div class="nt">🔧 cmd/worker</div>
+          <div class="nm">asynq consumer (:8081 health) · รัน pipeline คัดกรอง + งานกวาด 7 ชนิด · concurrency ตั้งได้</div>
+        </div>
+        <div class="node node--queue">
+          <div class="nt">⏰ cmd/scheduler</div>
+          <div class="nm">asynq scheduler · ลงทะเบียน cron แล้ว enqueue เท่านั้น · <strong>ต้องรันแค่ 1 replica</strong></div>
+        </div>
+      </div>
+      <div class="legend" style="margin-top:14px">
+        <div class="li">CLI/Jobs ครั้งคราว:</div>
+        <div class="li"><span class="pill--violet pill">reindex</span> backfill ดัชนีค้นหา</div>
+        <div class="li"><span class="pill--violet pill">importref</span> นำเข้าสาขา/ตำแหน่ง (CSV)</div>
+        <div class="li"><span class="pill--violet pill">seedresumes</span> seed เดโม</div>
+      </div>
+    </div>
+
+    <div class="row center" style="margin:8px 0">
+      <div class="conn-down eq"><div class="hd">▲ enqueue</div><div class="ln"></div></div>
+      <div class="node node--queue eq" style="max-width:340px;margin:0 auto">
+        <div class="nt">🔁 asynq บน Redis — คิวงาน</div>
+        <div class="nm">api ผลิตงาน → worker บริโภค · scheduler ตั้งเวลา → worker บริโภค</div>
+      </div>
+      <div class="conn-down eq"><div class="hd">▼ consume</div><div class="ln"></div></div>
+    </div>
+
+    <div class="conn-down"><div class="ln"></div><div class="hd">▼</div></div>
+
+    <!-- DATA -->
+    <div class="layer">
+      <span class="layer-label">ชั้นข้อมูล / Data &amp; Storage</span>
+      <div class="grid g4">
+        <div class="node node--data"><div class="nt">🐘 PostgreSQL 16</div><div class="nm"><code>hr_db</code> · pgx v5 · ข้อมูลโดเมนทั้งหมด · 41 migrations</div></div>
+        <div class="node node--data"><div class="nt">⚡ Redis</div><div class="nm">asynq queue · session/cache</div></div>
+        <div class="node node--data"><div class="nt">📦 Blob Storage</div><div class="nm">เรซูเม่, ข้อความ OCR, โปรไฟล์ JSON, จดหมาย, รายงาน</div></div>
+        <div class="node node--data"><div class="nt">🔎 Azure AI Search</div><div class="nm">ดัชนี <code>candidates</code> · hybrid keyword+vector (RRF)</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INTERNAL PACKAGES -->
+  <div class="section-title">โมดูลภายใน (internal packages) จัดกลุ่มตามโดเมน</div>
+  <div class="grid g3">
+
+    <div class="card">
+      <div class="pill" style="margin-bottom:12px">Pipeline &amp; AI คัดกรอง</div>
+      <div class="desc"><ul>
+        <li><strong>pipeline</strong> — task <code>process_application</code> รัน pipeline เต็ม</li>
+        <li><strong>ai</strong> — OCR + parse + embeddings (mock/azure/gemini)</li>
+        <li><strong>scoring</strong> — ให้คะแนน hybrid ถ่วงน้ำหนักต่อตำแหน่ง + must-have gate</li>
+        <li><strong>dedup</strong> — รวมผู้สมัครซ้ำเป็น canonical</li>
+        <li><strong>branch</strong> — จังหวัด→subregion→สาขา + คะแนนทำเล</li>
+        <li><strong>fit</strong> — วิเคราะห์ความเหมาะข้ามตำแหน่ง (sync)</li>
+        <li><strong>interview</strong> — สัมภาษณ์ AI แบบ adaptive (sync)</li>
+        <li><strong>search</strong> — seam ค้นหา (trigram / AI Search)</li>
+      </ul></div>
+    </div>
+
+    <div class="card">
+      <div class="pill" style="margin-bottom:12px">โดเมนใบสมัคร / HR workflow</div>
+      <div class="desc"><ul>
+        <li><strong>applications</strong> — แกนกลาง: persistence, status machine, schedule, feedback, approval, offer, letters, onboarding, bulk</li>
+        <li><strong>candidates / profiles</strong> — ข้อมูล + read API ของ HR</li>
+        <li><strong>intake</strong> — webhook รับเข้า (HMAC) → pipeline</li>
+        <li><strong>positions / vacancies / requisitions</strong> — JD, ตำแหน่งว่าง, การเปิดรับ</li>
+        <li><strong>stores</strong> — ข้อมูลสาขา + แมป subregion</li>
+        <li><strong>letters</strong> — เรนเดอร์จดหมาย PDF (ไทย)</li>
+        <li><strong>calendar</strong> — นัดสัมภาษณ์/Teams ผ่าน Graph</li>
+        <li><strong>reengage</strong> — ติดต่อ talent pool กลับ</li>
+      </ul></div>
+    </div>
+
+    <div class="card">
+      <div class="pill" style="margin-bottom:12px">ตัวตน / สิทธิ์ / การแจ้งเตือน</div>
+      <div class="desc"><ul>
+        <li><strong>candidateauth</strong> — บัญชีผู้สมัคร (OTP/LINE/Google), resume library, consent</li>
+        <li><strong>lineauth / auth</strong> — LINE OAuth + verify id-token</li>
+        <li><strong>hrauth</strong> — password sign-in ของ HR</li>
+        <li><strong>rbac / rbacadmin</strong> — role→permission→scope (DB-backed, fail-static)</li>
+        <li><strong>middleware</strong> — auth, logging, client-IP, CSRF/origin guard</li>
+        <li><strong>notify</strong> — seam แจ้งเตือน (LINE/อีเมล/Teams)</li>
+        <li><strong>members / users / settings</strong> — บัญชี, /me, config runtime</li>
+      </ul></div>
+    </div>
+
+    <div class="card">
+      <div class="pill--violet pill" style="margin-bottom:12px">PDPA &amp; การกำกับดูแล</div>
+      <div class="desc"><ul>
+        <li><strong>pdpa / pdpaadmin</strong> — consent, retention/erasure, คอนโซล DPO</li>
+        <li><strong>dsar</strong> — คำขอเข้าถึง/พกพา/ลบข้อมูล (ผู้สมัคร)</li>
+        <li><strong>breach</strong> — ทะเบียนเหตุข้อมูลรั่ว + นับถอยหลัง 72 ชม.</li>
+        <li><strong>activity</strong> — audit log เส้นทางผู้สมัคร</li>
+      </ul></div>
+    </div>
+
+    <div class="card">
+      <div class="pill--amber pill" style="margin-bottom:12px">รายงาน &amp; ภายนอก</div>
+      <div class="desc"><ul>
+        <li><strong>reports</strong> — funnel, KPI, ส่งออก CSV</li>
+        <li><strong>executive</strong> — overview ผู้บริหาร (budget vs headcount)</li>
+        <li><strong>peoplesoft</strong> — รับ webhook เข้า + sync ออก (Integration Broker)</li>
+        <li><strong>public</strong> — API สาธารณะของ portal (apply, status)</li>
+        <li><strong>health</strong> — รวม probe ของ dependency เป็น <code>/health</code></li>
+      </ul></div>
+    </div>
+
+    <div class="card desc">
+      <div class="pill--live pill" style="margin-bottom:12px">หลักการออกแบบ</div>
+      <p><strong>codebase เดียว 3 entrypoint</strong> — api/worker/scheduler build จาก
+      <code>backend/Dockerfile</code> ตัวเดียวด้วย build-arg <code>SVC</code> ทำให้ใช้โค้ดร่วมกันแต่แยก image</p>
+      <p><strong>provider seam</strong> — ทุกบริการภายนอกซ่อนหลัง interface + factory ที่เลือก
+      mock/real ตาม env ทดสอบได้โดยไม่ต้องมีของจริง</p>
+    </div>
+
+  </div>
+
+  <footer class="foot">
+    <span>03 · สถาปัตยกรรมแอปพลิเคชัน</span>
+    <span>ถัดไป → <a class="backlink" href="04-cloud.html" style="padding:4px 10px">04 โครงสร้างคลาวด์</a></span>
+  </footer>
+
+</div>
+</body>
+</html>

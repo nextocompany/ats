@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>08 RBAC Redesign (Proposed) — CP Axtra HR ATS</title>
+<link rel="stylesheet" href="styles.css" />
+<style>
+  .matrix { width: 100%; border-collapse: separate; border-spacing: 10px; }
+  .matrix th { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-faint); padding: 6px 8px; text-align: center; }
+  .matrix th.rowh { text-align: right; color: var(--brand-deep); white-space: nowrap; }
+  .matrix td { background: var(--brand-tint); border: 1px solid var(--line); border-radius: 11px; padding: 12px; vertical-align: middle; text-align: center; min-width: 130px; }
+  .matrix td.empty { background: repeating-linear-gradient(45deg, #fafbfd, #fafbfd 6px, #f2f4f8 6px, #f2f4f8 12px); border-style: dashed; }
+  .rolechip { display: inline-block; font-size: 13px; font-weight: 700; color: var(--brand-deep); background: var(--surface); border: 1px solid var(--brand-soft); border-left: 4px solid var(--brand); border-radius: 8px; padding: 7px 11px; margin: 3px 0; box-shadow: var(--shadow-sm); }
+  .rolechip.teal { border-left-color: var(--teal); color: var(--teal); }
+  .rolechip.violet { border-left-color: var(--violet); color: var(--violet); }
+  .rolechip.amber { border-left-color: var(--amber); color: var(--amber); }
+  .rolechip.ink { border-left-color: var(--ink); color: var(--ink); }
+  .rolechip small { display: block; font-weight: 500; font-size: 10.5px; color: var(--ink-faint); letter-spacing: 0; }
+  .sqlbox { font-family: var(--mono); font-size: 12px; background: #0e1726; color: #c7d4ee; border-radius: 10px; padding: 12px 14px; line-height: 1.6; overflow-x: auto; }
+  .sqlbox .k { color: #7fb0ff; } .sqlbox .c { color: #6b7a99; } .sqlbox .s { color: #7fe0d8; }
+  .tl { display: flex; align-items: stretch; gap: 0; flex-wrap: wrap; }
+  .tl .seg { flex: 1 1 0; min-width: 150px; position: relative; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-top: 4px solid var(--brand); border-radius: 11px; margin: 6px; box-shadow: var(--shadow-sm); }
+  .tl .seg.pool { border-top-color: var(--amber); }
+  .tl .seg.lock { border-top-color: var(--violet); }
+  .tl .seg .sn { font-size: 11px; font-weight: 700; color: var(--ink-faint); letter-spacing: .08em; }
+  .tl .seg .st { font-size: 14px; font-weight: 700; margin: 4px 0; }
+  .tl .seg .sd { font-size: 12px; color: var(--ink-soft); }
+  @media (max-width: 820px){ .matrix td { min-width: 0; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="brandmark"><b>CP AXTRA</b><span>AI HR ATS · System Diagrams</span></div>
+    <a class="backlink" href="index.html">← กลับหน้ารวม</a>
+  </div>
+
+  <span class="eyebrow">08 · RBAC Redesign · ฉบับเสนอ (Proposed)</span>
+  <h1 class="page-title">โมเดลสิทธิ์ใหม่ (Role &amp; Permission)</h1>
+  <p class="page-sub">
+    การออกแบบ RBAC ใหม่ตาม requirement ลูกค้า เปลี่ยนจากมิติเดียว (all/subregion/store) เป็น
+    <strong>2 แกน</strong> — "มองเห็นใคร" × "ทำอะไรได้" — พร้อม area แบบ dynamic, candidate pool กลาง,
+    การ lock ระหว่าง process และ timeout 3 วัน · <em>นี่คือแบบที่เสนอ ยังไม่ได้พัฒนา</em>
+  </p>
+
+  <hr class="rule" />
+
+  <!-- 2-AXIS MATRIX -->
+  <div class="section-title">โมเดล 2 แกน — Visibility scope × Capability</div>
+  <div class="canvas-board plain">
+    <table class="matrix">
+      <thead>
+        <tr>
+          <th class="rowh">มองเห็น ↓ / ทำได้ →</th>
+          <th>read-only (ดูอย่างเดียว)</th>
+          <th>operate (ลงมือทำ)</th>
+          <th>admin</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th class="rowh">store<br><small style="font-weight:400">สาขาเดียว + pool</small></th>
+          <td class="empty">—</td>
+          <td><span class="rolechip">hr_store<small>สาขาตัวเอง + central pool</small></span></td>
+          <td class="empty">—</td>
+        </tr>
+        <tr>
+          <th class="rowh">area<br><small style="font-weight:400">10-20 สาขา dynamic</small></th>
+          <td class="empty">—</td>
+          <td><span class="rolechip teal">area_hr<small>area ตัวเอง + central pool</small></span></td>
+          <td class="empty">—</td>
+        </tr>
+        <tr>
+          <th class="rowh">requisition<br><small style="font-weight:400">ตำแหน่งที่เปิดเอง</small></th>
+          <td><span class="rolechip violet">hiring_manager_store (sgm)<small>+ approve จ้าง</small></span><br><span class="rolechip violet">hiring_manager_ho<small>+ approve จ้าง</small></span></td>
+          <td class="empty">—</td>
+          <td class="empty">—</td>
+        </tr>
+        <tr>
+          <th class="rowh">all<br><small style="font-weight:400">ทั้งองค์กร</small></th>
+          <td><span class="rolechip amber">auditor<small>ตรวจสอบ/PDPA</small></span></td>
+          <td><span class="rolechip">ta<small>head office recruiter</small></span></td>
+          <td><span class="rolechip ink">super_admin<small>bypass</small></span></td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="legend">
+      <div class="li"><span class="swatch" style="background:var(--brand)"></span> scope = store</div>
+      <div class="li"><span class="swatch" style="background:var(--teal)"></span> scope = area</div>
+      <div class="li"><span class="swatch" style="background:var(--violet)"></span> scope = requisition</div>
+      <div class="li"><span class="swatch" style="background:var(--amber)"></span> scope = all (read)</div>
+      <div class="li">HM = "read-only บน ops" แต่ <strong>เป็นผู้อนุมัติจ้าง</strong> (operate ≠ approve)</div>
+    </div>
+  </div>
+
+  <!-- SCOPE RESOLUTION -->
+  <div class="section-title">การ resolve scope → SQL filter</div>
+  <div class="grid g2">
+    <div class="card">
+      <div class="pill" style="margin-bottom:10px">store · hr_store</div>
+      <div class="sqlbox"><span class="c">-- สาขาตัวเอง + central pool ทั้งหมด</span><br>assigned_store_id = <span class="s">$store</span><br><span class="k">OR</span> (talent_pool <span class="k">AND</span> assigned_store_id <span class="k">IS NULL</span>)</div>
+    </div>
+    <div class="card">
+      <div class="pill--live pill" style="margin-bottom:10px">area · area_hr</div>
+      <div class="sqlbox"><span class="c">-- สาขาใน area ที่ดูแล + central pool</span><br>assigned_store_id <span class="k">IN</span> (<span class="k">SELECT</span> store_no <span class="k">FROM</span> area_stores<br>&nbsp;&nbsp;<span class="k">WHERE</span> area_id <span class="k">IN</span> (<span class="k">SELECT</span> area_id <span class="k">FROM</span> user_areas<br>&nbsp;&nbsp;&nbsp;&nbsp;<span class="k">WHERE</span> user_id = <span class="s">$me</span>))<br><span class="k">OR</span> (talent_pool <span class="k">AND</span> assigned_store_id <span class="k">IS NULL</span>)</div>
+    </div>
+    <div class="card">
+      <div class="pill--violet pill" style="margin-bottom:10px">requisition · hiring manager</div>
+      <div class="sqlbox"><span class="c">-- เฉพาะ candidate ในตำแหน่งที่ตัวเองเปิด</span><br>vacancy_id <span class="k">IN</span> (<span class="k">SELECT</span> id <span class="k">FROM</span> vacancies<br>&nbsp;&nbsp;<span class="k">WHERE</span> hiring_manager_user_id = <span class="s">$me</span>)<br><span class="c">-- ไม่เห็น pool, ไม่เห็นอื่น (default-deny)</span></div>
+    </div>
+    <div class="card">
+      <div class="pill--amber pill" style="margin-bottom:10px">all · ta / auditor / super_admin</div>
+      <div class="sqlbox"><span class="c">-- ไม่มี filter (เห็นทั้งหมด)</span><br>(clause ว่าง)<br><br><span class="c">-- ต่างกันที่ capability:</span><br><span class="c">-- ta=operate, auditor=read, super_admin=admin</span></div>
+    </div>
+  </div>
+  <div class="card desc" style="margin-top:14px;border-left:4px solid var(--teal)">
+    <p><strong>สำคัญ:</strong> <code>subregion</code> ถูก<strong>ถอดออกจาก RBAC scope</strong> (แทนด้วย <code>area</code> ที่แก้ได้ผ่าน admin)
+    แต่ยังคงอยู่ในฐานะ attribute สำหรับ <strong>branch assigner</strong> (จับคู่ candidate↔store ตอน pipeline) — แยกบทบาทกันชัดเจน</p>
+  </div>
+
+  <!-- CANDIDATE LIFECYCLE -->
+  <div class="section-title">วงจร candidate: store-specific → central pool + lock + timeout 3 วัน</div>
+  <div class="canvas-board">
+    <div class="tl">
+      <div class="seg">
+        <div class="sn">1 · ยื่นสมัคร</div>
+        <div class="st">created_at</div>
+        <div class="sd">เริ่มจับเวลา 3 วัน</div>
+      </div>
+      <div class="seg">
+        <div class="sn">2 · pipeline จัดสาขา</div>
+        <div class="st">store-specific</div>
+        <div class="sd"><code>assigned_store_id</code> set, สาขานั้นรับผิดชอบ</div>
+      </div>
+      <div class="seg lock">
+        <div class="sn">3 · HR สาขา action ใดๆ</div>
+        <div class="st">picked_up_at set</div>
+        <div class="sd">หยุดนับเวลา → process ต่อ (lock ระหว่างทำ)</div>
+      </div>
+    </div>
+    <div class="row" style="justify-content:center;margin:6px 0"><span class="arrow-lbl">— หรือถ้าไม่มี action ใน 3 วัน —</span></div>
+    <div class="tl">
+      <div class="seg pool">
+        <div class="sn">4 · sweep ปล่อยลง pool</div>
+        <div class="st">central pool</div>
+        <div class="sd"><code>assigned_store_id=NULL, talent_pool=true</code> + แจ้งเตือน</div>
+      </div>
+      <div class="seg pool">
+        <div class="sn">5 · pool กลาง</div>
+        <div class="st">ใครก็ดึงได้</div>
+        <div class="sd">hr_store ทุกสาขา + area_hr + ta เห็น/ดึง</div>
+      </div>
+      <div class="seg lock">
+        <div class="sn">6 · ต้อง lock ก่อน operate</div>
+        <div class="st">candidate lock</div>
+        <div class="sd">กันสองคนทำพร้อมกัน · TTL 30 นาที</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOCK MECHANIC -->
+  <div class="section-title">กลไก Lock (ระดับ candidate)</div>
+  <div class="grid g3">
+    <div class="card desc">
+      <div class="pill--violet pill" style="margin-bottom:10px">key</div>
+      <p>lock ด้วย <strong>canonical <code>candidates.id</code></strong> (ไม่ใช่ account_id) → ครอบทุก application ของคนนั้น + รองรับ bulk/PS/legacy ที่ไม่มี account</p>
+    </div>
+    <div class="card desc">
+      <div class="pill--violet pill" style="margin-bottom:10px">พฤติกรรม</div>
+      <p>คนอื่น<strong>ยังเห็นได้</strong> แต่ <strong>operate ไม่ได้</strong> ขณะถูก lock → แสดง "กำลังถูกดำเนินการโดย X"</p>
+    </div>
+    <div class="card desc">
+      <div class="pill--violet pill" style="margin-bottom:10px">หมดอายุ</div>
+      <p><strong>TTL 30 นาที</strong> ต่ออายุเมื่อมี activity · ปลดเองได้ + admin override · acquire = <code>INSERT ON CONFLICT</code> (atomic)</p>
+    </div>
+  </div>
+
+  <!-- MIGRATION -->
+  <div class="section-title">การ migrate role เดิม → ใหม่ (แทนที่ทั้งหมด)</div>
+  <div class="card">
+    <table class="ptable" style="width:100%;border-collapse:collapse;font-size:13.5px">
+      <thead><tr>
+        <th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--line-strong);color:var(--ink-faint);font-size:11px;letter-spacing:.1em;text-transform:uppercase">role เดิม</th>
+        <th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--line-strong);color:var(--ink-faint);font-size:11px;letter-spacing:.1em;text-transform:uppercase">scope เดิม</th>
+        <th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--line-strong);color:var(--ink-faint);font-size:11px;letter-spacing:.1em;text-transform:uppercase">→ role ใหม่</th>
+        <th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--line-strong);color:var(--ink-faint);font-size:11px;letter-spacing:.1em;text-transform:uppercase">หมายเหตุ</th>
+      </tr></thead>
+      <tbody style="font-size:13px">
+        <tr><td style="padding:9px 10px;border-bottom:1px solid var(--line)">hr_staff</td><td style="padding:9px 10px;border-bottom:1px solid var(--line)">store</td><td style="padding:9px 10px;border-bottom:1px solid var(--line)"><b style="color:var(--brand-deep)">hr_store</b></td><td style="padding:9px 10px;border-bottom:1px solid var(--line);color:var(--ink-soft)">ตรง</td></tr>
+        <tr><td style="padding:9px 10px;border-bottom:1px solid var(--line)">hr_manager</td><td style="padding:9px 10px;border-bottom:1px solid var(--line)">store</td><td style="padding:9px 10px;border-bottom:1px solid var(--line)"><b style="color:var(--teal)">area_hr</b></td><td style="padding:9px 10px;border-bottom:1px solid var(--line);color:var(--ink-soft)">ต้องสร้าง area + assign</td></tr>
+        <tr><td style="padding:9px 10px;border-bottom:1px solid var(--line)">sgm</td><td style="padding:9px 10px;border-bottom:1px solid var(--line)">store + approver</td><td style="padding:9px 10px;border-bottom:1px solid var(--line)"><b style="color:var(--violet)">hiring_manager_store</b></td><td style="padding:9px 10px;border-bottom:1px solid var(--line);color:var(--ink-soft)">read-only ops แต่ยังเป็น approver</td></tr>
+        <tr><td style="padding:9px 10px;border-bottom:1px solid var(--line)">operation_director</td><td style="padding:9px 10px;border-bottom:1px solid var(--line)">subregion</td><td style="padding:9px 10px;border-bottom:1px solid var(--line)"><b style="color:var(--teal)">area_hr</b></td><td style="padding:9px 10px;border-bottom:1px solid var(--line);color:var(--ink-soft)">subregion ≠ area → map ใหม่</td></tr>
+        <tr><td style="padding:9px 10px;border-bottom:1px solid var(--line)">regional_director</td><td style="padding:9px 10px;border-bottom:1px solid var(--line)">all</td><td style="padding:9px 10px;border-bottom:1px solid var(--line)"><b style="color:var(--brand-deep)">ta</b></td><td style="padding:9px 10px;border-bottom:1px solid var(--line);color:var(--ink-soft)">operate-all</td></tr>
+        <tr><td style="padding:9px 10px;border-bottom:1px solid var(--line)">auditor</td><td style="padding:9px 10px;border-bottom:1px solid var(--line)">all (read)</td><td style="padding:9px 10px;border-bottom:1px solid var(--line)"><b style="color:var(--amber)">auditor (ใหม่)</b></td><td style="padding:9px 10px;border-bottom:1px solid var(--line);color:var(--ink-soft)">role read-only-all</td></tr>
+        <tr><td style="padding:9px 10px">super_admin</td><td style="padding:9px 10px">all</td><td style="padding:9px 10px"><b style="color:var(--ink)">super_admin</b></td><td style="padding:9px 10px;color:var(--ink-soft)">คงเดิม</td></tr>
+      </tbody>
+    </table>
+    <div class="desc" style="margin-top:12px"><p>⚠️ กระทบ <strong>approval workflow</strong> (000022): ผู้อนุมัติที่เคยเป็น sgm → เปลี่ยนเป็น <strong>hiring manager</strong> + remap level อื่น (hr_manager→area_hr, regional_director→ta)</p></div>
+  </div>
+
+  <!-- WHAT'S NEW -->
+  <div class="section-title">สิ่งที่ต้องสร้างใหม่ (gap จากระบบปัจจุบัน)</div>
+  <div class="grid g2">
+    <div class="card desc">
+      <div class="pill--clay pill" style="margin-bottom:10px">โครงสร้างใหม่</div>
+      <ul>
+        <li><strong>Area</strong> — ตาราง <code>areas</code> + <code>area_stores</code> (M:N) + <code>user_areas</code> + admin UI (ปัจจุบันมีแค่ subregion hardcode 13 ค่า)</li>
+        <li><strong>Requisition link</strong> — <code>vacancies.hiring_manager_user_id</code> (FK จริง) + <code>applications.vacancy_id</code> (ปัจจุบันขาด link นี้)</li>
+        <li><strong>Lock</strong> — ตาราง <code>candidate_locks</code> + TTL (ปัจจุบันไม่มีเลย)</li>
+        <li><strong>Timer</strong> — <code>applications.picked_up_at</code> + release sweep (ลอก pattern approval:sla_sweep)</li>
+        <li><strong>scope kinds</strong> — เพิ่ม <code>area</code>, <code>requisition</code> ใน CHECK</li>
+      </ul>
+    </div>
+    <div class="card desc">
+      <div class="pill--live pill" style="margin-bottom:10px">มีฐานรองรับแล้ว</div>
+      <ul>
+        <li>dynamic RBAC รองรับ <code>scope_kind</code> ต่อ role (แค่ขยาย CHECK)</li>
+        <li>central pool มีฐาน: <code>talent_pool</code> + <code>assigned_store_id=NULL</code> + <code>candidate_accounts</code></li>
+        <li>timeout sweep ลอก pattern <code>approval:sla_sweep</code> (index status,due_at) ได้</li>
+        <li>resolve actor จาก email (<code>hrauth.FindByEmail</code>) ใช้ผูก hiring manager ได้</li>
+      </ul>
+      <p style="margin-top:8px"><strong>ประมาณการ ~55-65 md</strong> แบ่ง 3 sub-phase (core → pool+lock → frontend+approval)</p>
+    </div>
+  </div>
+
+  <footer class="foot">
+    <span>08 · RBAC Redesign (Proposed) · อ้างอิง .claude/PRPs/plans/rbac-role-redesign-analysis.plan.md</span>
+    <span><a class="backlink" href="05-auth-rbac.html" style="padding:4px 10px">ดู RBAC ปัจจุบัน (05) →</a></span>
+  </footer>
+
+</div>
+</body>
+</html>
