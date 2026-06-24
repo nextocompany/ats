@@ -491,6 +491,24 @@ export function useSetAreaMembers() {
   });
 }
 
+// User-side area coverage (the user-admin area picker for area_hr).
+export function useUserAreas(userId: string | null) {
+  return useQuery({
+    queryKey: ["user-areas", userId],
+    queryFn: () => api.get<string[]>(`/api/v1/users/${userId}/areas`).then((r) => r.data ?? []),
+    enabled: !!userId,
+  });
+}
+
+export function useSetUserAreas() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, areaIds }: { userId: string; areaIds: string[] }) =>
+      api.put(`/api/v1/users/${userId}/areas`, { area_ids: areaIds }),
+    onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: ["user-areas", v.userId] }),
+  });
+}
+
 // useReassign manually (re)assigns an application to a store, or moves it to the
 // central pool ({ talent_pool: true }). Refreshes the application + inbox + journey.
 export function useReassign(id: string) {

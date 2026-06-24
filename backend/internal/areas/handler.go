@@ -29,6 +29,12 @@ func RegisterRoutes(app *fiber.App, h *Handler) {
 	g.Delete("/:id", h.Delete)
 	g.Put("/:id/stores", h.SetStores)
 	g.Put("/:id/members", h.SetMembers)
+
+	// User-side area coverage (the area picker in user admin). Distinct path from
+	// /users/me so it does not collide with the users handler.
+	u := app.Group("/api/v1/users/:id/areas")
+	u.Get("/", h.UserAreas)
+	u.Put("/", h.SetUserAreas)
 }
 
 // requireAdmin gates every endpoint on the area.admin permission.
@@ -198,4 +204,49 @@ func (h *Handler) SetMembers(c *fiber.Ctx) error {
 		return httpx.Fail(c, fiber.StatusInternalServerError, "could not set members")
 	}
 	return httpx.OK(c, fiber.Map{"area_id": id, "member_count": len(ids)})
+}
+
+// UserAreas returns the area ids a user covers.
+func (h *Handler) UserAreas(c *fiber.Ctx) error {
+	if _, ok := h.requireAdmin(c); !ok {
+		return httpx.Fail(c, fiber.StatusForbidden, "area administration not permitted")
+	}
+	uid, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return httpx.Fail(c, fiber.StatusBadRequest, "user id must be a valid uuid")
+	}
+	ids, err := h.repo.AreaIDsForUser(c.UserContext(), uid)
+	if err != nil {
+		return httpx.Fail(c, fiber.StatusInternalServerError, "could not load user areas")
+	}
+	return httpx.OK(c, ids)
+}
+
+// SetUserAreas replaces the set of areas a user covers.
+func (h *Handler) SetUserAreas(c *fiber.Ctx) error {
+	if _, ok := h.requireAdmin(c); !ok {
+		return httpx.Fail(c, fiber.StatusForbidden, "area administration not permitted")
+	}
+	uid, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return httpx.Fail(c, fiber.StatusBadRequest, "user id must be a valid uuid")
+	}
+	var req struct {
+		AreaIDs []string `json:"area_ids"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return httpx.Fail(c, fiber.StatusBadRequest, "invalid request body")
+	}
+	ids := make([]uuid.UUID, 0, len(req.AreaIDs))
+	for _, s := range req.AreaIDs {
+		aid, perr := uuid.Parse(strings.TrimSpace(s))
+		if perr != nil {
+			return httpx.Fail(c, fiber.StatusBadRequest, "area_ids must be valid uuids")
+		}
+		ids = append(ids, aid)
+	}
+	if err := h.repo.SetUserAreas(c.UserContext(), uid, ids); err != nil {
+		return httpx.Fail(c, fiber.StatusInternalServerError, "could not set user areas")
+	}
+	return httpx.OK(c, fiber.Map{"user_id": uid, "area_count": len(ids)})
 }

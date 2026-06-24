@@ -638,7 +638,22 @@
     "dpoPrimaryBadge": "Lead DPO",
     "fieldPhone": "DPO phone",
     "phonePlaceholder": "e.g. 02-000-0000",
-    "dpoBadge": "DPO"
+    "dpoBadge": "DPO",
+    "role_hr_store": "HR (store)",
+    "roleFull_hr_store": "HR (store)",
+    "role_area_hr": "Area HR",
+    "roleFull_area_hr": "Area HR",
+    "role_hiring_manager_store": "Hiring manager (store)",
+    "roleFull_hiring_manager_store": "Hiring manager (store)",
+    "role_hiring_manager_ho": "Hiring manager (HO)",
+    "roleFull_hiring_manager_ho": "Hiring manager (HO)",
+    "role_ta": "Talent acquisition",
+    "roleFull_ta": "Talent acquisition",
+    "areaCoverage": "Area coverage",
+    "areaCoverageNone": "No areas defined yet (create them in the Areas console)",
+    "areaCoverageSave": "Save coverage",
+    "areaCoverageSaved": "Area coverage updated",
+    "areaCoverageFailed": "Could not update area coverage"
   },
   "members": {
     "eyebrow": "Member management",

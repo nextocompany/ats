@@ -7,7 +7,9 @@ import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { KeyRound, Loader2, UserPlus } from "lucide-react";
 
-import { useCreateHRUser, useHRUsers, useRbacRoles, useUpdateHRUser } from "@/lib/queries";
+import { toast } from "sonner";
+
+import { useAreas, useCreateHRUser, useHRUsers, useRbacRoles, useSetUserAreas, useUpdateHRUser, useUserAreas } from "@/lib/queries";
 import type { CreateHRUserInput, HRUser, UpdateHRUserInput } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -144,12 +146,12 @@ function CreateUserDialog({ open, onClose }: { open: boolean; onClose: () => voi
   const [form, setForm] = useState<CreateHRUserInput>({
     email: "",
     full_name: "",
-    role: "hr_staff",
+    role: "hr_store",
     password: "",
   });
 
   function reset() {
-    setForm({ email: "", full_name: "", role: "hr_staff", password: "" });
+    setForm({ email: "", full_name: "", role: "hr_store", password: "" });
     create.reset();
   }
 
@@ -257,7 +259,7 @@ function EditUserDialog({ user, onClose }: { user: HRUser | null; onClose: () =>
   const t = useTranslations("admin");
   const update = useUpdateHRUser();
   const [fullName, setFullName] = useState("");
-  const [role, setRole] = useState("hr_staff");
+  const [role, setRole] = useState("hr_store");
   const [storeId, setStoreId] = useState<string>("");
   const [subregion, setSubregion] = useState("");
   const [active, setActive] = useState(true);
@@ -321,6 +323,7 @@ function EditUserDialog({ user, onClose }: { user: HRUser | null; onClose: () =>
           <Field label={t("fieldRole")}>
             <RoleSelect value={role} onChange={setRole} />
           </Field>
+          {role === "area_hr" && user && <AreaCoveragePicker userId={user.id} />}
           <div className="grid grid-cols-2 gap-3">
             <Field label={t("fieldStore")}>
               <Input
@@ -441,5 +444,62 @@ function RoleSelect({ value, onChange }: { value: string; onChange: (v: string) 
         ))}
       </SelectContent>
     </Select>
+  );
+}
+
+// AreaCoveragePicker assigns which areas an area_hr user covers (the user-side
+// view of user_areas; the symmetric area→members editor lives in the Area console).
+// Self-contained: loads + saves its own state so it doesn't touch the user form.
+function AreaCoveragePicker({ userId }: { userId: string }) {
+  const t = useTranslations("admin");
+  const { data: areas } = useAreas(true);
+  const { data: current } = useUserAreas(userId);
+  const save = useSetUserAreas();
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [hydratedFor, setHydratedFor] = useState<string | null>(null);
+
+  // Hydrate selection from the loaded coverage (render-phase reset, no effect).
+  const key = `${userId}:${(current ?? []).join(",")}`;
+  if (current && hydratedFor !== key) {
+    setHydratedFor(key);
+    setSel(new Set(current));
+  }
+
+  async function onSave() {
+    try {
+      await save.mutateAsync({ userId, areaIds: [...sel] });
+      toast.success(t("areaCoverageSaved"));
+    } catch {
+      toast.error(t("areaCoverageFailed"));
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-hairline p-3">
+      <p className="mb-2 text-sm font-medium text-foreground">{t("areaCoverage")}</p>
+      <div className="max-h-40 space-y-1 overflow-y-auto">
+        {(areas ?? []).filter((a) => a.active).map((a) => (
+          <label key={a.id} className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-sm hover:bg-muted">
+            <input
+              type="checkbox"
+              checked={sel.has(a.id)}
+              onChange={(e) => {
+                const next = new Set(sel);
+                if (e.target.checked) next.add(a.id);
+                else next.delete(a.id);
+                setSel(next);
+              }}
+            />
+            <span>{a.name}</span>
+            <span className="text-xs text-muted-foreground">({a.store_count})</span>
+          </label>
+        ))}
+        {(areas ?? []).length === 0 && <p className="px-1 py-2 text-xs text-muted-foreground">{t("areaCoverageNone")}</p>}
+      </div>
+      <Button type="button" variant="outline" size="sm" className="mt-2" onClick={onSave} disabled={save.isPending}>
+        {save.isPending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
+        {t("areaCoverageSave")}
+      </Button>
+    </div>
   );
 }

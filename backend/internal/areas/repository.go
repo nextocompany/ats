@@ -37,6 +37,10 @@ type Repository interface {
 	Delete(ctx context.Context, id uuid.UUID) error
 	SetStores(ctx context.Context, id uuid.UUID, storeNos []int) error
 	SetMembers(ctx context.Context, id uuid.UUID, userIDs []uuid.UUID) error
+	// AreaIDsForUser / SetUserAreas manage area coverage from the user side (the
+	// symmetric view of user_areas), for the user-admin area picker.
+	AreaIDsForUser(ctx context.Context, userID uuid.UUID) ([]string, error)
+	SetUserAreas(ctx context.Context, userID uuid.UUID, areaIDs []uuid.UUID) error
 }
 
 type pgRepository struct{ pool *pgxpool.Pool }
@@ -168,6 +172,41 @@ func (r *pgRepository) replace(ctx context.Context, table, valCol string, areaID
 	for _, v := range vals {
 		if _, err := tx.Exec(ctx, ins, areaID, v); err != nil {
 			return fmt.Errorf("areas: insert %s: %w", table, err)
+		}
+	}
+	return tx.Commit(ctx)
+}
+
+func (r *pgRepository) AreaIDsForUser(ctx context.Context, userID uuid.UUID) ([]string, error) {
+	rows, err := r.pool.Query(ctx, `SELECT area_id FROM user_areas WHERE user_id = $1`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("areas: area ids for user: %w", err)
+	}
+	defer rows.Close()
+	out := make([]string, 0)
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("areas: scan user area: %w", err)
+		}
+		out = append(out, id.String())
+	}
+	return out, rows.Err()
+}
+
+// SetUserAreas replaces the set of areas a user covers in one transaction.
+func (r *pgRepository) SetUserAreas(ctx context.Context, userID uuid.UUID, areaIDs []uuid.UUID) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("areas: begin user areas: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, `DELETE FROM user_areas WHERE user_id = $1`, userID); err != nil {
+		return fmt.Errorf("areas: clear user areas: %w", err)
+	}
+	for _, aid := range areaIDs {
+		if _, err := tx.Exec(ctx, `INSERT INTO user_areas (user_id, area_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, userID, aid); err != nil {
+			return fmt.Errorf("areas: insert user area: %w", err)
 		}
 	}
 	return tx.Commit(ctx)

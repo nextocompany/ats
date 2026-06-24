@@ -638,7 +638,22 @@
     "dpoPrimaryBadge": "DPO หลัก",
     "fieldPhone": "เบอร์โทร DPO",
     "phonePlaceholder": "เช่น 02-000-0000",
-    "dpoBadge": "DPO"
+    "dpoBadge": "DPO",
+    "role_hr_store": "HR สาขา",
+    "roleFull_hr_store": "HR สาขา",
+    "role_area_hr": "HR เขต",
+    "roleFull_area_hr": "HR เขต",
+    "role_hiring_manager_store": "ผู้จัดการสรรหา (สาขา)",
+    "roleFull_hiring_manager_store": "ผู้จัดการสรรหา (สาขา)",
+    "role_hiring_manager_ho": "ผู้จัดการสรรหา (สนญ.)",
+    "roleFull_hiring_manager_ho": "ผู้จัดการสรรหา (สนญ.)",
+    "role_ta": "ฝ่ายสรรหา (TA)",
+    "roleFull_ta": "ฝ่ายสรรหา (TA)",
+    "areaCoverage": "พื้นที่ที่ดูแล",
+    "areaCoverageNone": "ยังไม่มีพื้นที่ (สร้างได้ในหน้า Area)",
+    "areaCoverageSave": "บันทึกพื้นที่",
+    "areaCoverageSaved": "อัปเดตพื้นที่ที่ดูแลแล้ว",
+    "areaCoverageFailed": "อัปเดตพื้นที่ไม่สำเร็จ"
   },
   "members": {
     "eyebrow": "จัดการสมาชิก",
