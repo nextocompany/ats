@@ -22,6 +22,7 @@ import (
 	"github.com/nexto/hr-ats/internal/activity"
 	"github.com/nexto/hr-ats/internal/ai"
 	"github.com/nexto/hr-ats/internal/applications"
+	"github.com/nexto/hr-ats/internal/areas"
 	"github.com/nexto/hr-ats/internal/auth"
 	"github.com/nexto/hr-ats/internal/breach"
 	"github.com/nexto/hr-ats/internal/calendar"
@@ -466,6 +467,9 @@ func main() {
 	candidatelock.RegisterRoutes(app, candidatelock.NewHandler(
 		candidatelock.NewService(candidatelock.NewRepository(pool), 0),
 		hrUserResolver{svc: hrAuthSvc}))
+
+	// Area management (dynamic store groupings for the area scope), gated area.admin.
+	areas.RegisterRoutes(app, areas.NewHandler(areas.NewRepository(pool)))
 	// PDPA breach register (DPO/legal): record personal-data breaches, drive the
 	// s.37(4) 72h PDPC-notification countdown, and generate the notification
 	// content. Gated to breach.manage; company-wide (no RBAC data-scope). The DPO
