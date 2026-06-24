@@ -11,7 +11,9 @@ package rbac
 // This is also the single source of truth the seed-matrix parity test checks
 // against the independently-transcribed legacy allowlists.
 
-// legacyRoleScope mirrors the original switch in scope.go (pre-cutover).
+// legacyRoleScope mirrors the original switch in scope.go (pre-cutover) plus the
+// new 2-axis roles seeded additively in migration 000042. Used only as the
+// fail-static fallback when no DB authorizer is installed.
 var legacyRoleScope = map[string]string{
 	RoleSuperAdmin:       KindAll,
 	"regional_director":  KindAll,
@@ -20,6 +22,12 @@ var legacyRoleScope = map[string]string{
 	"sgm":                KindStore,
 	"hr_manager":         KindStore,
 	"hr_staff":           KindStore,
+	// New role model (see rbac-role-redesign-analysis.plan.md).
+	"hr_store":             KindStore,
+	"area_hr":              KindArea,
+	"hiring_manager_store": KindRequisition,
+	"hiring_manager_ho":    KindRequisition,
+	"ta":                   KindAll,
 }
 
 // legacyRolePerms mirrors the original hardcoded allowlists, super_admin omitted
@@ -31,6 +39,11 @@ var legacyRolePerms = map[string][]string{
 	"sgm":                {PermReportsView, PermBulkUpload, PermAssignmentWrite, PermOnboardingWrite, PermLetterWrite, PermScorecardLM, PermApprovalDecideL3},
 	"hr_manager":         {PermMembersAdmin, PermReportsView, PermBulkUpload, PermAssignmentWrite, PermOfferWrite, PermOnboardingWrite, PermLetterWrite, PermScorecardTA, PermApprovalDecideL2},
 	"hr_staff":           {PermReportsView, PermBulkUpload, PermOnboardingWrite, PermLetterWrite, PermScorecardTA, PermApprovalSubmit, PermApprovalDecideL1},
+	// New role model (mirrors migration 000042's seed). hiring_manager_* are
+	// read-only (scope only, no permissions until the approval-chain remap).
+	"hr_store": {PermReportsView, PermBulkUpload, PermAssignmentWrite, PermOfferWrite, PermOnboardingWrite, PermLetterWrite, PermScorecardTA},
+	"area_hr":  {PermReportsView, PermBulkUpload, PermAssignmentWrite, PermOfferWrite, PermOnboardingWrite, PermLetterWrite, PermScorecardTA},
+	"ta":       {PermReportsView, PermReportsExport, PermBulkUpload, PermAssignmentWrite, PermOfferWrite, PermOnboardingWrite, PermLetterWrite, PermScorecardTA},
 }
 
 func legacyCan(role, perm string) bool {
