@@ -209,6 +209,14 @@ type Config struct {
 	ApprovalSLACron    string
 	ApprovalSLAHours   int
 
+	// Pool-release sweep (RBAC redesign P2): return store-specific candidates that
+	// no store HR picked up within PoolReleaseGraceDays to the shared central pool.
+	// Defaults DISABLED — must stay off until picked_up_at stamping is wired, or it
+	// would release every store-specific application past the grace window.
+	PoolReleaseEnabled   bool
+	PoolReleaseCron      string
+	PoolReleaseGraceDays int
+
 	// Time-based re-engagement sweep: the scheduler enqueues 6mo + 12mo sweeps that
 	// nudge dormant candidates back to the portal. Disabled by default; opt in once
 	// real candidate volume warrants it (a fresh DB has no dormant cohort).
@@ -358,6 +366,10 @@ func Load() (*Config, error) {
 		ApprovalSLAEnabled: getenvBool("APPROVAL_SLA_ENABLED", false),
 		ApprovalSLACron:    getenv("APPROVAL_SLA_CRON", "0 * * * *"), // hourly
 		ApprovalSLAHours:   getenvInt("APPROVAL_SLA_HOURS", 48),
+
+		PoolReleaseEnabled:   getenvBool("POOL_RELEASE_ENABLED", false),
+		PoolReleaseCron:      getenv("POOL_RELEASE_CRON", "45 3 * * *"), // daily 03:45
+		PoolReleaseGraceDays: getenvInt("POOL_RELEASE_GRACE_DAYS", 3),
 
 		ReengageSweepEnabled: getenvBool("REENGAGE_SWEEP_ENABLED", false),
 		ReengageSweepCron:    getenv("REENGAGE_SWEEP_CRON", "0 2 * * *"), // daily 02:00
