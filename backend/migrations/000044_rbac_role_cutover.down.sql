@@ -65,7 +65,8 @@ ON CONFLICT DO NOTHING;
 DELETE FROM rbac_role_permissions
 WHERE (role_key = 'ta'                   AND permission IN ('requisition.manage', 'requisition.approve'))
    OR (role_key = 'area_hr'              AND permission IN ('requisition.manage', 'requisition.approve'))
-   OR (role_key = 'hiring_manager_store' AND permission = 'requisition.manage');
+   OR (role_key = 'hiring_manager_store' AND permission = 'requisition.manage')
+   OR (role_key = 'hiring_manager_ho'    AND permission = 'requisition.manage');
 
 -- 4. Move users + approval steps back (lossy on area_hr → see header).
 UPDATE users SET role = 'hr_staff'          WHERE role = 'hr_store';

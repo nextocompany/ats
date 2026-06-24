@@ -42,12 +42,15 @@ UPDATE approval_steps SET role = 'ta'                    WHERE role = 'regional_
 --      operation_director(manage,approve) -> area_hr
 --      hr_manager(manage)                 -> area_hr (dup of above)
 --      sgm(manage)                        -> hiring_manager_store
+--    Plus: hiring_manager_ho gets requisition.manage too (no old role mapped to it,
+--    but head-office hiring managers open requisitions, same as store HMs).
 INSERT INTO rbac_role_permissions (role_key, permission) VALUES
     ('ta',                   'requisition.manage'),
     ('ta',                   'requisition.approve'),
     ('area_hr',              'requisition.manage'),
     ('area_hr',              'requisition.approve'),
-    ('hiring_manager_store', 'requisition.manage')
+    ('hiring_manager_store', 'requisition.manage'),
+    ('hiring_manager_ho',    'requisition.manage')
 ON CONFLICT DO NOTHING;
 
 -- 4. Retire the old roles. Deleting an rbac_roles row CASCADEs its
