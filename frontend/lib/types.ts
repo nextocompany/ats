@@ -301,6 +301,9 @@ export interface OnboardingStatus {
   approved_count: number;
   required_count: number;
   complete: boolean;
+  // Closed = onboarding approve-complete AND the hire was pushed to PeopleSoft
+  // (the derived "case closed" signal; HR-only).
+  closed: boolean;
 }
 
 // ShortlistItem mirrors applications.ShortlistItem (LM Top-5 row).

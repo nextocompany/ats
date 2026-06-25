@@ -34,6 +34,7 @@ type OnboardingHandler struct {
 	blob     onboardingBlob
 	required []string
 	notify   statusNotifyDeps
+	hired    HiredSyncer // deferred PeopleSoft push on approve-complete; nil-safe
 }
 
 // NewOnboardingHandler builds the HR onboarding handler. required is the
@@ -47,6 +48,10 @@ func NewOnboardingHandler(apps Repository, blob onboardingBlob, required []strin
 func (h *OnboardingHandler) SetNotifier(n notify.Notifier, cands candidates.Repository, portalBaseURL string) {
 	h.notify = statusNotifyDeps{notifier: n, cands: cands, portalBaseURL: portalBaseURL}
 }
+
+// SetHiredSyncer wires the deferred PeopleSoft push fired when onboarding becomes
+// approve-complete (the close-case step). Unset → no push (tests/CI).
+func (h *OnboardingHandler) SetHiredSyncer(hired HiredSyncer) { h.hired = hired }
 
 // RegisterOnboardingRoutes mounts the HR onboarding endpoints.
 func RegisterOnboardingRoutes(app *fiber.App, h *OnboardingHandler) {
@@ -81,7 +86,12 @@ func (h *OnboardingHandler) Get(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	return httpx.OK(c, buildOnboardingStatus(id, h.required, docs, h.sign))
+	app, err := h.apps.FindByID(c.UserContext(), id)
+	if err != nil {
+		return err
+	}
+	synced := app != nil && app.PSSyncedAt != nil
+	return httpx.OK(c, buildOnboardingStatus(id, h.required, docs, h.sign, synced))
 }
 
 // Review records an HR approve/reject for one document and notifies the candidate.
@@ -142,6 +152,12 @@ func (h *OnboardingHandler) Review(c *fiber.Ctx) error {
 	// Best-effort candidate notification of the review outcome.
 	h.notify.notifyDocumentReviewed(c.UserContext(), h.apps, id, doc.DocType, approve, reason)
 
+	// Deferred close-case: an approval that completes the onboarding checklist
+	// triggers the PeopleSoft push (best-effort, once-only).
+	if approve {
+		h.maybeCloseCase(c.UserContext(), id)
+	}
+
 	url, serr := h.sign(doc.BlobURL)
 	if serr != nil {
 		log.Warn().Err(serr).Str("onboarding_doc", doc.ID.String()).Msg("onboarding: sign url failed (link omitted)")
@@ -152,6 +168,32 @@ func (h *OnboardingHandler) Review(c *fiber.Ctx) error {
 // sign returns a freshly-signed download URL for a stored blob.
 func (h *OnboardingHandler) sign(storedURL string) (string, error) {
 	return h.blob.SignedURLForStored(storedURL, onboardingSignedTTL)
+}
+
+// maybeCloseCase pushes the hired candidate to PeopleSoft (closing the case) the
+// moment onboarding becomes approve-complete. Best-effort and once-only: it no-ops
+// unless every required document is approved AND the application has not been
+// synced yet (ps_synced_at NULL). The fresh ps_synced_at read tolerates concurrent
+// final-doc approvals — at worst two pushes, which the PeopleSoft client + CSV
+// fallback absorb.
+func (h *OnboardingHandler) maybeCloseCase(ctx context.Context, appID uuid.UUID) {
+	if h.hired == nil {
+		return
+	}
+	docs, err := h.apps.ListOnboardingByApplication(ctx, appID)
+	if err != nil {
+		return
+	}
+	if !buildOnboardingStatus(appID, h.required, docs, h.sign, false).Complete {
+		return
+	}
+	app, err := h.apps.FindByID(ctx, appID)
+	if err != nil || app == nil || app.PSSyncedAt != nil {
+		return // unreadable, or already synced (once-only guard)
+	}
+	if serr := h.hired.SyncHired(ctx, appID); serr != nil {
+		log.Warn().Err(serr).Str("application", appID.String()).Msg("onboarding complete: peoplesoft sync failed (non-fatal)")
+	}
 }
 
 // onboardingDocView maps a document to its API projection with a signed URL.
@@ -166,7 +208,7 @@ func onboardingDocView(d OnboardingDocument, url string) OnboardingDocView {
 // buildOnboardingStatus assembles the checklist + progress, signing each
 // document's blob URL best-effort (a signing failure yields an empty URL — logged
 // — rather than failing the whole response). Shared by the HR and candidate lists.
-func buildOnboardingStatus(appID uuid.UUID, required []string, docs []OnboardingDocument, sign func(string) (string, error)) OnboardingStatus {
+func buildOnboardingStatus(appID uuid.UUID, required []string, docs []OnboardingDocument, sign func(string) (string, error), synced bool) OnboardingStatus {
 	views := make([]OnboardingDocView, 0, len(docs))
 	for _, d := range docs {
 		url, err := sign(d.BlobURL)
@@ -183,5 +225,6 @@ func buildOnboardingStatus(appID uuid.UUID, required []string, docs []Onboarding
 		ApprovedCount: approved,
 		RequiredCount: len(required),
 		Complete:      complete,
+		Closed:        complete && synced,
 	}
 }

@@ -219,7 +219,8 @@
     "doc_photo": "Photo",
     "doc_health_check": "Health certificate",
     "doc_military_certificate": "Military certificate (Sor.Dor.43)",
-    "doc_name_change": "Name change certificate"
+    "doc_name_change": "Name change certificate",
+    "caseClosed": "Case closed · synced to PeopleSoft"
   },
   "executive": {
     "eyebrow": "Leadership",

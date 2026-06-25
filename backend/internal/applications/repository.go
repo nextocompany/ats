@@ -164,7 +164,7 @@ func (r *pgRepository) FindByID(ctx context.Context, id uuid.UUID) (*Application
 		       COALESCE(talent_pool,false), COALESCE(dedup_state,''), created_at,
 		       ai_score_breakdown, COALESCE(ai_summary,''), COALESCE(ai_red_flags,''),
 		       ai_suggested_positions, COALESCE(rejection_reason,''),
-		       COALESCE(public_token,'')
+		       COALESCE(public_token,''), ps_synced_at
 		FROM applications WHERE id = $1`
 	var a Application
 	var breakdownRaw, suggestedRaw []byte
@@ -174,7 +174,7 @@ func (r *pgRepository) FindByID(ctx context.Context, id uuid.UUID) (*Application
 		&a.OCRConfidence, &a.NeedsManualReview, &a.QueueTaskID, &a.ParsedAt,
 		&a.AIScore, &a.MustHavePassed, &a.AssignedStoreID, &a.TalentPool, &a.DedupState, &a.CreatedAt,
 		&breakdownRaw, &a.AISummary, &a.AIRedFlags, &suggestedRaw, &a.RejectionReason,
-		&a.PublicToken,
+		&a.PublicToken, &a.PSSyncedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("applications: find by id: %w", err)

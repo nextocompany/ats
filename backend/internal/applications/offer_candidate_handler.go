@@ -8,7 +8,6 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
-	"github.com/rs/zerolog/log"
 
 	"github.com/nexto/hr-ats/internal/candidateauth"
 	"github.com/nexto/hr-ats/internal/notify"
@@ -36,18 +35,18 @@ type offerNegotiateNotify struct {
 
 // OfferCandidateHandler is the membership-authenticated candidate surface: list my
 // offers and accept/decline/negotiate. Identity comes from the candidateauth
-// session.
+// session. The PeopleSoft push is no longer fired on accept — it is deferred to
+// onboarding approve-complete (see the onboarding review handler).
 type OfferCandidateHandler struct {
 	apps      offerCandidateStore
-	hired     HiredSyncer // best-effort PeopleSoft push on accept; nil-safe
-	maxRounds int         // negotiation cap (config NEGOTIATION_MAX_ROUNDS)
+	maxRounds int // negotiation cap (config NEGOTIATION_MAX_ROUNDS)
 	hrNotify  offerNegotiateNotify
 }
 
 // NewOfferCandidateHandler builds the candidate offer handler. maxRounds caps the
 // number of candidate counter-offers (config NEGOTIATION_MAX_ROUNDS).
-func NewOfferCandidateHandler(apps offerCandidateStore, hired HiredSyncer, maxRounds int) *OfferCandidateHandler {
-	return &OfferCandidateHandler{apps: apps, hired: hired, maxRounds: maxRounds}
+func NewOfferCandidateHandler(apps offerCandidateStore, maxRounds int) *OfferCandidateHandler {
+	return &OfferCandidateHandler{apps: apps, maxRounds: maxRounds}
 }
 
 // SetNegotiateNotifier wires best-effort HR notification fired when a candidate
@@ -76,8 +75,9 @@ func (h *OfferCandidateHandler) ListMine(c *fiber.Ctx) error {
 	return httpx.OK(c, offers)
 }
 
-// Respond records the member's accept/decline. Accept advances the application to
-// hired and best-effort pushes to PeopleSoft; decline rejects it with the reason.
+// Respond records the member's accept/decline/negotiate. Accept advances the
+// application to hired (onboarding then begins); decline rejects it with the
+// reason; negotiate pauses the offer with the candidate's counter.
 func (h *OfferCandidateHandler) Respond(c *fiber.Ctx) error {
 	acct := candidateauth.CandidateFromCtx(c)
 	if acct == nil {
@@ -137,12 +137,10 @@ func (h *OfferCandidateHandler) Respond(c *fiber.Ctx) error {
 		return err
 	}
 
-	if accept && h.hired != nil {
-		// Best-effort: an accepted hire is committed regardless of PeopleSoft.
-		if serr := h.hired.SyncHired(c.UserContext(), offer.ApplicationID); serr != nil {
-			log.Warn().Err(serr).Str("application", offer.ApplicationID.String()).Msg("offer accept: peoplesoft sync failed (non-fatal)")
-		}
-	}
+	// Accept flips the application to 'hired' so onboarding can begin. The
+	// PeopleSoft push (and case close) is deferred until onboarding documents are
+	// uploaded AND HR-approved complete — see the onboarding review handler. It is
+	// intentionally NOT fired here.
 	return httpx.OK(c, offer)
 }
 

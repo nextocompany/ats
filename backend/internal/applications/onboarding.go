@@ -125,6 +125,9 @@ type OnboardingDocView struct {
 }
 
 // OnboardingStatus is the checklist + progress for one application's onboarding.
+// Closed is the derived "case finalized" signal: onboarding is approve-complete AND
+// the hire was pushed to PeopleSoft (ps_synced_at set). It is an HR/internal signal,
+// populated only on HR reads (the candidate sees Complete).
 type OnboardingStatus struct {
 	ApplicationID uuid.UUID           `json:"application_id"`
 	Required      []string            `json:"required"`
@@ -132,6 +135,7 @@ type OnboardingStatus struct {
 	ApprovedCount int                 `json:"approved_count"`
 	RequiredCount int                 `json:"required_count"`
 	Complete      bool                `json:"complete"`
+	Closed        bool                `json:"closed"`
 }
 
 // OnboardingReviewInput is the HR approve/reject payload.

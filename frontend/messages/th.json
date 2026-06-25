@@ -219,7 +219,8 @@
     "doc_photo": "รูปถ่าย",
     "doc_health_check": "ใบรับรองแพทย์",
     "doc_military_certificate": "หลักฐานทางทหาร (สด.43)",
-    "doc_name_change": "ใบเปลี่ยนชื่อ-สกุล"
+    "doc_name_change": "ใบเปลี่ยนชื่อ-สกุล",
+    "caseClosed": "ปิดเคสแล้ว · ส่งข้อมูลไปยัง PeopleSoft"
   },
   "executive": {
     "eyebrow": "ผู้บริหาร",

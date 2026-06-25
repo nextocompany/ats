@@ -168,11 +168,7 @@ func (f *fakeOfferCandStore) FindByID(context.Context, uuid.UUID) (*Application,
 	return f.app, nil
 }
 
-type fakeHired struct{ calls int }
-
-func (f *fakeHired) SyncHired(context.Context, uuid.UUID) error { f.calls++; return nil }
-
-func candidateOfferTestApp(store offerCandidateStore, hired HiredSyncer, acct *candidateauth.Account) *fiber.App {
+func candidateOfferTestApp(store offerCandidateStore, acct *candidateauth.Account) *fiber.App {
 	app := fiber.New(fiber.Config{ErrorHandler: httpx.ErrorHandler})
 	app.Use(func(c *fiber.Ctx) error {
 		if acct != nil {
@@ -182,12 +178,12 @@ func candidateOfferTestApp(store offerCandidateStore, hired HiredSyncer, acct *c
 		return c.Next()
 	})
 	passthrough := func(c *fiber.Ctx) error { return c.Next() }
-	RegisterCandidateOfferRoutes(app, NewOfferCandidateHandler(store, hired, 3), passthrough)
+	RegisterCandidateOfferRoutes(app, NewOfferCandidateHandler(store, 3), passthrough)
 	return app
 }
 
 func TestRespondOffer_Unauthed(t *testing.T) {
-	app := candidateOfferTestApp(&fakeOfferCandStore{}, &fakeHired{}, nil)
+	app := candidateOfferTestApp(&fakeOfferCandStore{}, nil)
 	if got := doOffer(t, app, fiber.MethodPost, "/api/v1/public/auth/offers/"+uuid.NewString()+"/respond", OfferResponseInput{Decision: "accept"}); got != fiber.StatusUnauthorized {
 		t.Fatalf("no session should be 401, got %d", got)
 	}
@@ -195,7 +191,7 @@ func TestRespondOffer_Unauthed(t *testing.T) {
 
 func TestRespondOffer_DeclineNoReason(t *testing.T) {
 	acct := &candidateauth.Account{ID: uuid.New()}
-	app := candidateOfferTestApp(&fakeOfferCandStore{}, &fakeHired{}, acct)
+	app := candidateOfferTestApp(&fakeOfferCandStore{}, acct)
 	if got := doOffer(t, app, fiber.MethodPost, "/api/v1/public/auth/offers/"+uuid.NewString()+"/respond", OfferResponseInput{Decision: "decline"}); got != fiber.StatusBadRequest {
 		t.Fatalf("decline without reason should be 400, got %d", got)
 	}
@@ -204,7 +200,7 @@ func TestRespondOffer_DeclineNoReason(t *testing.T) {
 func TestRespondOffer_NotFound(t *testing.T) {
 	acct := &candidateauth.Account{ID: uuid.New()}
 	store := &fakeOfferCandStore{respondErr: ErrOfferNotFound}
-	app := candidateOfferTestApp(store, &fakeHired{}, acct)
+	app := candidateOfferTestApp(store, acct)
 	if got := doOffer(t, app, fiber.MethodPost, "/api/v1/public/auth/offers/"+uuid.NewString()+"/respond", OfferResponseInput{Decision: "accept"}); got != fiber.StatusNotFound {
 		t.Fatalf("offer not owned by account should be 404, got %d", got)
 	}
@@ -213,57 +209,47 @@ func TestRespondOffer_NotFound(t *testing.T) {
 func TestRespondOffer_Conflict(t *testing.T) {
 	acct := &candidateauth.Account{ID: uuid.New()}
 	store := &fakeOfferCandStore{respondErr: ErrOfferConflict}
-	app := candidateOfferTestApp(store, &fakeHired{}, acct)
+	app := candidateOfferTestApp(store, acct)
 	if got := doOffer(t, app, fiber.MethodPost, "/api/v1/public/auth/offers/"+uuid.NewString()+"/respond", OfferResponseInput{Decision: "accept"}); got != fiber.StatusConflict {
 		t.Fatalf("expired/decided offer should be 409, got %d", got)
 	}
 }
 
-func TestRespondOffer_AcceptTriggersPS(t *testing.T) {
+func TestRespondOffer_AcceptOK(t *testing.T) {
 	acct := &candidateauth.Account{ID: uuid.New()}
 	store := &fakeOfferCandStore{respond: Offer{ID: uuid.New(), ApplicationID: uuid.New(), Status: OfferAccepted}}
-	hired := &fakeHired{}
-	app := candidateOfferTestApp(store, hired, acct)
+	app := candidateOfferTestApp(store, acct)
+	// Accept returns 200; the PeopleSoft push is deferred to onboarding
+	// approve-complete and is NOT fired by this handler.
 	if got := doOffer(t, app, fiber.MethodPost, "/api/v1/public/auth/offers/"+uuid.NewString()+"/respond", OfferResponseInput{Decision: "accept"}); got != fiber.StatusOK {
 		t.Fatalf("accept should be 200, got %d", got)
 	}
-	if hired.calls != 1 {
-		t.Fatalf("accept should fire a single PeopleSoft sync, got %d calls", hired.calls)
-	}
 }
 
-func TestRespondOffer_DeclineNoPS(t *testing.T) {
+func TestRespondOffer_DeclineOK(t *testing.T) {
 	acct := &candidateauth.Account{ID: uuid.New()}
 	store := &fakeOfferCandStore{respond: Offer{ID: uuid.New(), ApplicationID: uuid.New(), Status: OfferDeclined}}
-	hired := &fakeHired{}
-	app := candidateOfferTestApp(store, hired, acct)
+	app := candidateOfferTestApp(store, acct)
 	if got := doOffer(t, app, fiber.MethodPost, "/api/v1/public/auth/offers/"+uuid.NewString()+"/respond", OfferResponseInput{Decision: "decline", Reason: "took another role"}); got != fiber.StatusOK {
 		t.Fatalf("decline should be 200, got %d", got)
-	}
-	if hired.calls != 0 {
-		t.Fatalf("decline must not push to PeopleSoft, got %d calls", hired.calls)
 	}
 }
 
 func TestRespondOffer_NegotiateNoCounter(t *testing.T) {
 	acct := &candidateauth.Account{ID: uuid.New()}
-	app := candidateOfferTestApp(&fakeOfferCandStore{}, &fakeHired{}, acct)
+	app := candidateOfferTestApp(&fakeOfferCandStore{}, acct)
 	if got := doOffer(t, app, fiber.MethodPost, "/api/v1/public/auth/offers/"+uuid.NewString()+"/respond", OfferResponseInput{Decision: "negotiate"}); got != fiber.StatusBadRequest {
 		t.Fatalf("negotiate without a counter amount should be 400, got %d", got)
 	}
 }
 
-func TestRespondOffer_NegotiateOK_NoPS(t *testing.T) {
+func TestRespondOffer_NegotiateOK(t *testing.T) {
 	acct := &candidateauth.Account{ID: uuid.New()}
 	counter := 25000.0
 	store := &fakeOfferCandStore{negotiate: Offer{ID: uuid.New(), ApplicationID: uuid.New(), Status: OfferNegotiating, CounterSalary: &counter}}
-	hired := &fakeHired{}
-	app := candidateOfferTestApp(store, hired, acct)
+	app := candidateOfferTestApp(store, acct)
 	if got := doOffer(t, app, fiber.MethodPost, "/api/v1/public/auth/offers/"+uuid.NewString()+"/respond", OfferResponseInput{Decision: "negotiate", CounterSalary: &counter, Note: "ขอเพิ่มค่าเดินทาง"}); got != fiber.StatusOK {
 		t.Fatalf("valid negotiate should be 200, got %d", got)
-	}
-	if hired.calls != 0 {
-		t.Fatalf("negotiate must not push to PeopleSoft, got %d calls", hired.calls)
 	}
 }
 
@@ -271,7 +257,7 @@ func TestRespondOffer_NegotiateRoundsExhausted(t *testing.T) {
 	acct := &candidateauth.Account{ID: uuid.New()}
 	counter := 25000.0
 	store := &fakeOfferCandStore{negotiateErr: ErrNegotiationClosed}
-	app := candidateOfferTestApp(store, &fakeHired{}, acct)
+	app := candidateOfferTestApp(store, acct)
 	if got := doOffer(t, app, fiber.MethodPost, "/api/v1/public/auth/offers/"+uuid.NewString()+"/respond", OfferResponseInput{Decision: "negotiate", CounterSalary: &counter}); got != fiber.StatusConflict {
 		t.Fatalf("exhausted negotiation should be 409, got %d", got)
 	}
