@@ -110,6 +110,9 @@ type Repository interface {
 	GetOfferByID(ctx context.Context, id uuid.UUID) (*Offer, error)
 	SendOffer(ctx context.Context, applicationID uuid.UUID) (Offer, error)
 	RespondOffer(ctx context.Context, offerID, accountID uuid.UUID, accept bool, reason string) (Offer, error)
+	NegotiateOffer(ctx context.Context, offerID, accountID uuid.UUID, counter *float64, note string, maxRounds int) (Offer, error)
+	ReopenOffer(ctx context.Context, applicationID uuid.UUID) (Offer, error)
+	WithdrawOffer(ctx context.Context, applicationID uuid.UUID, reason string) (Offer, error)
 	ListOffersByAccount(ctx context.Context, accountID uuid.UUID) ([]OfferView, error)
 	// Letter generation (Module-3 3.3): interview/offer PDF letters.
 	GatherLetterData(ctx context.Context, applicationID uuid.UUID, letterType string) (letters.LetterData, error)

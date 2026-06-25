@@ -58,6 +58,11 @@ type Config struct {
 	// (frontend ScoreBadge), so the alert never contradicts the on-screen label.
 	InterviewHRNotifyThreshold int
 
+	// NegotiationMaxRounds caps how many times a candidate may counter an offer
+	// (Module-3 3.6 extension). Each candidate counter increments the round; once
+	// the cap is reached the candidate may only accept or reject. Defaults to 3.
+	NegotiationMaxRounds int
+
 	// AISearchProvider selects candidate search: "mock" (Postgres trigram, default)
 	// or "azure" (Azure AI Search query). Required Azure fields gate on "azure".
 	AISearchProvider    string
@@ -297,6 +302,7 @@ func Load() (*Config, error) {
 
 		InterviewMaxTurns:          getenvInt("INTERVIEW_MAX_TURNS", 6),
 		InterviewHRNotifyThreshold: getenvInt("INTERVIEW_HR_NOTIFY_THRESHOLD", 75),
+		NegotiationMaxRounds:       getenvInt("NEGOTIATION_MAX_ROUNDS", 3),
 
 		AuthProvider:          getenv("AUTH_PROVIDER", "mock"),
 		AzureADTenantID:       os.Getenv("AZURE_AD_TENANT_ID"),

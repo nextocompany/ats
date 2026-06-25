@@ -696,6 +696,28 @@ export function useSendOffer(appId: string) {
   });
 }
 
+// useReopenOffer returns a negotiating offer to draft so HR can revise & re-send.
+export function useReopenOffer(appId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<Offer>(`/api/v1/applications/${appId}/offer/reopen`).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["offer", appId] }),
+  });
+}
+
+// useWithdrawOffer ends a negotiation: declines the offer and rejects the application.
+export function useWithdrawOffer(appId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (reason: string) =>
+      api.post<Offer>(`/api/v1/applications/${appId}/offer/withdraw`, { reason }).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["offer", appId] });
+      qc.invalidateQueries({ queryKey: ["application", appId] });
+    },
+  });
+}
+
 // --- Letters (Module-3 3.3) -------------------------------------------------
 
 // useLetters loads an application's generated letters (each with a signed URL).

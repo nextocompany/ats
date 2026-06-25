@@ -229,7 +229,13 @@ export interface ApprovalDecisionInput {
 // --- Offer management (Module-3 3.6) ----------------------------------------
 // Mirrors internal/applications/offer.go.
 
-export type OfferStatus = "draft" | "sent" | "accepted" | "declined" | "expired";
+export type OfferStatus = "draft" | "sent" | "negotiating" | "accepted" | "declined" | "expired";
+
+// Benefit mirrors applications.Benefit — one structured benefit line on an offer.
+export interface Benefit {
+  label: string;
+  value: string;
+}
 
 // Offer mirrors applications.Offer (one per application).
 export interface Offer {
@@ -239,6 +245,10 @@ export interface Offer {
   salary: number | null;
   start_date: string | null;
   terms?: string;
+  benefits?: Benefit[];
+  counter_salary?: number | null;
+  negotiation_note?: string;
+  negotiation_round: number;
   sent_at: string | null;
   responded_at: string | null;
   expires_at: string | null;
@@ -251,6 +261,7 @@ export interface OfferInput {
   salary?: number | null;
   start_date?: string | null;
   terms?: string;
+  benefits?: Benefit[];
   expires_at?: string | null;
 }
 

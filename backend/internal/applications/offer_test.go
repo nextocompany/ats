@@ -144,9 +144,12 @@ func TestSendOffer_HappyPath(t *testing.T) {
 // ── Candidate offer handler ─────────────────────────────────────────────────
 
 type fakeOfferCandStore struct {
-	list       []OfferView
-	respond    Offer
-	respondErr error
+	list         []OfferView
+	respond      Offer
+	respondErr   error
+	negotiate    Offer
+	negotiateErr error
+	app          *Application
 }
 
 func (f *fakeOfferCandStore) ListOffersByAccount(context.Context, uuid.UUID) ([]OfferView, error) {
@@ -157,6 +160,12 @@ func (f *fakeOfferCandStore) GetOfferByID(context.Context, uuid.UUID) (*Offer, e
 }
 func (f *fakeOfferCandStore) RespondOffer(context.Context, uuid.UUID, uuid.UUID, bool, string) (Offer, error) {
 	return f.respond, f.respondErr
+}
+func (f *fakeOfferCandStore) NegotiateOffer(context.Context, uuid.UUID, uuid.UUID, *float64, string, int) (Offer, error) {
+	return f.negotiate, f.negotiateErr
+}
+func (f *fakeOfferCandStore) FindByID(context.Context, uuid.UUID) (*Application, error) {
+	return f.app, nil
 }
 
 type fakeHired struct{ calls int }
@@ -173,7 +182,7 @@ func candidateOfferTestApp(store offerCandidateStore, hired HiredSyncer, acct *c
 		return c.Next()
 	})
 	passthrough := func(c *fiber.Ctx) error { return c.Next() }
-	RegisterCandidateOfferRoutes(app, NewOfferCandidateHandler(store, hired), passthrough)
+	RegisterCandidateOfferRoutes(app, NewOfferCandidateHandler(store, hired, 3), passthrough)
 	return app
 }
 
@@ -233,5 +242,37 @@ func TestRespondOffer_DeclineNoPS(t *testing.T) {
 	}
 	if hired.calls != 0 {
 		t.Fatalf("decline must not push to PeopleSoft, got %d calls", hired.calls)
+	}
+}
+
+func TestRespondOffer_NegotiateNoCounter(t *testing.T) {
+	acct := &candidateauth.Account{ID: uuid.New()}
+	app := candidateOfferTestApp(&fakeOfferCandStore{}, &fakeHired{}, acct)
+	if got := doOffer(t, app, fiber.MethodPost, "/api/v1/public/auth/offers/"+uuid.NewString()+"/respond", OfferResponseInput{Decision: "negotiate"}); got != fiber.StatusBadRequest {
+		t.Fatalf("negotiate without a counter amount should be 400, got %d", got)
+	}
+}
+
+func TestRespondOffer_NegotiateOK_NoPS(t *testing.T) {
+	acct := &candidateauth.Account{ID: uuid.New()}
+	counter := 25000.0
+	store := &fakeOfferCandStore{negotiate: Offer{ID: uuid.New(), ApplicationID: uuid.New(), Status: OfferNegotiating, CounterSalary: &counter}}
+	hired := &fakeHired{}
+	app := candidateOfferTestApp(store, hired, acct)
+	if got := doOffer(t, app, fiber.MethodPost, "/api/v1/public/auth/offers/"+uuid.NewString()+"/respond", OfferResponseInput{Decision: "negotiate", CounterSalary: &counter, Note: "ขอเพิ่มค่าเดินทาง"}); got != fiber.StatusOK {
+		t.Fatalf("valid negotiate should be 200, got %d", got)
+	}
+	if hired.calls != 0 {
+		t.Fatalf("negotiate must not push to PeopleSoft, got %d calls", hired.calls)
+	}
+}
+
+func TestRespondOffer_NegotiateRoundsExhausted(t *testing.T) {
+	acct := &candidateauth.Account{ID: uuid.New()}
+	counter := 25000.0
+	store := &fakeOfferCandStore{negotiateErr: ErrNegotiationClosed}
+	app := candidateOfferTestApp(store, &fakeHired{}, acct)
+	if got := doOffer(t, app, fiber.MethodPost, "/api/v1/public/auth/offers/"+uuid.NewString()+"/respond", OfferResponseInput{Decision: "negotiate", CounterSalary: &counter}); got != fiber.StatusConflict {
+		t.Fatalf("exhausted negotiation should be 409, got %d", got)
 	}
 }

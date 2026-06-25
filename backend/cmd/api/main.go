@@ -364,7 +364,8 @@ func main() {
 	// Offer management (candidate side): a logged-in member lists their offers and
 	// accepts/declines. Accept best-effort pushes the hire to PeopleSoft. Routes sit
 	// under /api/v1/public/auth (already origin-guarded) behind RequireCandidate.
-	offerCandHandler := applications.NewOfferCandidateHandler(appRepo, psService)
+	offerCandHandler := applications.NewOfferCandidateHandler(appRepo, psService, cfg.NegotiationMaxRounds)
+	offerCandHandler.SetNegotiateNotifier(notifier, applications.NewHRDirectory(pool), cfg.DashboardBaseURL, cfg.TeamsWebhookURL != "")
 	applications.RegisterCandidateOfferRoutes(app, offerCandHandler, candidateauth.RequireCandidate(caSvc, cfg.SessionCookieName))
 	// Candidate letter downloads (account-scoped, under the origin-guarded /auth prefix).
 	applications.RegisterCandidateLetterRoutes(app, applications.NewLetterCandidateHandler(appRepo, blobClient), candidateauth.RequireCandidate(caSvc, cfg.SessionCookieName))

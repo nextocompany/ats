@@ -4,21 +4,22 @@
 // for an offer-stage application, edits it while draft, and sends it — after which
 // it is read-only and the candidate responds from the career-portal. Reads are open
 // to anyone who can see the application; the form is server-gated to offer roles.
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
-import type { Application, Offer, OfferStatus } from "@/lib/types";
-import { useCreateOffer, useMe, useOffer, useSendOffer, useUpdateOffer } from "@/lib/queries";
+import type { Application, Benefit, Offer, OfferStatus } from "@/lib/types";
+import { useCreateOffer, useMe, useOffer, useReopenOffer, useSendOffer, useUpdateOffer, useWithdrawOffer } from "@/lib/queries";
 import { canManageOffer } from "@/lib/roles";
 import { Button } from "@/components/ui/button";
 
 // Typed status → i18n-key map: adding an OfferStatus without a label is a compile
 // error (no unsound `as` cast).
-const STATUS_KEY: Record<OfferStatus, "status_draft" | "status_sent" | "status_accepted" | "status_declined" | "status_expired"> = {
+const STATUS_KEY: Record<OfferStatus, "status_draft" | "status_sent" | "status_negotiating" | "status_accepted" | "status_declined" | "status_expired"> = {
   draft: "status_draft",
   sent: "status_sent",
+  negotiating: "status_negotiating",
   accepted: "status_accepted",
   declined: "status_declined",
   expired: "status_expired",
@@ -60,7 +61,7 @@ export function OfferPanel({ applicationId, app }: Props) {
         // changes — e.g. after the draft is first created — without a sync effect.
         <OfferForm key={offer?.id ?? "new"} applicationId={applicationId} offer={offer ?? null} t={t} />
       ) : (
-        <OfferSummary offer={offer!} t={t} />
+        <OfferSummary applicationId={applicationId} offer={offer!} canManage={canManage} t={t} />
       )}
     </section>
   );
@@ -83,11 +84,24 @@ function OfferForm({
   const [startDate, setStartDate] = useState(toDateInput(offer?.start_date ?? null));
   const [terms, setTerms] = useState(offer?.terms ?? "");
   const [expiresAt, setExpiresAt] = useState(toDateInput(offer?.expires_at ?? null));
+  const [benefits, setBenefits] = useState<Benefit[]>(offer?.benefits ?? []);
+
+  function setBenefitAt(i: number, patch: Partial<Benefit>) {
+    setBenefits((prev) => prev.map((b, idx) => (idx === i ? { ...b, ...patch } : b)));
+  }
+  function addBenefit() {
+    setBenefits((prev) => [...prev, { label: "", value: "" }]);
+  }
+  function removeBenefit(i: number) {
+    setBenefits((prev) => prev.filter((_, idx) => idx !== i));
+  }
 
   const payload = () => ({
     salary: salary ? Number(salary) : null,
     start_date: fromDateInput(startDate),
     terms: terms.trim(),
+    // Drop blank rows so an empty editor stores no benefits (NULL JSONB).
+    benefits: benefits.map((b) => ({ label: b.label.trim(), value: b.value.trim() })).filter((b) => b.label !== "" || b.value !== ""),
     expires_at: fromDateInput(expiresAt),
   });
 
@@ -142,6 +156,31 @@ function OfferForm({
           className="w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
         />
       </label>
+      <div className="space-y-2">
+        <span className="text-xs font-medium text-foreground">{t("benefits")}</span>
+        {benefits.map((b, i) => (
+          <div key={i} className="flex gap-2">
+            <input
+              value={b.label}
+              onChange={(e) => setBenefitAt(i, { label: e.target.value })}
+              className="w-2/5 rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              placeholder={t("benefitLabelPlaceholder")}
+            />
+            <input
+              value={b.value}
+              onChange={(e) => setBenefitAt(i, { value: e.target.value })}
+              className="flex-1 rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              placeholder={t("benefitValuePlaceholder")}
+            />
+            <Button type="button" size="sm" variant="ghost" onClick={() => removeBenefit(i)}>
+              {t("benefitRemove")}
+            </Button>
+          </div>
+        ))}
+        <Button type="button" size="sm" variant="secondary" onClick={addBenefit}>
+          {t("benefitAdd")}
+        </Button>
+      </div>
       <label className="block space-y-1.5">
         <span className="text-xs font-medium text-foreground">{t("terms")}</span>
         <textarea
@@ -167,8 +206,38 @@ function OfferForm({
   );
 }
 
-function OfferSummary({ offer, t }: { offer: Offer; t: ReturnType<typeof useTranslations> }) {
+function OfferSummary({
+  applicationId,
+  offer,
+  canManage,
+  t,
+}: {
+  applicationId: string;
+  offer: Offer;
+  canManage: boolean;
+  t: ReturnType<typeof useTranslations>;
+}) {
   const statusLabel = t(STATUS_KEY[offer.status] ?? "status_sent");
+  const reopen = useReopenOffer(applicationId);
+  const withdraw = useWithdrawOffer(applicationId);
+  const [rejecting, setRejecting] = useState(false);
+  const [reason, setReason] = useState("");
+
+  function doReopen() {
+    reopen.mutate(undefined, {
+      onSuccess: () => toast.success(t("reopened")),
+      onError: (err) => toast.error(err instanceof Error ? err.message : t("reopenFailed")),
+    });
+  }
+  function doWithdraw(e: React.FormEvent) {
+    e.preventDefault();
+    if (!reason.trim()) return;
+    withdraw.mutate(reason.trim(), {
+      onSuccess: () => toast.success(t("withdrawn")),
+      onError: (err) => toast.error(err instanceof Error ? err.message : t("withdrawFailed")),
+    });
+  }
+
   return (
     <div className="mt-3 space-y-3 text-sm">
       <div className="flex items-center justify-between">
@@ -189,7 +258,60 @@ function OfferSummary({ offer, t }: { offer: Offer; t: ReturnType<typeof useTran
           </>
         )}
       </dl>
+      {offer.benefits && offer.benefits.length > 0 && (
+        <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 border-t border-hairline pt-2 text-xs">
+          {offer.benefits.map((b, i) => (
+            <Fragment key={`${b.label}-${i}`}>
+              <dt className="text-muted-foreground">{b.label}</dt>
+              <dd className="text-right font-medium">{b.value}</dd>
+            </Fragment>
+          ))}
+        </dl>
+      )}
       {offer.terms && <p className="rounded-lg bg-muted/40 px-3 py-2 text-xs text-foreground">{offer.terms}</p>}
+
+      {offer.status === "negotiating" && (
+        <div className="space-y-2 rounded-lg bg-amber-500/10 px-3 py-2 text-xs">
+          <p className="font-medium text-foreground">{t("counterTitle")}</p>
+          <p className="tabular-nums text-foreground">
+            {(offer.counter_salary ?? 0).toLocaleString("th-TH", { maximumFractionDigits: 0 })} {t("counterUnit")}
+          </p>
+          {offer.negotiation_note && <p className="text-muted-foreground">{offer.negotiation_note}</p>}
+          {canManage && !rejecting && (
+            <div className="flex gap-2 pt-1">
+              <Button type="button" size="sm" variant="secondary" className="gap-2" disabled={reopen.isPending} onClick={doReopen}>
+                {reopen.isPending && <Loader2 className="size-4 animate-spin" />}
+                {t("reviseResend")}
+              </Button>
+              <Button type="button" size="sm" variant="ghost" onClick={() => setRejecting(true)}>
+                {t("endNegotiation")}
+              </Button>
+            </div>
+          )}
+          {canManage && rejecting && (
+            <form onSubmit={doWithdraw} className="space-y-2 pt-1" noValidate>
+              <textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                rows={2}
+                required
+                className="w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                placeholder={t("endNegotiationPlaceholder")}
+              />
+              <div className="flex gap-2">
+                <Button type="button" size="sm" variant="ghost" onClick={() => setRejecting(false)}>
+                  {t("cancel")}
+                </Button>
+                <Button type="submit" size="sm" variant="destructive" className="gap-2" disabled={!reason.trim() || withdraw.isPending}>
+                  {withdraw.isPending && <Loader2 className="size-4 animate-spin" />}
+                  {t("confirmEndNegotiation")}
+                </Button>
+              </div>
+            </form>
+          )}
+        </div>
+      )}
+
       {offer.status === "declined" && offer.decline_reason && (
         <div className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
           <p className="font-medium">{t("declinedTitle")}</p>
