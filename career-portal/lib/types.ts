@@ -116,6 +116,24 @@ export interface PortalApplication {
   applied_at: string;
 }
 
+// GET /api/v1/public/me/applications/:token/timeline — the curated, login-gated
+// milestone timeline for one application. Each milestone collapses internal
+// status churn into a candidate-friendly step.
+export type MilestoneState = "done" | "current" | "upcoming";
+
+export interface TimelineMilestone {
+  key: string;
+  label: string;
+  detail: string;
+  reached_at: string | null;
+  state: MilestoneState;
+}
+
+export interface ApplicationTimeline {
+  position: string;
+  milestones: TimelineMilestone[];
+}
+
 // --- AI pre-interview (slice 2.5) ---
 
 // One message in the interview chat. role mirrors the chat-completion roles.

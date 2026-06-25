@@ -2,11 +2,13 @@ package applications
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/nexto/hr-ats/internal/rbac"
 )
@@ -204,4 +206,49 @@ func (r *pgRepository) ListByAccountForPortal(ctx context.Context, accountID uui
 		out = append(out, a)
 	}
 	return out, rows.Err()
+}
+
+// PortalTimelineByToken returns the curated-timeline input for one application,
+// scoped to the owning account. The ownership check (candidates.account_id) is
+// part of the lookup query, so an account can never read another candidate's
+// timeline by guessing a token. Returns ErrNotFound when the token is unknown or
+// not owned.
+func (r *pgRepository) PortalTimelineByToken(ctx context.Context, token string, accountID uuid.UUID) (*PortalTimeline, error) {
+	const metaQ = `
+		SELECT ap.id, ap.status, ap.created_at,
+		       COALESCE(NULLIF(p.title_th,''), p.title_en, '') AS position_title
+		FROM applications ap
+		JOIN candidates c ON c.id = ap.candidate_id
+		LEFT JOIN positions p ON p.id = ap.position_id
+		WHERE ap.public_token = $1 AND c.account_id = $2`
+	var (
+		appID uuid.UUID
+		tl    PortalTimeline
+	)
+	err := r.pool.QueryRow(ctx, metaQ, token, accountID).Scan(&appID, &tl.Status, &tl.CreatedAt, &tl.Position)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("applications: portal timeline meta: %w", err)
+	}
+
+	const histQ = `
+		SELECT to_status, changed_at
+		FROM application_status_history
+		WHERE application_id = $1
+		ORDER BY changed_at ASC`
+	rows, err := r.pool.Query(ctx, histQ, appID)
+	if err != nil {
+		return nil, fmt.Errorf("applications: portal timeline history: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var e StatusEvent
+		if err := rows.Scan(&e.To, &e.At); err != nil {
+			return nil, fmt.Errorf("applications: timeline event scan: %w", err)
+		}
+		tl.Events = append(tl.Events, e)
+	}
+	return &tl, rows.Err()
 }

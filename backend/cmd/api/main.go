@@ -357,6 +357,9 @@ func main() {
 	app.Post("/api/v1/public/apply/quick", candidateauth.RequireCandidate(caSvc, cfg.SessionCookieName), publicHandler.QuickApply)
 	// Candidate-facing application history (their own, by session account).
 	app.Get("/api/v1/public/me/applications", candidateauth.RequireCandidate(caSvc, cfg.SessionCookieName), publicHandler.MyApplications)
+	// Curated, login-gated status timeline for one of the member's applications
+	// (account-scoped by public token).
+	app.Get("/api/v1/public/me/applications/:token/timeline", candidateauth.RequireCandidate(caSvc, cfg.SessionCookieName), publicHandler.MyApplicationTimeline)
 
 	// Offer management (candidate side): a logged-in member lists their offers and
 	// accepts/declines. Accept best-effort pushes the hire to PeopleSoft. Routes sit
