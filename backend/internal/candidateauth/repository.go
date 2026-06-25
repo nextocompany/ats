@@ -41,6 +41,8 @@ type Repository interface {
 	// BackfillContact fills phone/email from an apply when the account lacks them
 	// (set-once, collision-safe on email, never errors on an email already taken).
 	BackfillContact(ctx context.Context, accountID uuid.UUID, phone, email string) error
+	// BackfillNames fills the Thai/English match names from an apply, fill-once.
+	BackfillNames(ctx context.Context, accountID uuid.UUID, nameTH, nameEN string) error
 	SetResume(ctx context.Context, accountID uuid.UUID, blobURL, fileType string) error
 
 	// Resume library (CV history, capped at MaxResumes, exactly one default).
@@ -97,7 +99,8 @@ const accountColumns = `
 	id, full_name, COALESCE(email,''), email_verified, COALESCE(phone,''),
 	COALESCE(line_user_id,''), COALESCE(line_display_id,''), COALESCE(google_sub,''),
 	COALESCE(province,''), COALESCE(resume_blob_url,''), COALESCE(resume_file_type,''),
-	pdpa_consent, COALESCE(pdpa_version,''), status, created_at`
+	pdpa_consent, COALESCE(pdpa_version,''), status, created_at,
+	COALESCE(display_name,''), COALESCE(name_th,''), COALESCE(name_en,'')`
 
 func scanAccount(row pgx.Row) (*Account, error) {
 	var a Account
@@ -106,6 +109,7 @@ func scanAccount(row pgx.Row) (*Account, error) {
 		&a.LineUserID, &a.LineDisplayID, &a.GoogleSub,
 		&a.Province, &a.ResumeBlobURL, &a.ResumeFileType,
 		&a.PDPAConsent, &a.PDPAVersion, &a.Status, &a.CreatedAt,
+		&a.DisplayName, &a.NameTH, &a.NameEN,
 	); err != nil {
 		return nil, err
 	}
@@ -212,8 +216,9 @@ func (r *pgRepository) findOrCreateBySub(ctx context.Context, subCol, sub, name,
 	// Unify by email: an account created via email-OTP gets this provider linked.
 	if email != "" {
 		if a, err := r.findByColumn(ctx, "email", email); err == nil {
+			// The provider name is the cosmetic display name, never the matched name.
 			if _, uerr := r.pool.Exec(ctx,
-				`UPDATE candidate_accounts SET `+subCol+` = $2, full_name = COALESCE(NULLIF(full_name,''), $3), updated_at = NOW() WHERE id = $1`,
+				`UPDATE candidate_accounts SET `+subCol+` = $2, display_name = COALESCE(NULLIF(display_name,''), $3), updated_at = NOW() WHERE id = $1`,
 				a.ID, sub, name); uerr != nil {
 				return nil, fmt.Errorf("candidateauth: link %s: %w", subCol, uerr)
 			}
@@ -223,8 +228,10 @@ func (r *pgRepository) findOrCreateBySub(ctx context.Context, subCol, sub, name,
 		}
 	}
 
+	// The provider name (LINE/Google) is the cosmetic display_name, NOT full_name —
+	// full_name/name_th/name_en are set explicitly by the candidate at apply/profile.
 	ins := `
-		INSERT INTO candidate_accounts (` + subCol + `, full_name, email, email_verified)
+		INSERT INTO candidate_accounts (` + subCol + `, display_name, email, email_verified)
 		VALUES ($1, $2, $3, $4)
 		RETURNING ` + accountColumns
 	a, err := scanAccount(r.pool.QueryRow(ctx, ins, sub, name, nullable(email), email != ""))
@@ -285,20 +292,26 @@ func (r *pgRepository) UpdateProfile(ctx context.Context, accountID uuid.UUID, p
 	// Email is set-once and collision-guarded (the column is UNIQUE): it only
 	// writes when this account has no email yet AND no other account owns it.
 	// email_verified is never touched — a typed email is not a verified one.
+	// full_name is the canonical name (candidates.full_name / dedup / search / HR
+	// display) and follows the Thai name; name_en is match-only; display_name is
+	// cosmetic. Sparse: each NULLIF keeps the existing value when "" is passed.
 	const q = `
 		UPDATE candidate_accounts SET
-			full_name       = COALESCE(NULLIF($2,''), full_name),
-			phone           = COALESCE(NULLIF($3,''), phone),
+			name_th         = COALESCE(NULLIF($2,''), name_th),
+			name_en         = COALESCE(NULLIF($3,''), name_en),
+			display_name    = COALESCE(NULLIF($4,''), display_name),
+			full_name       = COALESCE(NULLIF($2,''), NULLIF($9,''), full_name),
+			phone           = COALESCE(NULLIF($5,''), phone),
 			email           = CASE
 			                     WHEN COALESCE(email,'') = ''
 			                      AND NULLIF($6,'') IS NOT NULL
 			                      AND NOT EXISTS (SELECT 1 FROM candidate_accounts b WHERE b.email = $6 AND b.id <> $1)
 			                     THEN $6 ELSE email END,
-			line_display_id = COALESCE(NULLIF($4,''), line_display_id),
-			province        = COALESCE(NULLIF($5,''), province),
+			line_display_id = COALESCE(NULLIF($7,''), line_display_id),
+			province        = COALESCE(NULLIF($8,''), province),
 			updated_at      = NOW()
 		WHERE id = $1`
-	if _, err := r.pool.Exec(ctx, q, accountID, p.FullName, p.Phone, p.LineDisplayID, p.Province, p.Email); err != nil {
+	if _, err := r.pool.Exec(ctx, q, accountID, p.NameTH, p.NameEN, p.DisplayName, p.Phone, p.Email, p.LineDisplayID, p.Province, p.FullName); err != nil {
 		if isUnique(err) { // concurrent insert claimed the email between the guard and the write
 			return ErrEmailTaken
 		}
@@ -331,6 +344,23 @@ func (r *pgRepository) BackfillContact(ctx context.Context, accountID uuid.UUID,
 			return nil
 		}
 		return fmt.Errorf("candidateauth: backfill contact: %w", err)
+	}
+	return nil
+}
+
+// BackfillNames fills the account's Thai/English match names from an apply
+// submission, fill-once (keeps an existing value, only sets when empty) so the
+// signup/profile names stay authoritative. full_name follows name_th (canonical).
+func (r *pgRepository) BackfillNames(ctx context.Context, accountID uuid.UUID, nameTH, nameEN string) error {
+	const q = `
+		UPDATE candidate_accounts SET
+			name_th    = COALESCE(NULLIF(name_th,''), NULLIF($2,'')),
+			name_en    = COALESCE(NULLIF(name_en,''), NULLIF($3,'')),
+			full_name  = COALESCE(NULLIF(full_name,''), NULLIF($2,'')),
+			updated_at = NOW()
+		WHERE id = $1`
+	if _, err := r.pool.Exec(ctx, q, accountID, nameTH, nameEN); err != nil {
+		return fmt.Errorf("candidateauth: backfill names: %w", err)
 	}
 	return nil
 }

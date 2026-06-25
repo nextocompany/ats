@@ -51,6 +51,9 @@ func (h *Handler) SetAudit(w auditWriter) { h.audit = w }
 type meView struct {
 	ID             string `json:"id"`
 	FullName       string `json:"full_name"`
+	DisplayName    string `json:"display_name"`
+	NameTH         string `json:"name_th"`
+	NameEN         string `json:"name_en"`
 	Email          string `json:"email"`
 	Phone          string `json:"phone"`
 	Province       string `json:"province"`
@@ -64,7 +67,8 @@ type meView struct {
 
 func toMeView(a *Account) meView {
 	return meView{
-		ID: a.ID.String(), FullName: a.FullName, Email: a.Email, Phone: a.Phone,
+		ID: a.ID.String(), FullName: a.FullName, DisplayName: a.DisplayName,
+		NameTH: a.NameTH, NameEN: a.NameEN, Email: a.Email, Phone: a.Phone,
 		Province: a.Province, LineDisplayID: a.LineDisplayID,
 		LineLinked: a.LineLinked(), GoogleLinked: a.GoogleLinked(),
 		HasResume: a.HasResume(), ResumeFileType: a.ResumeFileType, PDPAConsent: a.PDPAConsent,
@@ -210,6 +214,9 @@ func (h *Handler) UpdateProfile(c *fiber.Ctx) error {
 	}
 	var body struct {
 		FullName       string `json:"full_name"`
+		NameTH         string `json:"name_th"`
+		NameEN         string `json:"name_en"`
+		DisplayName    string `json:"display_name"`
 		Phone          string `json:"phone"`
 		Email          string `json:"email"`
 		LineDisplayID  string `json:"line_display_id"`
@@ -221,7 +228,8 @@ func (h *Handler) UpdateProfile(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, "invalid request body")
 	}
 	if err := h.svc.UpdateProfile(c.UserContext(), acct.ID, ProfileUpdate{
-		FullName: body.FullName, Phone: body.Phone, Email: body.Email, LineDisplayID: body.LineDisplayID, Province: body.Province,
+		FullName: body.FullName, NameTH: body.NameTH, NameEN: body.NameEN, DisplayName: body.DisplayName,
+		Phone: body.Phone, Email: body.Email, LineDisplayID: body.LineDisplayID, Province: body.Province,
 	}); err != nil {
 		switch {
 		case errors.Is(err, ErrEmailTaken):

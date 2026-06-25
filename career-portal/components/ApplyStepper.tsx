@@ -52,7 +52,8 @@ export function ApplyStepper({ positionId, positionTitle, account, prefill }: Ap
   // External prefill (e.g. SEEK deep link) takes precedence over saved account
   // values; a blank prefill field falls back to the account.
   const [mode, setMode] = useState<"review" | "edit">("review");
-  const [fullName, setFullName] = useState(prefill?.fullName || account.full_name);
+  const [nameTH, setNameTH] = useState(prefill?.fullName || account.name_th);
+  const [nameEN, setNameEN] = useState(account.name_en);
   const [phone, setPhone] = useState(prefill?.phone || account.phone);
   const [email, setEmail] = useState(prefill?.email || account.email);
   const [province, setProvince] = useState(prefill?.province || account.province);
@@ -75,12 +76,13 @@ export function ApplyStepper({ positionId, positionTitle, account, prefill }: Ap
 
   // Phone is always required; email is too — a LINE-only account often has no
   // email, so the form forces it (prefilled from the account/LINE when present).
-  const fullNameOk = fullName.trim().length > 0;
+  const nameThOk = nameTH.trim().length > 0;
+  const nameEnOk = nameEN.trim().length > 0;
   const phoneOk = phone.trim().length > 0;
   const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   // The saved-profile (quick) path can only run when the account already carries a
-  // complete contact set; otherwise the candidate is sent to the form to fill it.
-  const profileComplete = fullNameOk && phoneOk && emailOk;
+  // complete name + contact set; otherwise the candidate is sent to the form.
+  const profileComplete = nameThOk && nameEnOk && phoneOk && emailOk;
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const picked = e.target.files?.[0] ?? null;
@@ -103,11 +105,12 @@ export function ApplyStepper({ positionId, positionTitle, account, prefill }: Ap
   }
 
   function submitForm() {
-    if (!fullNameOk || !phoneOk || !emailOk || !file || fileError || !consentOk) return;
+    if (!nameThOk || !nameEnOk || !phoneOk || !emailOk || !file || fileError || !consentOk) return;
     apply.mutate(
       {
         positionId,
-        fullName: fullName.trim(),
+        nameTH: nameTH.trim(),
+        nameEN: nameEN.trim(),
         phone: phone.trim(),
         email: email.trim(),
         province: province.trim() || undefined,
@@ -172,8 +175,12 @@ export function ApplyStepper({ positionId, positionTitle, account, prefill }: Ap
         <div className="space-y-5">
           <dl className="space-y-3 rounded-xl border border-line bg-surface-muted p-4 text-sm">
             <div className="flex justify-between gap-3">
-              <dt className="text-muted-foreground">ชื่อ-นามสกุล</dt>
-              <dd className="font-medium">{fullName || "-"}</dd>
+              <dt className="text-muted-foreground">ชื่อ-นามสกุล (ไทย)</dt>
+              <dd className={nameThOk ? "font-medium" : "font-medium text-destructive"}>{nameTH || "ยังไม่ได้กรอก"}</dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-muted-foreground">ชื่อ-นามสกุล (อังกฤษ)</dt>
+              <dd className={nameEnOk ? "font-medium" : "font-medium text-destructive"}>{nameEN || "ยังไม่ได้กรอก"}</dd>
             </div>
             <div className="flex justify-between gap-3">
               <dt className="text-muted-foreground">เบอร์โทรศัพท์</dt>
@@ -218,10 +225,17 @@ export function ApplyStepper({ positionId, positionTitle, account, prefill }: Ap
         <div className="space-y-5">
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="full_name">
-                ชื่อ-นามสกุล <span className="text-destructive">*</span>
+              <Label htmlFor="name_th">
+                ชื่อ-นามสกุล (ภาษาไทย) <span className="text-destructive">*</span>
               </Label>
-              <Input id="full_name" value={fullName} onChange={(e) => setFullName(e.target.value)} autoComplete="name" />
+              <Input id="name_th" value={nameTH} onChange={(e) => setNameTH(e.target.value)} autoComplete="name" placeholder="เช่น สมชาย ใจดี" aria-invalid={nameTH.length > 0 && !nameThOk} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="name_en">
+                ชื่อ-นามสกุล (ภาษาอังกฤษ) <span className="text-destructive">*</span>
+              </Label>
+              <Input id="name_en" value={nameEN} onChange={(e) => setNameEN(e.target.value)} autoComplete="name" placeholder="e.g. Somchai Jaidee" aria-invalid={nameEN.length > 0 && !nameEnOk} />
+              <p className="text-xs text-muted-foreground">ใช้ตรวจสอบให้ตรงกับชื่อในเรซูเม่</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone">
@@ -275,7 +289,7 @@ export function ApplyStepper({ positionId, positionTitle, account, prefill }: Ap
               type="button"
               size="tap"
               onClick={submitForm}
-              disabled={!fullNameOk || !phoneOk || !emailOk || !file || !!fileError || pending || !consentOk}
+              disabled={!nameThOk || !nameEnOk || !phoneOk || !emailOk || !file || !!fileError || pending || !consentOk}
               className="flex-1"
             >
               {apply.isPending ? "กำลังส่ง…" : "ส่งใบสมัคร"}

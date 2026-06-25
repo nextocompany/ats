@@ -243,6 +243,23 @@ func (f *fakeRepo) BackfillContact(_ context.Context, id uuid.UUID, phone, email
 	return nil
 }
 
+func (f *fakeRepo) BackfillNames(_ context.Context, id uuid.UUID, nameTH, nameEN string) error {
+	a, ok := f.accounts[id]
+	if !ok {
+		return ErrNotFound
+	}
+	if nameTH != "" && a.NameTH == "" {
+		a.NameTH = nameTH
+		if a.FullName == "" {
+			a.FullName = nameTH
+		}
+	}
+	if nameEN != "" && a.NameEN == "" {
+		a.NameEN = nameEN
+	}
+	return nil
+}
+
 func (f *fakeRepo) SetResume(_ context.Context, id uuid.UUID, blobURL, fileType string) error {
 	a, ok := f.accounts[id]
 	if !ok {
