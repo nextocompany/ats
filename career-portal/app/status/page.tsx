@@ -1,28 +1,40 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 
 import { PortalShell } from "@/components/PortalShell";
 import { StatusCard } from "@/components/StatusCard";
+import { StatusTimeline } from "@/components/StatusTimeline";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useStatus } from "@/lib/queries";
+import { useApplicationTimeline, useStatus } from "@/lib/queries";
+import { useCandidate } from "@/lib/session";
 
 function StatusContent() {
   const params = useSearchParams();
+  const router = useRouter();
   const prefill = params.get("token") ?? "";
   const [input, setInput] = useState(prefill);
   // Query the token from the URL immediately; otherwise wait for a submit.
   const [token, setToken] = useState(prefill);
 
+  const { isAuthenticated, isLoading: authLoading } = useCandidate();
   const { data, isLoading, isError, isFetched } = useStatus(token);
+  // The richer timeline is login-gated; only fetch once we know the candidate is
+  // authenticated. A 404 (unknown / not-owned token) falls back to the card.
+  const timeline = useApplicationTimeline(token, isAuthenticated);
+  const hasTimeline = isAuthenticated && timeline.data && !timeline.isError;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setToken(input.trim());
+  }
+
+  function handleLogin() {
+    router.push(`/login?return=${encodeURIComponent(`/status?token=${token}`)}`);
   }
 
   return (
@@ -50,7 +62,9 @@ function StatusContent() {
         </div>
       </form>
 
-      {token && isLoading ? <Skeleton className="h-48 w-full rounded-2xl" /> : null}
+      {token && (isLoading || (isAuthenticated && timeline.isLoading)) ? (
+        <Skeleton className="h-48 w-full rounded-2xl" />
+      ) : null}
 
       {token && isError ? (
         <div className="rounded-xl border border-line bg-card p-6 text-center">
@@ -58,7 +72,24 @@ function StatusContent() {
         </div>
       ) : null}
 
-      {token && data && isFetched ? <StatusCard status={data} /> : null}
+      {/* Logged in + owns this application → the full curated timeline. */}
+      {token && hasTimeline ? <StatusTimeline timeline={timeline.data} /> : null}
+
+      {/* Otherwise show the current status card. When not logged in, invite the
+          candidate to sign in for the full progress timeline. */}
+      {token && data && isFetched && !hasTimeline && !(isAuthenticated && timeline.isLoading) ? (
+        <div className="space-y-4">
+          <StatusCard status={data} />
+          {!isAuthenticated && !authLoading ? (
+            <div className="rounded-xl border border-dashed border-line bg-card/60 p-5 text-center">
+              <p className="text-sm text-muted-foreground">เข้าสู่ระบบเพื่อดูความคืบหน้าทั้งหมดของใบสมัคร</p>
+              <Button variant="outline" size="tap" className="mt-3" onClick={handleLogin}>
+                เข้าสู่ระบบ
+              </Button>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

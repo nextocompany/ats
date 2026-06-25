@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "./api";
 import { getMyLetters, getMyOffers, getMyOnboarding, respondToOffer } from "./auth";
 import type {
+  ApplicationTimeline,
   ApplyInput,
   ApplyResult,
   ApplicationStatus,
@@ -153,6 +154,21 @@ export function useMyApplications(enabled = true) {
     queryKey: ["my-applications"],
     queryFn: () => api.get<PortalApplication[]>("/api/v1/public/me/applications").then((r) => r.data),
     enabled,
+  });
+}
+
+// useApplicationTimeline loads the curated, login-gated milestone timeline for
+// one application by its public token. Account-scoped server-side (a 404 means
+// unknown or not-owned). enabled defers until both a token and auth are known.
+export function useApplicationTimeline(token: string, enabled = true) {
+  return useQuery<ApplicationTimeline>({
+    queryKey: ["application-timeline", token],
+    queryFn: () =>
+      api
+        .get<ApplicationTimeline>(`/api/v1/public/me/applications/${encodeURIComponent(token)}/timeline`)
+        .then((r) => r.data),
+    enabled: enabled && !!token,
+    retry: false,
   });
 }
 

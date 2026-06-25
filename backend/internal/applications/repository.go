@@ -14,6 +14,11 @@ import (
 	"github.com/nexto/hr-ats/internal/rbac"
 )
 
+// ErrNotFound is returned by account-scoped portal lookups when the token is
+// unknown or the application is not owned by the requesting account (the two are
+// deliberately indistinguishable to the caller — no IDOR oracle).
+var ErrNotFound = errors.New("applications: not found")
+
 // Repository is the application data-access contract.
 type Repository interface {
 	Create(ctx context.Context, a Application) (Application, error)
@@ -26,6 +31,10 @@ type Repository interface {
 	// position title, status, applied-at, and the opaque public status token so the
 	// portal can deep-link each row to /status.
 	ListByAccountForPortal(ctx context.Context, accountID uuid.UUID) ([]PortalApplication, error)
+	// PortalTimelineByToken returns the account-scoped status timeline input for a
+	// single application identified by its public token. Returns ErrNotFound when
+	// the token is unknown OR the application is not owned by accountID (no IDOR).
+	PortalTimelineByToken(ctx context.Context, token string, accountID uuid.UUID) (*PortalTimeline, error)
 	SetRawFile(ctx context.Context, id uuid.UUID, blobURL string) error
 	SetQueueTaskID(ctx context.Context, id uuid.UUID, taskID string) error
 	SetStatus(ctx context.Context, id uuid.UUID, status string) error

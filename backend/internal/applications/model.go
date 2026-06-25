@@ -153,6 +153,24 @@ type PortalApplication struct {
 	AppliedAt     time.Time `json:"applied_at"`
 }
 
+// StatusEvent is one recorded status transition from application_status_history.
+// Only to_status + changed_at are exposed — the curation layer (apptimeline)
+// must never see from_status, rejection reasons, or actor identity.
+type StatusEvent struct {
+	To string
+	At time.Time
+}
+
+// PortalTimeline is the account-scoped input for the candidate status timeline:
+// the application's current status, applied-at, position title, and its recorded
+// transitions. Returned only when the requesting account owns the application.
+type PortalTimeline struct {
+	Position  string
+	CreatedAt time.Time
+	Status    string
+	Events    []StatusEvent
+}
+
 // Score carries scoring results in a repository-friendly (pre-serialized) form,
 // so this package does not depend on the scoring package.
 type Score struct {

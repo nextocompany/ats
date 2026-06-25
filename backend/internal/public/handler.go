@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"io"
 	"net/mail"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/nexto/hr-ats/internal/applications"
+	"github.com/nexto/hr-ats/internal/apptimeline"
 	"github.com/nexto/hr-ats/internal/auth"
 	"github.com/nexto/hr-ats/internal/candidateauth"
 	"github.com/nexto/hr-ats/internal/middleware"
@@ -497,6 +499,40 @@ func (h *Handler) MyApplications(c *fiber.Ctx) error {
 		items = []applications.PortalApplication{}
 	}
 	return httpx.OK(c, items)
+}
+
+// ApplicationTimelineResponse is the curated candidate-facing status timeline.
+type ApplicationTimelineResponse struct {
+	Position   string                  `json:"position"`
+	Milestones []apptimeline.Milestone `json:"milestones"`
+}
+
+// MyApplicationTimeline handles
+// GET /api/v1/public/me/applications/:token/timeline (RequireCandidate): the
+// curated milestone timeline for one of the logged-in member's applications,
+// keyed by its public token. Account-scoped — an unknown OR unowned token both
+// return 404 (no IDOR oracle). This is the richer, login-gated counterpart of
+// the public /status/:token current-status view.
+func (h *Handler) MyApplicationTimeline(c *fiber.Ctx) error {
+	acct := candidateauth.CandidateFromCtx(c)
+	if acct == nil {
+		return fiber.NewError(fiber.StatusUnauthorized, "authentication required")
+	}
+	tl, err := h.apps.PortalTimelineByToken(c.UserContext(), c.Params("token"), acct.ID)
+	if errors.Is(err, applications.ErrNotFound) {
+		return fiber.NewError(fiber.StatusNotFound, "application not found")
+	}
+	if err != nil {
+		return err
+	}
+	events := make([]apptimeline.Event, len(tl.Events))
+	for i, e := range tl.Events {
+		events[i] = apptimeline.Event{To: e.To, At: e.At}
+	}
+	return httpx.OK(c, ApplicationTimelineResponse{
+		Position:   tl.Position,
+		Milestones: apptimeline.Build(events, tl.CreatedAt, tl.Status),
+	})
 }
 
 // Status handles GET /api/v1/public/status/:token — minimal projection only.
