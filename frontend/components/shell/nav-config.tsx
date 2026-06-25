@@ -4,7 +4,6 @@ import {
   Users,
   UploadCloud,
   Search,
-  BarChart3,
   LineChart,
   FileBarChart,
   ClipboardCheck,
@@ -47,7 +46,6 @@ export const NAV: NavItem[] = [
   { href: "/applications", label: "Applications", key: "inbox", icon: Inbox },
   { href: "/candidates", label: "Candidates", key: "candidates", icon: Users },
   { href: "/search", label: "Search", key: "search", icon: Search },
-  { href: "/analytics", label: "Analytics", key: "analytics", icon: BarChart3 },
 ];
 
 // Bulk upload is for HR roles that add candidates (super_admin/hr_manager/sgm/

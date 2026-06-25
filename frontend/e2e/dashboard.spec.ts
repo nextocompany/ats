@@ -40,13 +40,6 @@ test("inbox → detail shows resume pane + AI panel", async ({ page }) => {
   }
 });
 
-test("analytics renders charts", async ({ page }) => {
-  await page.goto("/analytics");
-  await expect(page.getByRole("heading", { name: "Analytics" })).toBeVisible();
-  await expect(page.getByText("Recruitment Funnel")).toBeVisible();
-  await page.screenshot({ path: "e2e/__screens__/analytics-1440.png", fullPage: true });
-});
-
 test("candidates list renders", async ({ page }) => {
   await page.goto("/candidates");
   await expect(page.getByRole("heading", { name: "Candidates" })).toBeVisible();
