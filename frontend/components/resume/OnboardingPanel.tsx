@@ -47,6 +47,12 @@ export function OnboardingPanel({ applicationId, app }: Props) {
         </span>
       </div>
 
+      {status.closed && (
+        <p className="mt-3 rounded-lg bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+          {t("caseClosed")}
+        </p>
+      )}
+
       <ul className="mt-3 flex flex-col gap-2">
         {status.required.map((type) => (
           <OnboardingRow key={type} applicationId={applicationId} docType={type} doc={byType.get(type) ?? null} t={t} />

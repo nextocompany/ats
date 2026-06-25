@@ -110,6 +110,9 @@ type Repository interface {
 	GetOfferByID(ctx context.Context, id uuid.UUID) (*Offer, error)
 	SendOffer(ctx context.Context, applicationID uuid.UUID) (Offer, error)
 	RespondOffer(ctx context.Context, offerID, accountID uuid.UUID, accept bool, reason string) (Offer, error)
+	NegotiateOffer(ctx context.Context, offerID, accountID uuid.UUID, counter *float64, note string, maxRounds int) (Offer, error)
+	ReopenOffer(ctx context.Context, applicationID uuid.UUID) (Offer, error)
+	WithdrawOffer(ctx context.Context, applicationID uuid.UUID, reason string) (Offer, error)
 	ListOffersByAccount(ctx context.Context, accountID uuid.UUID) ([]OfferView, error)
 	// Letter generation (Module-3 3.3): interview/offer PDF letters.
 	GatherLetterData(ctx context.Context, applicationID uuid.UUID, letterType string) (letters.LetterData, error)
@@ -161,7 +164,7 @@ func (r *pgRepository) FindByID(ctx context.Context, id uuid.UUID) (*Application
 		       COALESCE(talent_pool,false), COALESCE(dedup_state,''), created_at,
 		       ai_score_breakdown, COALESCE(ai_summary,''), COALESCE(ai_red_flags,''),
 		       ai_suggested_positions, COALESCE(rejection_reason,''),
-		       COALESCE(public_token,'')
+		       COALESCE(public_token,''), ps_synced_at
 		FROM applications WHERE id = $1`
 	var a Application
 	var breakdownRaw, suggestedRaw []byte
@@ -171,7 +174,7 @@ func (r *pgRepository) FindByID(ctx context.Context, id uuid.UUID) (*Application
 		&a.OCRConfidence, &a.NeedsManualReview, &a.QueueTaskID, &a.ParsedAt,
 		&a.AIScore, &a.MustHavePassed, &a.AssignedStoreID, &a.TalentPool, &a.DedupState, &a.CreatedAt,
 		&breakdownRaw, &a.AISummary, &a.AIRedFlags, &suggestedRaw, &a.RejectionReason,
-		&a.PublicToken,
+		&a.PublicToken, &a.PSSyncedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("applications: find by id: %w", err)
@@ -215,7 +218,13 @@ func (r *pgRepository) SetStatus(ctx context.Context, id uuid.UUID, status strin
 }
 
 func (r *pgRepository) SetRejection(ctx context.Context, id uuid.UUID, reason string) error {
-	const q = `UPDATE applications SET status = $2, rejection_reason = $3, updated_at = NOW() WHERE id = $1`
+	// Never overwrite a terminal status. This closes a TOCTOU race: an offer-stage
+	// reject reads status='offer', but the candidate may concurrently accept
+	// (app→'hired') before the reject lands; without this guard the WithdrawOffer→
+	// ErrOfferConflict fallback would flip 'hired' back to 'rejected'. A no-op (0
+	// rows) on an already-terminal app is the safe outcome.
+	const q = `UPDATE applications SET status = $2, rejection_reason = $3, updated_at = NOW()
+	           WHERE id = $1 AND status NOT IN ('hired','rejected')`
 	if _, err := r.pool.Exec(ctx, q, id, StatusRejected, reason); err != nil {
 		return fmt.Errorf("applications: set rejection: %w", err)
 	}

@@ -2,6 +2,7 @@ package applications
 
 import (
 	"context"
+	"errors"
 	"strconv"
 	"strings"
 	"time"
@@ -222,9 +223,24 @@ func (h *DashboardHandler) Bulk(c *fiber.Ctx) error {
 			continue
 		}
 		if target == StatusRejected {
-			if err := h.apps.SetRejection(c.UserContext(), id, reason); err != nil {
-				failed++
-				continue
+			// An offer-stage application with an active offer must be rejected via
+			// WithdrawOffer so the offers row is terminalized in the same tx — a
+			// plain SetRejection would orphan a live offer the candidate keeps
+			// seeing. ErrOfferConflict (no active offer) falls back to SetRejection.
+			rejected := false
+			if app.Status == StatusOffer {
+				if _, werr := h.apps.WithdrawOffer(c.UserContext(), id, reason); werr == nil {
+					rejected = true
+				} else if !errors.Is(werr, ErrOfferConflict) {
+					failed++
+					continue
+				}
+			}
+			if !rejected {
+				if err := h.apps.SetRejection(c.UserContext(), id, reason); err != nil {
+					failed++
+					continue
+				}
 			}
 		} else if err := h.apps.SetStatus(c.UserContext(), id, target); err != nil {
 			failed++
@@ -234,7 +250,8 @@ func (h *DashboardHandler) Bulk(c *fiber.Ctx) error {
 		_ = h.activity.RecordWith(c.UserContext(), activity.Actor{UserID: buid, IP: bip, UserAgent: bua}, activity.ActionBulkAction, "application", id, fiber.Map{"status": target})
 		// Keep the search index fresh — best-effort, never fails the bulk action.
 		_ = h.indexer.Index(c.UserContext(), app.CandidateID)
-		// Notify the candidate — best-effort (rejections are never notified).
+		// Notify the candidate of the outcome — best-effort (statusDoc has copy for
+		// both shortlist progress and rejection).
 		h.notifyDeps.notifyStatusChange(c.UserContext(), h.apps, id, target)
 		// Notify the store line manager that a candidate awaits shortlist review.
 		if target == StatusShortlisted {

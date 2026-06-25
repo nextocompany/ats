@@ -149,6 +149,7 @@
     "statusLabel": "Status",
     "status_draft": "Draft",
     "status_sent": "Sent",
+    "status_negotiating": "Negotiating",
     "status_accepted": "Accepted",
     "status_declined": "Declined",
     "status_expired": "Expired",
@@ -158,6 +159,11 @@
     "expiresAt": "Offer expires",
     "terms": "Terms / notes",
     "termsPlaceholder": "Benefits, conditions, notes…",
+    "benefits": "Benefits",
+    "benefitLabelPlaceholder": "Benefit",
+    "benefitValuePlaceholder": "Detail",
+    "benefitAdd": "Add benefit",
+    "benefitRemove": "Remove",
     "create": "Create draft",
     "save": "Save",
     "send": "Send offer",
@@ -166,7 +172,18 @@
     "saveFailed": "Could not save offer",
     "sent": "Offer sent to candidate",
     "sendFailed": "Could not send offer",
-    "declinedTitle": "Candidate declined"
+    "declinedTitle": "Candidate declined",
+    "counterTitle": "Candidate counter-offer",
+    "counterUnit": "THB / month",
+    "reviseResend": "Revise & re-send",
+    "endNegotiation": "End negotiation",
+    "endNegotiationPlaceholder": "Reason for ending the negotiation",
+    "confirmEndNegotiation": "Confirm",
+    "cancel": "Cancel",
+    "reopened": "Offer reopened for editing",
+    "reopenFailed": "Could not reopen the offer",
+    "withdrawn": "Negotiation ended",
+    "withdrawFailed": "Could not end the negotiation"
   },
   "letters": {
     "title": "Letters",
@@ -202,7 +219,8 @@
     "doc_photo": "Photo",
     "doc_health_check": "Health certificate",
     "doc_military_certificate": "Military certificate (Sor.Dor.43)",
-    "doc_name_change": "Name change certificate"
+    "doc_name_change": "Name change certificate",
+    "caseClosed": "Case closed · synced to PeopleSoft"
   },
   "executive": {
     "eyebrow": "Leadership",

@@ -11,9 +11,10 @@ import { useRespondOffer } from "@/lib/queries";
 import type { Offer, OfferStatus } from "@/lib/types";
 
 // Typed status → i18n-key map (no unsound `as` cast; exhaustive over OfferStatus).
-export const STATUS_KEY: Record<OfferStatus, "status_draft" | "status_sent" | "status_accepted" | "status_declined" | "status_expired"> = {
+export const STATUS_KEY: Record<OfferStatus, "status_draft" | "status_sent" | "status_negotiating" | "status_accepted" | "status_declined" | "status_expired"> = {
   draft: "status_draft",
   sent: "status_sent",
+  negotiating: "status_negotiating",
   accepted: "status_accepted",
   declined: "status_declined",
   expired: "status_expired",
@@ -28,20 +29,31 @@ export function formatThaiDate(iso: string | null): string {
   return new Intl.DateTimeFormat("th-TH", { dateStyle: "long", timeZone: "UTC" }).format(d);
 }
 
+type Mode = "idle" | "rejecting" | "negotiating";
+
 export function OfferCard({ offer, t }: { offer: Offer; t: ReturnType<typeof useTranslations> }) {
   const respond = useRespondOffer(offer.id);
-  const [declining, setDeclining] = useState(false);
+  const [mode, setMode] = useState<Mode>("idle");
   const [reason, setReason] = useState("");
+  const [counter, setCounter] = useState("");
+  const [note, setNote] = useState("");
 
   const respondable = offer.status === "sent";
+  const counterValue = Number(counter);
+  const counterValid = counter.trim() !== "" && Number.isFinite(counterValue) && counterValue > 0;
 
   function accept() {
     respond.mutate({ decision: "accept" });
   }
-  function decline(e: React.FormEvent) {
+  function reject(e: React.FormEvent) {
     e.preventDefault();
     if (!reason.trim()) return;
     respond.mutate({ decision: "decline", reason: reason.trim() });
+  }
+  function negotiate(e: React.FormEvent) {
+    e.preventDefault();
+    if (!counterValid) return;
+    respond.mutate({ decision: "negotiate", counter_salary: counterValue, note: note.trim() || undefined });
   }
 
   return (
@@ -71,8 +83,25 @@ export function OfferCard({ offer, t }: { offer: Offer; t: ReturnType<typeof use
         )}
       </dl>
 
+      {offer.benefits && offer.benefits.length > 0 && (
+        <dl className="space-y-2 border-t border-line pt-4 text-sm">
+          <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("benefitsTitle")}</dt>
+          {offer.benefits.map((b, i) => (
+            <div key={`${b.label}-${i}`} className="flex justify-between gap-4">
+              <dt className="text-muted-foreground">{b.label}</dt>
+              <dd className="text-right font-medium">{b.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+
       {offer.terms && <p className="rounded-lg bg-secondary px-3 py-2 text-sm text-foreground/80">{offer.terms}</p>}
 
+      {offer.status === "negotiating" && (
+        <p className="rounded-lg bg-secondary px-3 py-2 text-sm font-medium text-foreground/80">
+          {t("negotiatingNote", { amount: (offer.counter_salary ?? 0).toLocaleString("th-TH", { maximumFractionDigits: 0 }) })}
+        </p>
+      )}
       {offer.status === "accepted" && <p className="text-sm font-medium text-primary">{t("acceptedNote")}</p>}
       {offer.status === "declined" && <p className="text-sm text-muted-foreground">{t("declinedNote")}</p>}
       {offer.status === "expired" && <p className="text-sm text-destructive">{t("expiredNote")}</p>}
@@ -83,20 +112,60 @@ export function OfferCard({ offer, t }: { offer: Offer; t: ReturnType<typeof use
         </p>
       )}
 
-      {respondable && !declining && (
-        <div className="flex gap-3">
+      {respondable && mode === "idle" && (
+        <div className="flex flex-wrap gap-3">
           <Button onClick={accept} disabled={respond.isPending} className="gap-2">
             {respond.isPending && <Loader2 className="size-4 animate-spin" />}
             {t("accept")}
           </Button>
-          <Button variant="outline" onClick={() => setDeclining(true)} disabled={respond.isPending}>
-            {t("decline")}
+          <Button variant="outline" onClick={() => setMode("negotiating")} disabled={respond.isPending}>
+            {t("negotiate")}
+          </Button>
+          <Button variant="ghost" onClick={() => setMode("rejecting")} disabled={respond.isPending}>
+            {t("reject")}
           </Button>
         </div>
       )}
 
-      {respondable && declining && (
-        <form onSubmit={decline} className="space-y-3" noValidate>
+      {respondable && mode === "negotiating" && (
+        <form onSubmit={negotiate} className="space-y-3" noValidate>
+          <label className="block space-y-1.5">
+            <span className="text-sm font-medium text-foreground">{t("counterLabel")}</span>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              value={counter}
+              onChange={(e) => setCounter(e.target.value)}
+              required
+              className="w-full rounded-lg border border-line bg-transparent px-3 py-2 text-sm tabular-nums outline-none focus-visible:border-primary"
+              placeholder={t("counterPlaceholder")}
+            />
+          </label>
+          <label className="block space-y-1.5">
+            <span className="text-sm font-medium text-foreground">{t("counterNoteLabel")}</span>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={2}
+              className="w-full rounded-lg border border-line bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-primary"
+              placeholder={t("counterNotePlaceholder")}
+            />
+          </label>
+          <div className="flex gap-3">
+            <Button type="button" variant="ghost" onClick={() => setMode("idle")}>
+              {t("cancel")}
+            </Button>
+            <Button type="submit" variant="outline" className="gap-2" disabled={!counterValid || respond.isPending}>
+              {respond.isPending && <Loader2 className="size-4 animate-spin" />}
+              {t("confirmNegotiate")}
+            </Button>
+          </div>
+        </form>
+      )}
+
+      {respondable && mode === "rejecting" && (
+        <form onSubmit={reject} className="space-y-3" noValidate>
           <label className="block space-y-1.5">
             <span className="text-sm font-medium text-foreground">{t("declineReasonLabel")}</span>
             <textarea
@@ -109,7 +178,7 @@ export function OfferCard({ offer, t }: { offer: Offer; t: ReturnType<typeof use
             />
           </label>
           <div className="flex gap-3">
-            <Button type="button" variant="ghost" onClick={() => setDeclining(false)}>
+            <Button type="button" variant="ghost" onClick={() => setMode("idle")}>
               {t("cancel")}
             </Button>
             <Button type="submit" variant="outline" className="gap-2" disabled={!reason.trim() || respond.isPending}>

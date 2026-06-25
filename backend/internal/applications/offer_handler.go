@@ -37,6 +37,8 @@ func RegisterOfferRoutes(app *fiber.App, h *OfferHandler) {
 	app.Post("/api/v1/applications/:id/offer", h.Create)
 	app.Patch("/api/v1/applications/:id/offer", h.Update)
 	app.Post("/api/v1/applications/:id/offer/send", h.Send)
+	app.Post("/api/v1/applications/:id/offer/reopen", h.Reopen)
+	app.Post("/api/v1/applications/:id/offer/withdraw", h.Withdraw)
 }
 
 func (h *OfferHandler) scopedAppID(c *fiber.Ctx) (uuid.UUID, error) {
@@ -127,6 +129,64 @@ func (h *OfferHandler) Update(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
+	return httpx.OK(c, offer)
+}
+
+// Reopen returns a negotiating offer to draft so HR can revise and re-send it via
+// the existing Update + Send path.
+func (h *OfferHandler) Reopen(c *fiber.Ctx) error {
+	id, err := h.scopedAppID(c)
+	if err != nil {
+		return err
+	}
+	u, _ := c.Locals(middleware.UserContextKey).(middleware.DevUser)
+	if !canManageOffer(u.Role) {
+		return fiber.NewError(fiber.StatusForbidden, "insufficient role to manage offers")
+	}
+	if ok, lerr := h.guardOfferLock(c, id); !ok {
+		return lerr
+	}
+	offer, err := h.apps.ReopenOffer(c.UserContext(), id)
+	if errors.Is(err, ErrOfferNotEditable) {
+		return fiber.NewError(fiber.StatusConflict, "only an offer under negotiation can be reopened")
+	}
+	if err != nil {
+		return err
+	}
+	return httpx.OK(c, offer)
+}
+
+// Withdraw ends a negotiation (or a sent offer) by declining the offer and
+// rejecting the application in one transaction.
+func (h *OfferHandler) Withdraw(c *fiber.Ctx) error {
+	id, err := h.scopedAppID(c)
+	if err != nil {
+		return err
+	}
+	u, _ := c.Locals(middleware.UserContextKey).(middleware.DevUser)
+	if !canManageOffer(u.Role) {
+		return fiber.NewError(fiber.StatusForbidden, "insufficient role to manage offers")
+	}
+	if ok, lerr := h.guardOfferLock(c, id); !ok {
+		return lerr
+	}
+	var in OfferResponseInput
+	if err := c.BodyParser(&in); err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "invalid payload")
+	}
+	reason := strings.TrimSpace(in.Reason)
+	if reason == "" {
+		return fiber.NewError(fiber.StatusBadRequest, "a reason is required to end the negotiation")
+	}
+	offer, err := h.apps.WithdrawOffer(c.UserContext(), id, reason)
+	if errors.Is(err, ErrOfferConflict) {
+		return fiber.NewError(fiber.StatusConflict, "no active offer to end for this application")
+	}
+	if err != nil {
+		return err
+	}
+	// Best-effort candidate notification of the rejection.
+	h.notify.notifyStatusChange(c.UserContext(), h.apps, id, StatusRejected)
 	return httpx.OK(c, offer)
 }
 

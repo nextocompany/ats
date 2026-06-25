@@ -69,6 +69,10 @@ type Application struct {
 	// bulk/PeopleSoft/legacy rows). Used to build the candidate deep link
 	// /status?token=…; never the application UUID (that page is public).
 	PublicToken string `json:"-"`
+	// PSSyncedAt is set when the hired candidate was pushed to PeopleSoft (the
+	// deferred close-case step). Nil until onboarding is approved-complete and the
+	// push succeeds; doubles as the once-only guard. Populated by FindByID.
+	PSSyncedAt *time.Time `json:"ps_synced_at,omitempty"`
 	// Display fields — human-readable joins populated by the inbox List query so
 	// the UI can lead with a person (name + role + store) instead of a UUID.
 	// omitempty keeps single-record responses (Get/Intake) unchanged.

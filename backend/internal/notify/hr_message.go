@@ -178,6 +178,27 @@ func OnboardingDocUploadedHR(toEmails []string, teamsEnabled bool, docType, dash
 	return hrMessages(toEmails, teamsEnabled, doc)
 }
 
+// OfferNegotiatedHR notifies store HR that a candidate countered their offer with a
+// new figure and (optionally) a note, so HR can revise & re-send or end the
+// negotiation. counterText is the pre-formatted counter amount (e.g. "25,000 บาท").
+func OfferNegotiatedHR(toEmails []string, teamsEnabled bool, positionTitle, counterText, note, dashURL string) []Message {
+	details := make([]emailtmpl.DetailRow, 0, 3)
+	if positionTitle != "" {
+		details = append(details, emailtmpl.DetailRow{Label: "ตำแหน่ง", Value: positionTitle})
+	}
+	details = append(details, emailtmpl.DetailRow{Label: "ตัวเลขที่ผู้สมัครเสนอ", Value: fallback(counterText, "-")})
+	if note != "" {
+		details = append(details, emailtmpl.DetailRow{Label: "หมายเหตุจากผู้สมัคร", Value: note})
+	}
+	doc := emailtmpl.Doc{
+		Title:      "ผู้สมัครขอต่อรองข้อเสนอ",
+		Paragraphs: []string{"ผู้สมัครได้ส่งตัวเลขที่ต้องการต่อรองกลับมา กรุณาพิจารณาปรับแก้แล้วส่งใหม่ หรือยุติการต่อรอง"},
+		Details:    details,
+		CTA:        &emailtmpl.CTA{Label: "ดูรายละเอียด", URL: dashURL},
+	}
+	return hrMessages(toEmails, teamsEnabled, doc)
+}
+
 // hrMessages fans a Doc out to one branded email Message per address plus an
 // optional Teams Message. The email carries the rendered HTML; the Teams message
 // carries only the plain body (Teams renders its own Adaptive Card from it).

@@ -78,7 +78,7 @@ func (h *OnboardingCandidateHandler) ListMine(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	return httpx.OK(c, buildOnboardingStatus(appID, h.required, docs, h.sign))
+	return httpx.OK(c, buildOnboardingStatus(appID, h.required, docs, h.sign, false))
 }
 
 // Upload stores (or replaces) a required document for the member's hired
@@ -134,7 +134,7 @@ func (h *OnboardingCandidateHandler) Upload(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	return httpx.OK(c, buildOnboardingStatus(appID, h.required, docs, h.sign))
+	return httpx.OK(c, buildOnboardingStatus(appID, h.required, docs, h.sign, false))
 }
 
 // sign returns a freshly-signed download URL for a stored blob.

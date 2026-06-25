@@ -24,7 +24,13 @@ export interface PublicPosition {
 }
 
 // Offer management (Module-3 3.6) — mirrors applications.OfferView / OfferResponseInput.
-export type OfferStatus = "draft" | "sent" | "accepted" | "declined" | "expired";
+export type OfferStatus = "draft" | "sent" | "negotiating" | "accepted" | "declined" | "expired";
+
+// Benefit mirrors applications.Benefit — one structured benefit line on an offer.
+export interface Benefit {
+  label: string;
+  value: string;
+}
 
 export interface Offer {
   id: string;
@@ -33,6 +39,10 @@ export interface Offer {
   salary: number | null;
   start_date: string | null;
   terms?: string;
+  benefits?: Benefit[];
+  counter_salary?: number | null;
+  negotiation_note?: string;
+  negotiation_round: number;
   sent_at: string | null;
   responded_at: string | null;
   expires_at: string | null;
@@ -43,8 +53,10 @@ export interface Offer {
 }
 
 export interface OfferResponseInput {
-  decision: "accept" | "decline";
+  decision: "accept" | "decline" | "negotiate";
   reason?: string;
+  counter_salary?: number;
+  note?: string;
 }
 
 // Letters (Module-3 3.3) — mirrors applications.LetterView.
