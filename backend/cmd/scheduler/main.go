@@ -128,6 +128,23 @@ func main() {
 		log.Info().Msg("scheduler: time-based re-engagement disabled (REENGAGE_SWEEP_ENABLED=false)")
 	}
 
+	// Interview reminders: enqueue a sweep that reminds candidates ~1 day before a
+	// booked human interview. Disabled by default so a fresh environment never
+	// messages anyone until opted in.
+	if cfg.InterviewReminderEnabled {
+		remTask, err := queue.NewInterviewReminderSweepTask(queue.InterviewReminderSweepPayload{})
+		if err != nil {
+			log.Fatal().Err(err).Msg("build interview reminder sweep task failed")
+		}
+		remID, err := scheduler.Register(cfg.InterviewReminderCron, remTask)
+		if err != nil {
+			log.Fatal().Err(err).Str("cron", cfg.InterviewReminderCron).Msg("register interview reminder sweep failed")
+		}
+		log.Info().Str("cron", cfg.InterviewReminderCron).Str("entry_id", remID).Msg("scheduler: interview:reminder_sweep registered")
+	} else {
+		log.Info().Msg("scheduler: interview reminders disabled (INTERVIEW_REMINDER_ENABLED=false)")
+	}
+
 	if err := scheduler.Run(); err != nil {
 		log.Fatal().Err(err).Msg("scheduler error")
 	}

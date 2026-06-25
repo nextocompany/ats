@@ -49,6 +49,12 @@ type Repository interface {
 	FindAppointment(ctx context.Context, applicationID uuid.UUID) (*Appointment, error)
 	// ListAppointments returns every round for an application, ordered by round_no.
 	ListAppointments(ctx context.Context, applicationID uuid.UUID) ([]Appointment, error)
+	// ListAppointmentsDueForReminder returns the latest-round appointments whose
+	// human interview is ~1 day away and not yet reminded, with the candidate's
+	// contact handles — the input for the interview reminder sweep.
+	ListAppointmentsDueForReminder(ctx context.Context) ([]DueReminder, error)
+	// MarkReminderSent stamps an appointment's reminder_sent_at (at-most-once).
+	MarkReminderSent(ctx context.Context, appointmentID uuid.UUID) error
 	// ListUpcomingInterviews returns scheduled interviews across applications for
 	// the HR calendar, role-scoped (the cross-store privacy boundary).
 	ListUpcomingInterviews(ctx context.Context, f UpcomingFilter, scope rbac.Scope) ([]UpcomingInterview, int, error)
