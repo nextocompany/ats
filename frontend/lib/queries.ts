@@ -17,7 +17,6 @@ import type {
   CreateHRUserInput,
   ExecutiveOverview,
   FitAnalysis,
-  Funnel,
   HRUser,
   InterviewAppointment,
   UpcomingInterview,
@@ -54,7 +53,6 @@ import type {
   SearchFilter,
   SearchHit,
   ShortlistItem,
-  Source,
   StoreLoad,
   TimelineEntry,
   UpdateHRUserInput,
@@ -285,14 +283,8 @@ export function useTimeline(id: string) {
   });
 }
 
-export function useFunnel() {
-  return useQuery({ queryKey: ["funnel"], queryFn: () => api.get<Funnel>("/api/v1/reports/funnel").then((r) => r.data) });
-}
 export function useKpi() {
   return useQuery({ queryKey: ["kpi"], queryFn: () => api.get<KPI>("/api/v1/reports/kpi").then((r) => r.data) });
-}
-export function useSources() {
-  return useQuery({ queryKey: ["sources"], queryFn: () => api.get<Source[]>("/api/v1/reports/sources").then((r) => r.data) });
 }
 export function useWaitingByStore() {
   return useQuery({ queryKey: ["by-store"], queryFn: () => api.get<StoreLoad[]>("/api/v1/reports/by-store").then((r) => r.data) });

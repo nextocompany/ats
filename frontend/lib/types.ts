@@ -484,13 +484,6 @@ export interface FitAnalysis {
   generated_at: string;
 }
 
-export interface Funnel {
-  applied: number;
-  passed_ai: number;
-  reviewed: number;
-  hired: number;
-}
-
 export interface KPI {
   applied: number;
   passed: number;
