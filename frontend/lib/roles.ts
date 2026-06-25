@@ -118,6 +118,20 @@ export function canManageRequisitions(me: PermHolder): boolean {
   return can(me, PERMS.requisitionManage);
 }
 
+// canCompareCandidates gates the per-position Compare Candidates view — a hiring
+// decision aid. Generous on purpose (decision-makers + HR who handle the funnel:
+// line managers, placement writers, interviewers, requisition managers); the
+// backend RBAC scope is the real boundary on which candidates are visible.
+export function canCompareCandidates(me: PermHolder): boolean {
+  return (
+    isLineManager(me) ||
+    isSuperAdmin(me) ||
+    can(me, PERMS.assignmentWrite) ||
+    canRecordInterviewFeedback(me) ||
+    can(me, PERMS.requisitionManage)
+  );
+}
+
 // canApproveRequisitions gates approving a pending requisition into 'open'.
 export function canApproveRequisitions(me: PermHolder): boolean {
   return can(me, PERMS.requisitionApprove);

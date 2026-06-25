@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   Lock,
   Map,
+  Scale,
   Settings,
   SlidersHorizontal,
   type LucideIcon,
@@ -22,6 +23,7 @@ import {
   canAccessApprovals,
   canAdminPdpa,
   canBulkUpload,
+  canCompareCandidates,
   canManageAreas,
   canManageRequisitions,
   canManageScoring,
@@ -63,6 +65,10 @@ export const EXECUTIVE_NAV: NavItem = { href: "/executive", label: "Executive", 
 // Shortlist is the Line Manager's Top-5 review queue — gated to sgm (store GM).
 export const SHORTLIST_NAV: NavItem = { href: "/shortlist", label: "Shortlist", key: "shortlist", icon: ClipboardCheck };
 
+// Compare is the per-position candidate comparison + ranking decision aid —
+// gated via canCompareCandidates (decision-makers + HR funnel handlers).
+export const COMPARE_NAV: NavItem = { href: "/compare", label: "Compare", key: "compare", icon: Scale };
+
 // Approvals is the multi-level hiring sign-off queue — any chain role (hr_staff/
 // hr_manager/sgm/regional_director) + super_admin, gated via canAccessApprovals.
 export const APPROVALS_NAV: NavItem = { href: "/approvals", label: "Approvals", key: "approvals", icon: CheckSquare };
@@ -101,6 +107,7 @@ export function navForRole(me?: Me): NavItem[] {
   if (canViewReports(me)) items.push(REPORTS_NAV);
   if (canViewExecutive(me)) items.push(EXECUTIVE_NAV);
   if (isLineManager(me)) items.push(SHORTLIST_NAV);
+  if (canCompareCandidates(me)) items.push(COMPARE_NAV);
   if (canAccessApprovals(me)) items.push(APPROVALS_NAV);
   if (canViewInterviews(me)) items.push(INTERVIEWS_NAV);
   if (canBulkUpload(me)) items.push(BULK_NAV);
@@ -113,7 +120,7 @@ export function navForRole(me?: Me): NavItem[] {
 }
 
 // ALL_NAV is every possible item, for pathname→item lookups (e.g. header title).
-export const ALL_NAV: NavItem[] = [...NAV, REPORTS_NAV, EXECUTIVE_NAV, SHORTLIST_NAV, APPROVALS_NAV, INTERVIEWS_NAV, BULK_NAV, REQUISITIONS_NAV, PDPA_NAV, SCORING_NAV, AREAS_NAV, ADMIN_NAV, PRIVACY_NAV];
+export const ALL_NAV: NavItem[] = [...NAV, REPORTS_NAV, EXECUTIVE_NAV, SHORTLIST_NAV, COMPARE_NAV, APPROVALS_NAV, INTERVIEWS_NAV, BULK_NAV, REQUISITIONS_NAV, PDPA_NAV, SCORING_NAV, AREAS_NAV, ADMIN_NAV, PRIVACY_NAV];
 
 // Brand lockup — text-only institutional wordmark, no monogram tile or dot mark.
 // "CP AXTRA" tracked uppercase over an "ATS Console" line (HSBC/JPM register),
