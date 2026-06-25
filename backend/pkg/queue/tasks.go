@@ -279,6 +279,43 @@ func ParseApprovalSLASweepPayload(body []byte) (ApprovalSLASweepPayload, error) 
 	return p, nil
 }
 
+// TypeInterviewReminderSweep is the asynq task type for the interview reminder
+// sweep: notify candidates whose booked human interview is ~1 day away.
+const TypeInterviewReminderSweep = "interview:reminder_sweep"
+
+// InterviewReminderSweepPayload is the (empty) job body — the worker derives the
+// due appointments from the DB at run time.
+type InterviewReminderSweepPayload struct{}
+
+// interviewReminderUniqueTTL dedups overlapping sweep enqueues during a rolling
+// deploy (does NOT prevent the next cron tick).
+const interviewReminderUniqueTTL = 1 * time.Hour
+
+// NewInterviewReminderSweepTask builds the interview reminder sweep task.
+func NewInterviewReminderSweepTask(p InterviewReminderSweepPayload) (*asynq.Task, error) {
+	body, err := json.Marshal(p)
+	if err != nil {
+		return nil, fmt.Errorf("queue: marshal payload: %w", err)
+	}
+	return asynq.NewTask(
+		TypeInterviewReminderSweep,
+		body,
+		asynq.MaxRetry(taskMaxRetry),
+		asynq.Timeout(taskTimeout),
+		asynq.Retention(taskRetention),
+		asynq.Unique(interviewReminderUniqueTTL),
+	), nil
+}
+
+// ParseInterviewReminderSweepPayload decodes an interview reminder sweep body.
+func ParseInterviewReminderSweepPayload(body []byte) (InterviewReminderSweepPayload, error) {
+	var p InterviewReminderSweepPayload
+	if err := json.Unmarshal(body, &p); err != nil {
+		return p, fmt.Errorf("queue: unmarshal payload: %w", err)
+	}
+	return p, nil
+}
+
 // TypePoolReleaseSweep is the asynq task type for the store-pickup SLA sweep:
 // release store-specific candidates that no store HR acted on within the grace
 // window back into the shared central pool (RBAC redesign P2).

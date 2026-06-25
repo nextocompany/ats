@@ -167,6 +167,9 @@ func main() {
 	// Approval SLA escalation (Module-3 3.5): remind approvers of overdue steps.
 	approvalSLASvc := applications.NewApprovalSLAService(appRepo, notifier, applications.NewHRDirectory(pool), cfg.DashboardBaseURL, cfg.TeamsWebhookURL != "")
 
+	// Interview reminders: notify candidates ~1 day before a booked interview.
+	interviewReminderSvc := applications.NewInterviewReminderService(appRepo, notifier, cfg.PortalBaseURL)
+
 	srv := asynq.NewServer(redisOpt, asynq.Config{Concurrency: cfg.WorkerConcurrency})
 	mux := asynq.NewServeMux()
 	mux.HandleFunc(queue.TypeProcessApplication, processor.HandleProcessApplication)
@@ -176,6 +179,7 @@ func main() {
 	mux.HandleFunc(queue.TypeRetentionSweep, retentionSvc.HandleRetentionSweep)
 	mux.HandleFunc(queue.TypeAuthCleanup, authCleanupSvc.HandleAuthCleanup)
 	mux.HandleFunc(queue.TypeApprovalSLASweep, approvalSLASvc.HandleApprovalSLASweep)
+	mux.HandleFunc(queue.TypeInterviewReminderSweep, interviewReminderSvc.HandleInterviewReminderSweep)
 	poolReleaseSvc := applications.NewPoolReleaseService(appRepo, cfg.PoolReleaseGraceDays)
 	mux.HandleFunc(queue.TypePoolReleaseSweep, poolReleaseSvc.HandlePoolReleaseSweep)
 

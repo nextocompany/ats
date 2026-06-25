@@ -223,6 +223,13 @@ type Config struct {
 	ReengageSweepEnabled bool
 	ReengageSweepCron    string
 
+	// Interview reminder sweep: the scheduler enqueues a periodic sweep that sends
+	// the candidate a "your interview is tomorrow" reminder ~1 day before a booked
+	// human interview. Disabled by default; enable on the scheduler app to start
+	// reminding. Hourly cron + a 24h window self-heals a missed tick.
+	InterviewReminderEnabled bool
+	InterviewReminderCron    string
+
 	// IntakeWebhookSecret authenticates the external intake webhook (MS Forms / SEEK
 	// / JobsDB → /api/v1/intake/:source) via HMAC. Empty ⇒ the endpoint is not
 	// mounted at all (intake disabled, secure by default).
@@ -373,6 +380,9 @@ func Load() (*Config, error) {
 
 		ReengageSweepEnabled: getenvBool("REENGAGE_SWEEP_ENABLED", false),
 		ReengageSweepCron:    getenv("REENGAGE_SWEEP_CRON", "0 2 * * *"), // daily 02:00
+
+		InterviewReminderEnabled: getenvBool("INTERVIEW_REMINDER_ENABLED", false),
+		InterviewReminderCron:    getenv("INTERVIEW_REMINDER_CRON", "0 * * * *"), // hourly
 
 		IntakeWebhookSecret: os.Getenv("INTAKE_WEBHOOK_SECRET"),
 
