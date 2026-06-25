@@ -75,6 +75,11 @@
         <span class="hint">กรอกอัตราของทีมคุณ แล้วราคาค่าพัฒนาจะคำนวณให้ทันที</span>
       </div>
       <div class="field">
+        <label for="maint">ค่าบำรุงรักษา / ดูแลระบบ (THB / เดือน)</label>
+        <input class="rate" id="maint" type="text" inputmode="numeric" value="30,000" />
+        <span class="hint">บริการหลังส่งมอบ: แก้บั๊ก, แพตช์ความปลอดภัย, ดูแล L1/L2 · แนะนำสัญญา 12 เดือน</span>
+      </div>
+      <div class="field">
         <label>สกุลเงิน</label>
         <span class="pill" style="font-size:13px;padding:8px 14px">บาท (THB)</span>
       </div>
@@ -115,6 +120,7 @@
   <div class="grand" style="margin-top:22px">
     <div class="gx"><span class="gl">รวมแรงงานพัฒนา</span><span class="gv" id="g-md">— man-day</span></div>
     <div class="gx"><span class="gl">รวมค่าพัฒนา (one-time)</span><span class="gv" id="g-dev">—</span></div>
+    <div class="gx"><span class="gl">ค่าบำรุงรักษา / ปี (×12)</span><span class="gv" id="g-maint-y">—</span></div>
     <div class="gx"><span class="gl">รวมค่าคลาวด์ / เดือน</span><span class="gv teal" id="g-cloud">—</span></div>
     <div class="gx"><span class="gl">ค่าคลาวด์ / ปี (×12)</span><span class="gv teal" id="g-cloud-y">—</span></div>
   </div>
@@ -238,6 +244,43 @@
     </table>
   </div>
 
+  <!-- ============ PHASE 4: OPEN HOUSE (OPTIONAL ADD-ON · ESTIMATED SEPARATELY) ============ -->
+  <div class="section-title">Phase 4 · Open House — เว็บลงทะเบียนหน้างาน (เสริม · คิดแยกจากฐาน 3 Phase)</div>
+  <div class="card">
+    <p class="desc" style="margin-bottom:14px">ไมโครไซต์สำหรับงานรับสมัครหน้างาน (<strong>walk-in / job fair / open house</strong>):
+    ผู้สมัครสแกน QR → ลงทะเบียนบนมือถือ → ยินยอม PDPA → ถ่าย/อัปโหลดเรซูเม่ เข้าสู่ pipeline AI เดิม
+    (<code>source_channel = walk_in</code>) ทันที พร้อมโหมด kiosk หน้าบูธ และแดชบอร์ด HR real-time
+    · <strong>เป็นงานเสริม คิดแยกจากฐาน 3 Phase</strong> · ใช้ OCR / คัดกรอง / dedup / PDPA และโครงสร้างคลาวด์ร่วมกับ Pool &amp; Portal (ไม่มีค่าคลาวด์เพิ่มเป็นนัยสำคัญ)</p>
+    <table class="ptable" data-openhouse>
+      <thead><tr><th>งาน</th><th>รายละเอียด</th><th class="num">man-day</th><th class="num">ราคา (THB)</th></tr></thead>
+      <tbody>
+        <tr class="grp"><td colspan="4">เว็บอีเวนต์ (Event Microsite)</td></tr>
+        <tr data-md="7"><td class="wt">หน้า Landing อีเวนต์</td><td class="wd">ตำแหน่งที่เปิด, สถานที่/แผนที่, กำหนดการ, แบรนด์ต่อรอบงาน</td><td class="num md">7</td><td class="num cost">—</td></tr>
+        <tr data-md="3"><td class="wt">QR ต่ออีเวนต์ + deep link</td><td class="wd">สร้าง QR ต่อรอบ → เปิดหน้าลงทะเบียนตรง</td><td class="num md">3</td><td class="num cost">—</td></tr>
+        <tr data-md="8"><td class="wt">ลงทะเบียนหน้างาน (mobile-first)</td><td class="wd">ฟอร์มสั้น เร็ว + ยินยอม PDPA หน้างาน</td><td class="num md">8</td><td class="num cost">—</td></tr>
+        <tr data-md="5"><td class="wt">ถ่าย/อัปโหลดเรซูเม่ → pipeline เดิม</td><td class="wd">เข้า OCR + คัดกรอง AI (source=walk_in) ใช้ของ Pool</td><td class="num md">5</td><td class="num cost">—</td></tr>
+        <tr class="grp"><td colspan="4">โหมดหน้างาน (On-site)</td></tr>
+        <tr data-md="7"><td class="wt">Kiosk mode</td><td class="wd">แท็บเล็ตประจำบูธ, auto-reset ต่อคน, ทนเน็ตหลุด</td><td class="num md">7</td><td class="num cost">—</td></tr>
+        <tr data-md="5"><td class="wt">เจ้าหน้าที่ช่วยกรอก</td><td class="wd">staff-assisted entry + บัตรคิว/สลิป</td><td class="num md">5</td><td class="num cost">—</td></tr>
+        <tr class="grp"><td colspan="4">จัดการอีเวนต์ (มุม HR)</td></tr>
+        <tr data-md="6"><td class="wt">สร้าง/ตั้งค่าอีเวนต์</td><td class="wd">ออก QR, ช่วงเวลา, ตำแหน่งที่ร่วม, สถานที่</td><td class="num md">6</td><td class="num cost">—</td></tr>
+        <tr data-md="6"><td class="wt">แดชบอร์ดหน้างาน real-time</td><td class="wd">ยอดลงทะเบียน/ผ่านคัดกรอง ต่อตำแหน่ง</td><td class="num md">6</td><td class="num cost">—</td></tr>
+        <tr data-md="4"><td class="wt">รายชื่อ walk-in ต่ออีเวนต์</td><td class="wd">เชื่อม dedup เข้า talent pool เดิม</td><td class="num md">4</td><td class="num cost">—</td></tr>
+        <tr class="grp"><td colspan="4">QA &amp; PM</td></tr>
+        <tr data-md="6"><td class="wt">ทดสอบ + UAT</td><td class="wd">จำลองหน้างาน, peak load ช่วงอีเวนต์</td><td class="num md">6</td><td class="num cost">—</td></tr>
+        <tr data-md="4"><td class="wt">บริหารโครงการ + UX อีเวนต์</td><td class="wd">ประสานงาน, ออกแบบ flow หน้างาน</td><td class="num md">4</td><td class="num cost">—</td></tr>
+      </tbody>
+      <tfoot><tr><td colspan="2">รวม Phase 4 · Open House</td><td class="num" data-md-total>—</td><td class="num cost" data-cost-total>—</td></tr></tfoot>
+    </table>
+  </div>
+
+  <!-- OPEN HOUSE SUBTOTAL (separate from the 3-phase base) -->
+  <div class="grand" style="margin-top:18px;border:2px solid var(--teal)">
+    <div class="gx"><span class="gl">Open House · แรงงานพัฒนา</span><span class="gv" id="oh-md">— man-day</span></div>
+    <div class="gx"><span class="gl">Open House · ค่าพัฒนา (เสริม · one-time)</span><span class="gv" id="oh-dev">—</span></div>
+    <div class="gx"><span class="gl">รวมทั้งหมด (ฐาน 3 Phase + Open House)</span><span class="gv teal" id="g-dev-all">—</span></div>
+  </div>
+
   <!-- ASSUMPTIONS -->
   <div class="section-title">สมมติฐาน &amp; ขอบเขต</div>
   <div class="grid g2">
@@ -254,9 +297,11 @@
       <p><strong>หมายเหตุการประเมิน</strong></p>
       <ul>
         <li>man-day เป็น<strong>ประมาณการ effort</strong> จากขอบเขตจริงในซอร์สโค้ด อาจปรับตามรายละเอียด requirement</li>
-        <li>ค่าพัฒนา = man-day × rate ที่กรอก (ยังไม่รวม VAT, ค่า license, ค่า support หลังส่งมอบ)</li>
+        <li>ค่าพัฒนา = man-day × rate ที่กรอก (ยังไม่รวม VAT, ค่า license)</li>
         <li>ค่าคลาวด์เป็น list-price โดยประมาณ ค่า AI ผันแปรตามปริมาณใบสมัคร/เดือน</li>
-        <li>ยังไม่รวม: ค่า LINE Official Account, ค่า domain/cert, ค่าที่ปรึกษากฎหมาย PDPA, ค่าบำรุงรักษารายปี</li>
+        <li><strong>ค่าบำรุงรักษา / ดูแลระบบ</strong> = บริการหลังส่งมอบ (แก้บั๊ก, แพตช์ความปลอดภัย, อัปเดต dependency, ดูแล L1/L2) คิดรายเดือน · แนะนำสัญญา 12 เดือน · ปรับตัวเลขได้ที่ช่องด้านบน · ไม่รวมงานพัฒนาฟีเจอร์ใหม่ (คิดแยกเป็น change request)</li>
+        <li><strong>Phase 4 · Open House</strong> เป็นงานเสริม (optional) คิดแยกจากฐาน 3 Phase · ต่อยอดบน Pool/Portal และใช้ pipeline AI / PDPA / dedup เดิม จึงไม่ซ้ำงานรากฐาน · ค่าคลาวด์ใช้ร่วม (เพิ่ม burst เฉพาะช่วงจัดงาน)</li>
+        <li>ยังไม่รวม: ค่า LINE Official Account, ค่า domain/cert, ค่าที่ปรึกษากฎหมาย PDPA</li>
       </ul>
     </div>
   </div>
@@ -271,6 +316,7 @@
 <script>
   const THB = n => n.toLocaleString('th-TH', { maximumFractionDigits: 0 });
   const rateEl = document.getElementById('rate');
+  const maintEl = document.getElementById('maint');
 
   function parseNum(v) { return parseFloat(String(v).replace(/[^0-9.]/g, '')) || 0; }
 
@@ -320,9 +366,29 @@
     set('g-cloud', THB(cloudTotal) + ' ฿');
     set('g-cloud-y', THB(cloudTotal * 12) + ' ฿');
     document.getElementById('cloud-grand').textContent = THB(cloudTotal) + ' ฿';
+
+    // maintenance (flat THB / month, editable) → annual contract value
+    const maintMonthly = parseNum(maintEl.value);
+    set('g-maint-y', maintMonthly ? THB(maintMonthly * 12) + ' ฿' : '—');
+
+    // Open House (optional add-on — estimated separately, NOT in the 3-phase base)
+    const ohTable = document.querySelector('table[data-openhouse]');
+    let ohMd = 0;
+    ohTable.querySelectorAll('tr[data-md]').forEach(tr => {
+      const m = parseNum(tr.dataset.md);
+      ohMd += m;
+      tr.querySelector('.cost').textContent = rate ? THB(m * rate) : '—';
+    });
+    const ohDev = ohMd * rate;
+    ohTable.querySelector('[data-md-total]').textContent = ohMd + ' md';
+    ohTable.querySelector('[data-cost-total]').textContent = rate ? THB(ohDev) + ' ฿' : '—';
+    set('oh-md', ohMd + ' man-day');
+    set('oh-dev', rate ? THB(ohDev) + ' ฿' : '—');
+    set('g-dev-all', rate ? THB(totalDev + ohDev) + ' ฿' : 'กรอก rate');
   }
 
   rateEl.addEventListener('input', recalc);
+  maintEl.addEventListener('input', recalc);
   document.querySelectorAll('input.cloud').forEach(i => i.addEventListener('input', recalc));
   recalc();
 </script>
