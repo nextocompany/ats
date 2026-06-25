@@ -234,17 +234,18 @@ func (r *pgRepository) NegotiateOffer(ctx context.Context, offerID, accountID uu
 
 	var (
 		status    string
+		appStatus string
 		round     int
 		expiresAt *time.Time
 		acctOwner *uuid.UUID
 	)
 	err = tx.QueryRow(ctx, `
-		SELECT o.status, o.negotiation_round, o.expires_at, c.account_id
+		SELECT o.status, a.status, o.negotiation_round, o.expires_at, c.account_id
 		FROM offers o
 		JOIN applications a ON a.id = o.application_id
 		JOIN candidates c ON c.id = a.candidate_id
 		WHERE o.id = $1
-		FOR UPDATE OF o`, offerID).Scan(&status, &round, &expiresAt, &acctOwner)
+		FOR UPDATE OF o`, offerID).Scan(&status, &appStatus, &round, &expiresAt, &acctOwner)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Offer{}, ErrOfferNotFound
 	}
@@ -256,6 +257,12 @@ func (r *pgRepository) NegotiateOffer(ctx context.Context, offerID, accountID uu
 		return Offer{}, ErrOfferNotFound
 	}
 	if status != OfferSent {
+		return Offer{}, ErrOfferConflict
+	}
+	// Backstop (mirrors RespondOffer's accept/decline guard): never negotiate an
+	// offer whose application has already moved off the offer stage (e.g. an
+	// out-of-band reject left an orphaned 'sent' offer row).
+	if appStatus != StatusOffer {
 		return Offer{}, ErrOfferConflict
 	}
 	if expiresAt != nil && time.Now().After(*expiresAt) {

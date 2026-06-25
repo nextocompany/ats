@@ -184,5 +184,16 @@ func TestOffer_WithdrawReconcilesOfferAndApplication(t *testing.T) {
 	}
 }
 
+func TestOffer_WithdrawNoActiveOfferConflicts(t *testing.T) {
+	ctx := context.Background()
+	r, _, _, appID := setupOffer(t)
+	// Offer-stage application but no offer row composed yet → WithdrawOffer reports
+	// ErrOfferConflict, which the UpdateStatus handler treats as "fall back to a
+	// plain rejection".
+	if _, err := r.WithdrawOffer(ctx, appID, "no offer yet"); !errors.Is(err, ErrOfferConflict) {
+		t.Fatalf("withdraw with no active offer err = %v, want ErrOfferConflict", err)
+	}
+}
+
 func ptrF(f float64) *float64     { return &f }
 func ptrT(t time.Time) *time.Time { return &t }

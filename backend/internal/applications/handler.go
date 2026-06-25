@@ -214,7 +214,23 @@ func (h *Handler) UpdateStatus(c *fiber.Ctx) error {
 		if strings.TrimSpace(req.Reason) == "" {
 			return fiber.NewError(fiber.StatusBadRequest, "a rejection reason is required")
 		}
-		if err := h.apps.SetRejection(c.UserContext(), id, strings.TrimSpace(req.Reason)); err != nil {
+		reason := strings.TrimSpace(req.Reason)
+		// When the application sits at the offer stage with an active (sent/
+		// negotiating) offer, reject through WithdrawOffer so the offer row is
+		// terminalized in the same transaction — otherwise the candidate keeps
+		// seeing a live offer on a rejected application. WithdrawOffer reports
+		// ErrOfferConflict when no active offer row exists (e.g. offer-stage but no
+		// offer composed yet), in which case we fall back to a plain rejection.
+		if app.Status == StatusOffer {
+			if _, werr := h.apps.WithdrawOffer(c.UserContext(), id, reason); werr == nil {
+				h.recordStatusChange(c, id, app.Status, StatusRejected)
+				h.notifyDeps.notifyStatusChange(c.UserContext(), h.apps, id, StatusRejected)
+				return httpx.OK(c, fiber.Map{"id": id, "status": StatusRejected})
+			} else if !errors.Is(werr, ErrOfferConflict) {
+				return werr
+			}
+		}
+		if err := h.apps.SetRejection(c.UserContext(), id, reason); err != nil {
 			return err
 		}
 		h.recordStatusChange(c, id, app.Status, StatusRejected)
