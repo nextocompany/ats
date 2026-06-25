@@ -261,6 +261,12 @@ func (s *Service) BackfillContact(ctx context.Context, accountID uuid.UUID, phon
 	return s.repo.BackfillContact(ctx, accountID, phone, email)
 }
 
+// BackfillNames best-effort fills the Thai/English match names onto an account
+// from an apply submission (fill-once; signup/profile names stay authoritative).
+func (s *Service) BackfillNames(ctx context.Context, accountID uuid.UUID, nameTH, nameEN string) error {
+	return s.repo.BackfillNames(ctx, accountID, strings.TrimSpace(nameTH), strings.TrimSpace(nameEN))
+}
+
 // SaveResume stores the resume under an account-scoped blob key and records it.
 // The stored value is the blob KEY (not a URL) so quick-apply can Download it.
 func (s *Service) SaveResume(ctx context.Context, accountID uuid.UUID, fileName, fileType, contentType string, data []byte) error {

@@ -100,7 +100,8 @@ export function usePublicPosition(id: string) {
 export function buildApplyForm(input: ApplyInput): FormData {
   const form = new FormData();
   form.set("position_id", input.positionId);
-  form.set("full_name", input.fullName);
+  form.set("name_th", input.nameTH);
+  form.set("name_en", input.nameEN);
   if (input.phone) form.set("phone", input.phone);
   if (input.email) form.set("email", input.email);
   if (input.idCard) form.set("id_card", input.idCard);

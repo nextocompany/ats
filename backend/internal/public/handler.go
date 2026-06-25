@@ -54,6 +54,10 @@ type AccountResolver interface {
 	// apply form when the account lacks them (set-once, collision-safe). LINE
 	// accounts in particular start with no email; this is how they acquire one.
 	BackfillContact(ctx context.Context, accountID uuid.UUID, phone, email string) error
+	// BackfillNames fills the account's Thai/English match names from the apply
+	// form when the account lacks them (fill-once), so the worker name-mismatch
+	// gate has names to compare the parsed resume against.
+	BackfillNames(ctx context.Context, accountID uuid.UUID, nameTH, nameEN string) error
 }
 
 const maxResumeBytes = 10 * 1024 * 1024
@@ -207,13 +211,22 @@ func (h *Handler) Apply(c *fiber.Ctx) error {
 	if err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "valid position_id is required")
 	}
-	name := c.FormValue("full_name")
-	if name == "" && acct != nil {
-		name = acct.FullName
+	// Names: the Thai name is canonical (becomes CandidateName + account full_name);
+	// both Thai and English are matched against the parsed resume by the worker.
+	// Prefer the form values, fall back to the account (account-first), then to a
+	// legacy single full_name field for older clients.
+	nameTH := strings.TrimSpace(formOr(c, "name_th", acctNameTH(acct)))
+	nameEN := strings.TrimSpace(formOr(c, "name_en", acctNameEN(acct)))
+	if nameTH == "" {
+		nameTH = strings.TrimSpace(c.FormValue("full_name"))
 	}
-	if name == "" {
-		return fiber.NewError(fiber.StatusBadRequest, "full_name is required")
+	if nameTH == "" && acct != nil {
+		nameTH = acct.FullName
 	}
+	if nameTH == "" {
+		return fiber.NewError(fiber.StatusBadRequest, "name is required")
+	}
+	name := nameTH
 	// Phone and email are both required at apply: an email-OTP account already
 	// carries an email so only phone is new, but a LINE-only account often has
 	// neither, so the form must supply them (prefilled from LINE when available).
@@ -287,6 +300,11 @@ func (h *Handler) Apply(c *fiber.Ctx) error {
 	if accountID != nil {
 		if err := h.accounts.BackfillContact(c.UserContext(), *accountID, phone, email); err != nil {
 			log.Warn().Err(err).Str("account_id", accountID.String()).Msg("failed to backfill account contact")
+		}
+		// Persist the match names too, so the worker name-mismatch gate has the
+		// Thai/English names to compare the parsed resume against (fill-once).
+		if err := h.accounts.BackfillNames(c.UserContext(), *accountID, nameTH, nameEN); err != nil {
+			log.Warn().Err(err).Str("account_id", accountID.String()).Msg("failed to backfill account names")
 		}
 	}
 	// Mint the status token BEFORE notifying so the apply notification carries the
@@ -445,6 +463,20 @@ func acctEmail(a *candidateauth.Account) string {
 func acctProvince(a *candidateauth.Account) string {
 	if a != nil {
 		return a.Province
+	}
+	return ""
+}
+
+func acctNameTH(a *candidateauth.Account) string {
+	if a != nil {
+		return a.NameTH
+	}
+	return ""
+}
+
+func acctNameEN(a *candidateauth.Account) string {
+	if a != nil {
+		return a.NameEN
 	}
 	return ""
 }

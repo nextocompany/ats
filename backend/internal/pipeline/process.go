@@ -236,15 +236,24 @@ func (pr *Processor) run(ctx context.Context, p queue.ProcessApplicationPayload,
 	// nicknames / OCR slips never falsely reject a real applicant. Skipped for
 	// accountless intakes (bulk/webhook) — no registered name to compare. Runs
 	// BEFORE UpdateProfileFields overwrites the candidate's name with the parsed one.
-	if acctName, hasAccount, nerr := pr.candidates.GetAccountName(ctx, candID); nerr != nil {
+	if nameTH, nameEN, hasAccount, nerr := pr.candidates.GetAccountMatchNames(ctx, candID); nerr != nil {
 		log.Warn().Err(nerr).Str("candidate", candID.String()).Msg("name-mismatch gate: account name lookup failed (skipping check)")
-	} else if hasAccount && acctName != "" && profile.Personal.Name != "" && !dedup.NameLooselyMatches(acctName, profile.Personal.Name) {
-		if serr := pr.apps.SetStatus(ctx, appID, applications.StatusNameMismatch); serr != nil {
-			return canonicalID, fmt.Errorf("pipeline: set name_mismatch: %w", serr)
+	} else {
+		resume := profile.Personal.Name
+		hasName := nameTH != "" || nameEN != ""
+		// A CV is written in one language, so accept the resume if it loosely
+		// matches EITHER the Thai or the English name. NameMatchesAny skips empty
+		// names (NameLooselyMatches treats an empty arg as a match, which would
+		// otherwise auto-pass the gate and never flag a real mismatch).
+		matched := dedup.NameMatchesAny(resume, nameTH, nameEN)
+		if hasAccount && resume != "" && hasName && !matched {
+			if serr := pr.apps.SetStatus(ctx, appID, applications.StatusNameMismatch); serr != nil {
+				return canonicalID, fmt.Errorf("pipeline: set name_mismatch: %w", serr)
+			}
+			pr.notifyNameMismatch(ctx, appID, candID)
+			logger.Info().Str("name_th", nameTH).Str("name_en", nameEN).Str("resume", resume).Msg("resume name does not match account - flagged name_mismatch")
+			return canonicalID, nil
 		}
-		pr.notifyNameMismatch(ctx, appID, candID)
-		logger.Info().Str("account", acctName).Str("resume", profile.Personal.Name).Msg("resume name does not match account - flagged name_mismatch")
-		return canonicalID, nil
 	}
 
 	if err := profile.Validate(); err != nil {

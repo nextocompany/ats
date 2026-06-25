@@ -18,10 +18,11 @@ import (
 type Repository interface {
 	Create(ctx context.Context, c Candidate) (Candidate, error)
 	FindByID(ctx context.Context, id uuid.UUID) (*Candidate, error)
-	// GetAccountName returns the registered full_name of the candidate's owning
-	// portal account. hasAccount is false for accountless intakes (bulk/webhook),
-	// which have no registered name to compare against.
-	GetAccountName(ctx context.Context, candidateID uuid.UUID) (name string, hasAccount bool, err error)
+	// GetAccountMatchNames returns the candidate account's Thai + English names,
+	// the two fields matched against the parsed resume name (a CV is in one
+	// language, so the gate accepts a match against either). hasAccount is false
+	// for accountless intakes (bulk/webhook), which have no registered name.
+	GetAccountMatchNames(ctx context.Context, candidateID uuid.UUID) (nameTH, nameEN string, hasAccount bool, err error)
 	List(ctx context.Context, f Filter, scope rbac.Scope) ([]Candidate, int, error)
 	Timeline(ctx context.Context, id uuid.UUID) ([]activity.Entry, error)
 	UpdateProfileFields(ctx context.Context, id uuid.UUID, f ProfileFields) error
@@ -90,19 +91,19 @@ func (r *pgRepository) FindByID(ctx context.Context, id uuid.UUID) (*Candidate, 
 	return &c, nil
 }
 
-func (r *pgRepository) GetAccountName(ctx context.Context, candidateID uuid.UUID) (string, bool, error) {
-	const q = `SELECT COALESCE(a.full_name,'')
+func (r *pgRepository) GetAccountMatchNames(ctx context.Context, candidateID uuid.UUID) (string, string, bool, error) {
+	const q = `SELECT COALESCE(a.name_th,''), COALESCE(a.name_en,'')
 		FROM candidates c JOIN candidate_accounts a ON a.id = c.account_id
 		WHERE c.id = $1`
-	var name string
-	err := r.pool.QueryRow(ctx, q, candidateID).Scan(&name)
+	var nameTH, nameEN string
+	err := r.pool.QueryRow(ctx, q, candidateID).Scan(&nameTH, &nameEN)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return "", false, nil // accountless candidate (no portal account)
+		return "", "", false, nil // accountless candidate (no portal account)
 	}
 	if err != nil {
-		return "", false, fmt.Errorf("candidates: get account name: %w", err)
+		return "", "", false, fmt.Errorf("candidates: get account match names: %w", err)
 	}
-	return name, true, nil
+	return nameTH, nameEN, true, nil
 }
 
 // UpdateProfileFields applies parsed values, overwriting only non-empty inputs

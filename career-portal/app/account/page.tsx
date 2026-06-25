@@ -25,7 +25,7 @@ import type { Account } from "@/lib/types";
 // the stable /me has_resume flag (not the async count) so the figure does not flicker.
 function profileCompleteness(account: Account): number {
   const filled = [
-    account.full_name.trim().length > 0,
+    account.name_th.trim().length > 0 && account.name_en.trim().length > 0,
     account.phone.trim().length > 0,
     account.province.trim().length > 0,
     account.line_linked,
@@ -120,7 +120,7 @@ export default function AccountPage() {
     <PortalShell backHref="/jobs">
       <div className="reveal flex flex-col gap-12 lg:gap-14">
         <AccountIdentityHeader
-          name={candidate.full_name || contact}
+          name={candidate.display_name || candidate.full_name || contact}
           contact={contact}
           secondary={secondary}
           summary={summary}

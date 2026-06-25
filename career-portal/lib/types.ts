@@ -135,7 +135,8 @@ export interface InterviewSessionState {
 // the candidate session cookie (account-first) — no LINE id-token header.
 export interface ApplyInput {
   positionId: string;
-  fullName: string;
+  nameTH: string; // Thai full name (canonical + matched)
+  nameEN: string; // English full name (matched)
   phone?: string;
   email?: string;
   idCard?: string;
@@ -150,6 +151,9 @@ export interface ApplyInput {
 export interface Account {
   id: string;
   full_name: string;
+  display_name: string; // from LINE/Google login; cosmetic, not matched
+  name_th: string; // Thai full name; required at apply; matched vs resume
+  name_en: string; // English full name; required at apply; matched vs resume
   email: string;
   phone: string;
   province: string;
@@ -177,6 +181,9 @@ export interface AccountResume {
 // PATCH /api/v1/public/auth/profile body.
 export interface ProfileInput {
   full_name?: string;
+  name_th?: string;
+  name_en?: string;
+  display_name?: string;
   phone?: string;
   // email is set-once: only accepted by the server when the account has none yet
   // (LINE accounts start without one). A colliding email returns 409.

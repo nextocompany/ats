@@ -16,7 +16,7 @@ export function AccountNav({ compact }: { compact?: boolean }) {
   }
 
   if (isAuthenticated && candidate) {
-    const label = candidate.full_name?.trim() || "บัญชีของฉัน";
+    const label = candidate.display_name?.trim() || candidate.full_name?.trim() || "บัญชีของฉัน";
     return (
       <Link
         href="/account"

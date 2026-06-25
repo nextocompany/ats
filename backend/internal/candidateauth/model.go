@@ -67,6 +67,9 @@ type Resume struct {
 type Account struct {
 	ID             uuid.UUID `json:"id"`
 	FullName       string    `json:"full_name"`
+	DisplayName    string    `json:"display_name"` // from LINE/Google login; cosmetic, NOT matched
+	NameTH         string    `json:"name_th"`      // Thai full name; required at apply; matched vs resume
+	NameEN         string    `json:"name_en"`      // English full name; required at apply; matched vs resume
 	Email          string    `json:"email"`
 	EmailVerified  bool      `json:"email_verified"`
 	Phone          string    `json:"phone"`
@@ -98,6 +101,9 @@ func (a *Account) GoogleLinked() bool { return a.GoogleSub != "" }
 // are ignored so a partial save never blanks existing data).
 type ProfileUpdate struct {
 	FullName      string
+	NameTH        string // Thai full name; also synced into full_name (the canonical)
+	NameEN        string // English full name; match-only
+	DisplayName   string // cosmetic; usually prefilled from LINE, optionally editable
 	Phone         string
 	Email         string // set-once: only writes when the account has no email yet
 	LineDisplayID string
