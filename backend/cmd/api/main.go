@@ -436,6 +436,8 @@ func main() {
 	applications.RegisterFeedbackRoutes(app, feedbackHandler)
 	// Line-Manager Top-5 shortlist + per-application scorecard summary (TA + LM).
 	applications.RegisterShortlistRoutes(app, applications.NewShortlistHandler(appRepo))
+	// Per-position Compare Candidates ranking (post-AI-interview pool).
+	applications.RegisterCompareRoutes(app, applications.NewCompareHandler(appRepo, positionRepo))
 	// Multi-level hiring approval chain (Staff → HR Manager → SGM → Regional).
 	approvalHandler := applications.NewApprovalHandler(appRepo, cfg.ApprovalSLAHours)
 	approvalHandler.SetNotifier(notifier, applications.NewHRDirectory(pool), cfg.DashboardBaseURL, cfg.TeamsWebhookURL != "")

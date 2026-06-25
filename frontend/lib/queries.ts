@@ -14,6 +14,7 @@ import type {
   ApprovalRequest,
   BulkIntakeResult,
   Candidate,
+  CompareResponse,
   CreateHRUserInput,
   ExecutiveOverview,
   FitAnalysis,
@@ -198,6 +199,18 @@ export function usePositions() {
   return useQuery({
     queryKey: ["positions"],
     queryFn: () => api.get<Position[]>("/api/v1/positions").then((r) => r.data),
+  });
+}
+
+// useCompare loads the per-position Compare ranking (eligible post-AI-interview
+// candidates, ranked by the screening+AI-interview composite). RBAC-scoped
+// server-side. Deferred until a position is chosen.
+export function useCompare(positionId: string) {
+  return useQuery({
+    queryKey: ["compare", positionId],
+    queryFn: () =>
+      api.get<CompareResponse>("/api/v1/compare" + buildQuery({ position_id: positionId })).then((r) => r.data),
+    enabled: !!positionId,
   });
 }
 

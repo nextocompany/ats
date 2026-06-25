@@ -304,6 +304,33 @@ export interface ShortlistItem {
   composite: number;
 }
 
+// CompareItem mirrors applications.CompareItem (one ranked candidate in the
+// per-position comparison: both AI scores + screening breakdown + risk signals).
+export interface CompareItem {
+  application_id: string;
+  candidate_name: string;
+  status: string;
+  applied_at: string;
+  assigned_store_id: number | null;
+  store_name: string;
+  screening_score: number | null;
+  breakdown?: ScoreBreakdown | null;
+  must_have_passed: boolean | null;
+  ai_summary?: string;
+  ai_red_flags?: string;
+  interview_score: number | null;
+  recommendation: string; // strong_recommend | recommend | neutral | caution
+  interview_summary?: string;
+  composite: number;
+}
+
+// CompareResponse mirrors applications.CompareResponse (GET /api/v1/compare).
+export interface CompareResponse {
+  position_id: string;
+  position_title: string;
+  candidates: CompareItem[];
+}
+
 // Position is the slim picker projection (mirrors positions.ListItem).
 export interface Position {
   id: string;

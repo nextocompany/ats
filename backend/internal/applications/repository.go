@@ -58,6 +58,10 @@ type Repository interface {
 	// Shortlist returns the top-N shortlisted applications visible to scope,
 	// composite-ranked (AI score + TA interview rating) — powers the LM view.
 	Shortlist(ctx context.Context, scope rbac.Scope, limit int) ([]ShortlistItem, error)
+	// CompareByPosition returns the eligible (post-AI-interview) candidates for one
+	// position visible to scope, ranked by the screening+AI-interview composite —
+	// powers the Compare Candidates view.
+	CompareByPosition(ctx context.Context, positionID uuid.UUID, scope rbac.Scope, limit int) ([]CompareItem, error)
 	// Sprint 2:
 	SetCanonicalCandidate(ctx context.Context, id, candidateID uuid.UUID) error
 	SetDedupState(ctx context.Context, id uuid.UUID, state string, confidence float64) error
