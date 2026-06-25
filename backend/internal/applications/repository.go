@@ -218,7 +218,13 @@ func (r *pgRepository) SetStatus(ctx context.Context, id uuid.UUID, status strin
 }
 
 func (r *pgRepository) SetRejection(ctx context.Context, id uuid.UUID, reason string) error {
-	const q = `UPDATE applications SET status = $2, rejection_reason = $3, updated_at = NOW() WHERE id = $1`
+	// Never overwrite a terminal status. This closes a TOCTOU race: an offer-stage
+	// reject reads status='offer', but the candidate may concurrently accept
+	// (app→'hired') before the reject lands; without this guard the WithdrawOffer→
+	// ErrOfferConflict fallback would flip 'hired' back to 'rejected'. A no-op (0
+	// rows) on an already-terminal app is the safe outcome.
+	const q = `UPDATE applications SET status = $2, rejection_reason = $3, updated_at = NOW()
+	           WHERE id = $1 AND status NOT IN ('hired','rejected')`
 	if _, err := r.pool.Exec(ctx, q, id, StatusRejected, reason); err != nil {
 		return fmt.Errorf("applications: set rejection: %w", err)
 	}

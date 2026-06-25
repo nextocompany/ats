@@ -173,9 +173,11 @@ func (h *OnboardingHandler) sign(storedURL string) (string, error) {
 // maybeCloseCase pushes the hired candidate to PeopleSoft (closing the case) the
 // moment onboarding becomes approve-complete. Best-effort and once-only: it no-ops
 // unless every required document is approved AND the application has not been
-// synced yet (ps_synced_at NULL). The fresh ps_synced_at read tolerates concurrent
-// final-doc approvals — at worst two pushes, which the PeopleSoft client + CSV
-// fallback absorb.
+// synced yet (ps_synced_at NULL). The once-only guard is reliable because Review
+// holds the per-candidate processing lock (guardLock) before calling this, so
+// concurrent final-doc approvals for the same candidate are serialised — the
+// ps_synced_at read always sees a committed prior push. (PeopleSoft's create_applicant
+// is NOT idempotent, so the lock — not the client — is what prevents a duplicate.)
 func (h *OnboardingHandler) maybeCloseCase(ctx context.Context, appID uuid.UUID) {
 	if h.hired == nil {
 		return

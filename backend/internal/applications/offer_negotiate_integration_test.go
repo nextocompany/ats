@@ -195,5 +195,23 @@ func TestOffer_WithdrawNoActiveOfferConflicts(t *testing.T) {
 	}
 }
 
+func TestSetRejection_NeverOverwritesTerminal(t *testing.T) {
+	ctx := context.Background()
+	r, _, _, appID := setupOffer(t)
+	// Simulate the race outcome: the candidate accepted just before HR's reject
+	// landed, so the application is already 'hired'.
+	if err := r.SetHired(ctx, appID); err != nil {
+		t.Fatalf("set hired: %v", err)
+	}
+	// The reject fallback must NOT flip 'hired' back to 'rejected'.
+	if err := r.SetRejection(ctx, appID, "HR clicked reject during the race"); err != nil {
+		t.Fatalf("set rejection: %v", err)
+	}
+	app, _ := r.FindByID(ctx, appID)
+	if app.Status != StatusHired {
+		t.Fatalf("status after racing reject = %q, want hired (guard must no-op on terminal)", app.Status)
+	}
+}
+
 func ptrF(f float64) *float64     { return &f }
 func ptrT(t time.Time) *time.Time { return &t }

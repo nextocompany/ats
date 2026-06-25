@@ -182,10 +182,11 @@ func OnboardingDocUploadedHR(toEmails []string, teamsEnabled bool, docType, dash
 // new figure and (optionally) a note, so HR can revise & re-send or end the
 // negotiation. counterText is the pre-formatted counter amount (e.g. "25,000 บาท").
 func OfferNegotiatedHR(toEmails []string, teamsEnabled bool, positionTitle, counterText, note, dashURL string) []Message {
-	details := []emailtmpl.DetailRow{
-		{Label: "ตำแหน่ง", Value: fallback(positionTitle, "-")},
-		{Label: "ตัวเลขที่ผู้สมัครเสนอ", Value: fallback(counterText, "-")},
+	details := make([]emailtmpl.DetailRow, 0, 3)
+	if positionTitle != "" {
+		details = append(details, emailtmpl.DetailRow{Label: "ตำแหน่ง", Value: positionTitle})
 	}
+	details = append(details, emailtmpl.DetailRow{Label: "ตัวเลขที่ผู้สมัครเสนอ", Value: fallback(counterText, "-")})
 	if note != "" {
 		details = append(details, emailtmpl.DetailRow{Label: "หมายเหตุจากผู้สมัคร", Value: note})
 	}

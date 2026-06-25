@@ -250,7 +250,8 @@ func (h *DashboardHandler) Bulk(c *fiber.Ctx) error {
 		_ = h.activity.RecordWith(c.UserContext(), activity.Actor{UserID: buid, IP: bip, UserAgent: bua}, activity.ActionBulkAction, "application", id, fiber.Map{"status": target})
 		// Keep the search index fresh — best-effort, never fails the bulk action.
 		_ = h.indexer.Index(c.UserContext(), app.CandidateID)
-		// Notify the candidate — best-effort (rejections are never notified).
+		// Notify the candidate of the outcome — best-effort (statusDoc has copy for
+		// both shortlist progress and rejection).
 		h.notifyDeps.notifyStatusChange(c.UserContext(), h.apps, id, target)
 		// Notify the store line manager that a candidate awaits shortlist review.
 		if target == StatusShortlisted {
