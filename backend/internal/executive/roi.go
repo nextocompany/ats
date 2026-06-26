@@ -220,9 +220,12 @@ func (l *liveService) success(ctx context.Context, f ExecFilters, since time.Tim
 		labelExpr = "COALESCE(NULLIF(p.title_en,''), p.title_th, 'Position')"
 		joins = `JOIN positions p ON p.id = a.position_id`
 	default: // branch
-		keyExpr = "s.store_no::text"
-		labelExpr = "COALESCE(NULLIF(s.store_name,''), 'Store')"
-		joins = `JOIN stores s ON s.store_no = a.assigned_store_id`
+		// LEFT JOIN (not INNER) so hired apps with a NULL assigned_store_id (direct
+		// hire / legacy / hired-before-assigned) land in an "Unassigned" bucket
+		// instead of vanishing — this is what keeps Σ success.hires == headline.
+		keyExpr = "COALESCE(s.store_no::text, 'unassigned')"
+		labelExpr = "COALESCE(NULLIF(s.store_name,''), 'Unassigned')"
+		joins = `LEFT JOIN stores s ON s.store_no = a.assigned_store_id`
 	}
 
 	q := fmt.Sprintf(`

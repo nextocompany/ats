@@ -189,6 +189,51 @@ func TestROI_SuccessSumsToHeadline(t *testing.T) {
 	}
 }
 
+func TestROI_BranchUnassignedReconciles(t *testing.T) {
+	f := setupROI(t)
+	ctx := context.Background()
+	// A direct hire with NO assigned branch must still appear (Unassigned bucket)
+	// so the branch table reconciles to the headline. Insert it on top of the
+	// 3-hire fixture → headline becomes 4.
+	var candID uuid.UUID
+	if err := f.pool.QueryRow(ctx,
+		`INSERT INTO candidates (full_name, source_channel, status) VALUES ('c','Referral','available') RETURNING id`).Scan(&candID); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	if _, err := f.pool.Exec(ctx,
+		`INSERT INTO applications (candidate_id, position_id, status, assigned_store_id, created_at, hired_at)
+		 VALUES ($1,$2,'hired',NULL,$3,$4)`,
+		candID, f.p1, now.AddDate(0, 0, -8), now.AddDate(0, 0, -2)); err != nil {
+		t.Fatal(err)
+	}
+
+	v, err := f.svc.ROI(ctx, ExecFilters{Period: "year", Dimension: "branch"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.Hires != 4 {
+		t.Fatalf("headline hires = %d, want 4", v.Hires)
+	}
+	var sum int
+	var hasUnassigned bool
+	for _, r := range v.Success {
+		sum += r.Hires
+		if r.Key == "unassigned" {
+			hasUnassigned = true
+			if r.Hires != 1 {
+				t.Errorf("unassigned hires = %d, want 1", r.Hires)
+			}
+		}
+	}
+	if sum != v.Hires {
+		t.Errorf("Σ success hires = %d, want headline %d (branch INNER JOIN would drop NULL-store hires)", sum, v.Hires)
+	}
+	if !hasUnassigned {
+		t.Errorf("expected an 'unassigned' branch bucket for the NULL-store hire")
+	}
+}
+
 func TestROI_DimensionFilterScopes(t *testing.T) {
 	f := setupROI(t)
 	ctx := context.Background()

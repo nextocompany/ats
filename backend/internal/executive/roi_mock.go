@@ -42,7 +42,7 @@ func (m *mockService) ROI(ctx context.Context, f ExecFilters) (ROIView, error) {
 		ConversionToHire: pct(hired, applied),
 	}
 
-	success := mockSuccess(f.Dimension, stores, positions, months)
+	success := mockSuccess(f.Dimension, stores, positions, months, hired)
 
 	view := ROIView{
 		DataSource: "mock",
@@ -62,23 +62,20 @@ func (m *mockService) ROI(ctx context.Context, f ExecFilters) (ROIView, error) {
 	return view, nil
 }
 
-// mockSuccess synthesizes per-dimension rows over real dimension names so Σ rows
-// reconciles to the headline hired count.
-func mockSuccess(dimension string, stores []storeRef, positions []PipelinePosition, months int) []SuccessRow {
+// mockSuccess synthesizes per-dimension rows over real dimension names, then
+// distributes the headline hired count across them so Σ rows.Hires == headline
+// (the same reconciliation invariant the live path holds).
+func mockSuccess(dimension string, stores []storeRef, positions []PipelinePosition, months, headlineHires int) []SuccessRow {
 	sources := []string{"LINE", "Google", "Walk-in", "Referral", "JobsDB"}
 	rows := make([]SuccessRow, 0)
 
 	switch dimension {
 	case "position":
 		for i, p := range positions {
-			apps := (120 + i*40) * months
-			hires := apps * (10 + seedSpan(i+1, 12)) / 100
 			rows = append(rows, SuccessRow{
 				Key:           p.PositionID,
 				Label:         p.Title,
-				Applications:  apps,
-				Hires:         hires,
-				Conversion:    pct(hires, apps),
+				Applications:  (120 + i*40) * months,
 				AvgTimeToHire: round1(13 + float64(seedSpan(i*5, 80))/10.0),
 				TopSource:     sources[i%len(sources)],
 			})
@@ -98,31 +95,51 @@ func mockSuccess(dimension string, stores []storeRef, positions []PipelinePositi
 				rows = append(rows, SuccessRow{Key: "region:" + region, Label: region, TopSource: sources[idx%len(sources)]})
 				idx++
 			}
-			apps := (90 + seedSpan(s.no, 120)) * months
-			hires := apps * (8 + seedSpan(s.no*3, 14)) / 100
-			rows[pos].Applications += apps
-			rows[pos].Hires += hires
+			rows[pos].Applications += (90 + seedSpan(s.no, 120)) * months
 		}
 		for i := range rows {
-			rows[i].Conversion = pct(rows[i].Hires, rows[i].Applications)
 			rows[i].AvgTimeToHire = round1(14 + float64(seedSpan(i*7, 60))/10.0)
 		}
 	default: // branch
 		for i, s := range stores {
-			apps := (90 + seedSpan(s.no, 150)) * months
-			hires := apps * (8 + seedSpan(s.no*3, 15)) / 100
 			rows = append(rows, SuccessRow{
 				Key:           intToStr(s.no),
 				Label:         s.name,
-				Applications:  apps,
-				Hires:         hires,
-				Conversion:    pct(hires, apps),
+				Applications:  (90 + seedSpan(s.no, 150)) * months,
 				AvgTimeToHire: round1(13 + float64(seedSpan(s.no*4, 70))/10.0),
 				TopSource:     sources[i%len(sources)],
 			})
 		}
 	}
+	distributeHires(rows, headlineHires)
 	return rows
+}
+
+// distributeHires spreads total hires across rows proportionally to their
+// applications (largest-remainder), so Σ rows.Hires == total exactly and the
+// per-row conversion stays consistent. Deterministic (no rand).
+func distributeHires(rows []SuccessRow, total int) {
+	if len(rows) == 0 {
+		return
+	}
+	var sumApps int
+	for _, r := range rows {
+		sumApps += r.Applications
+	}
+	assigned := 0
+	for i := range rows {
+		if sumApps > 0 && total > 0 {
+			rows[i].Hires = total * rows[i].Applications / sumApps
+		}
+		assigned += rows[i].Hires
+	}
+	for i := 0; assigned < total; i = (i + 1) % len(rows) {
+		rows[i].Hires++
+		assigned++
+	}
+	for i := range rows {
+		rows[i].Conversion = pct(rows[i].Hires, rows[i].Applications)
+	}
 }
 
 // GetCostConfig / SetCostConfig satisfy the Service cost-config seam (mock).

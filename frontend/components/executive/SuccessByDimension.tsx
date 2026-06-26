@@ -71,6 +71,10 @@ export function SuccessByDimension({ rows, dimension }: Props) {
           </tbody>
         </table>
       )}
+
+      {dimension === "region" && rows.length > 0 && (
+        <p className="mt-4 text-xs text-muted-foreground">{t("successRegionNote")}</p>
+      )}
     </section>
   );
 }

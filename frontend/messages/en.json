@@ -345,7 +345,8 @@
     "costSave": "Save assumptions",
     "costSaved": "Cost assumptions saved",
     "costSaveFailed": "Could not save assumptions",
-    "costNegative": "Cost figures must be non-negative"
+    "costNegative": "Cost figures must be non-negative",
+    "successRegionNote": "A branch assigned to more than one region is counted in each, so regional totals can exceed the company headline."
   },
   "reports": {
     "eyebrow": "Reporting",
