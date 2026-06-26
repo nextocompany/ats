@@ -698,6 +698,76 @@ export interface ExecutiveOverview {
   sourcing: Source[];
 }
 
+// ── Recruitment ROI & Performance (mirrors internal/executive ROIView) ──────
+
+// ExecCostConfig: the admin-configured cost assumptions driving ROI. Cost figures
+// are nullable — unset (null) means the ROI cards show an empty-state.
+export interface ExecCostConfig {
+  currency: string;
+  system_cost_monthly: number | null;
+  traditional_cost_per_hire: number | null;
+  vacancy_cost_per_day: number | null;
+  traditional_time_to_hire_days: number | null;
+  updated_by?: string;
+  updated_at?: string;
+}
+
+export interface ExecFunnelStat {
+  applied: number;
+  screened: number;
+  interviewed: number;
+  offered: number;
+  hired: number;
+  response_rate: number;
+  conversion_to_hire: number;
+}
+
+export interface ExecTimeToHire {
+  hires: number;
+  avg_days: number;
+  median_days: number;
+}
+
+export interface ExecSuccessRow {
+  key: string;
+  label: string;
+  applications: number;
+  hires: number;
+  conversion: number;
+  avg_time_to_hire: number;
+  top_source: string;
+}
+
+export type ExecPeriod = "month" | "quarter" | "year";
+export type ExecDimension = "branch" | "region" | "position";
+
+// ExecROIFilters are the period + dimension controls applied to the whole payload.
+export interface ExecROIFilters {
+  period: ExecPeriod;
+  dimension: ExecDimension;
+  store?: number | null;
+  region?: string;
+  position?: string;
+}
+
+export interface ExecutiveROI {
+  data_source: "mock" | "live";
+  generated_at: string;
+  period: ExecPeriod;
+  dimension: ExecDimension;
+  cost: ExecCostConfig;
+  cost_configured: boolean;
+  hires: number;
+  system_cost_period: number;
+  cost_per_hire: number;
+  savings: number;
+  roi_pct: number;
+  vacancy_cost_avoided: number;
+  funnel: ExecFunnelStat;
+  time_to_hire: ExecTimeToHire;
+  success: ExecSuccessRow[];
+}
+
 // AdminSettings mirrors the Go settings handler dto — runtime, admin-managed flags.
 export interface AdminSettings {
   allow_all_tenants: boolean;
