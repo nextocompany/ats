@@ -56,3 +56,90 @@ type Source struct {
 	Hired      int     `json:"hired"`
 	Conversion float64 `json:"conversion"`
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Recruitment ROI & Performance dashboard
+//
+// The ATS stores no cost/finance data, so ROI is driven by admin-configured cost
+// assumptions (CostConfig, gated settings.admin). Period semantics are explicit
+// per metric: a hire counts in the period it was HIRED (hired_at), while resume
+// volume / funnel / response-rate count in the period applications were CREATED
+// (created_at). Success rows decompose the headline: hires + time-to-hire use the
+// hired_at window (so Σ success.hires == ROIView.Hires), applications use the
+// created_at window.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// CostConfig holds the single-row admin cost assumptions. All cost figures are
+// pointers so an unset assumption (nil) drives the ROI empty-state instead of a
+// fabricated zero.
+type CostConfig struct {
+	Currency                  string   `json:"currency"`
+	SystemCostMonthly         *float64 `json:"system_cost_monthly"`
+	TraditionalCostPerHire    *float64 `json:"traditional_cost_per_hire"`
+	VacancyCostPerDay         *float64 `json:"vacancy_cost_per_day"`
+	TraditionalTimeToHireDays *float64 `json:"traditional_time_to_hire_days"`
+	UpdatedBy                 string   `json:"updated_by,omitempty"`
+	UpdatedAt                 string   `json:"updated_at,omitempty"`
+}
+
+// configured reports whether every cost figure ROI math needs is present.
+func (c CostConfig) configured() bool {
+	return c.SystemCostMonthly != nil && c.TraditionalCostPerHire != nil
+}
+
+// ExecFilters are the period + dimension controls applied to the whole payload.
+type ExecFilters struct {
+	Period    string // "month" | "quarter" | "year" (rolling lookback)
+	Dimension string // success-table grouping: "branch" | "region" | "position"
+	Store     *int   // optional branch filter (assigned_store_id)
+	Region    string // optional area id filter (areas.id)
+	Position  string // optional position id filter
+}
+
+// FunnelStat is the volume/response funnel over the created_at window.
+type FunnelStat struct {
+	Applied          int     `json:"applied"`
+	Screened         int     `json:"screened"`
+	Interviewed      int     `json:"interviewed"`
+	Offered          int     `json:"offered"`
+	Hired            int     `json:"hired"`
+	ResponseRate     float64 `json:"response_rate"`      // share of apps picked up by HR, 1 dp
+	ConversionToHire float64 `json:"conversion_to_hire"` // hired/applied, 1 dp
+}
+
+// TimeToHire is apply→offer-accept duration over the hired_at window.
+type TimeToHire struct {
+	Hires      int     `json:"hires"`
+	AvgDays    float64 `json:"avg_days"`
+	MedianDays float64 `json:"median_days"`
+}
+
+// SuccessRow is one branch/region/position row decomposing the headline hires.
+type SuccessRow struct {
+	Key           string  `json:"key"`              // dimension id (store_no/area id/position id) or label
+	Label         string  `json:"label"`            // human label
+	Applications  int     `json:"applications"`     // created_at window
+	Hires         int     `json:"hires"`            // hired_at window
+	Conversion    float64 `json:"conversion"`       // hires/applications velocity ratio, 1 dp
+	AvgTimeToHire float64 `json:"avg_time_to_hire"` // days, hired_at window
+	TopSource     string  `json:"top_source"`
+}
+
+// ROIView is the consolidated Recruitment ROI & Performance payload.
+type ROIView struct {
+	DataSource         string       `json:"data_source"`  // "mock" | "live"
+	GeneratedAt        string       `json:"generated_at"` // RFC3339; stamped by the handler
+	Period             string       `json:"period"`
+	Dimension          string       `json:"dimension"`
+	Cost               CostConfig   `json:"cost"`
+	CostConfigured     bool         `json:"cost_configured"`
+	Hires              int          `json:"hires"`              // status='hired' in hired_at window
+	SystemCostPeriod   float64      `json:"system_cost_period"` // monthly * months_in_period
+	CostPerHire        float64      `json:"cost_per_hire"`
+	Savings            float64      `json:"savings"` // vs traditional cost-per-hire
+	ROIPct             float64      `json:"roi_pct"`
+	VacancyCostAvoided float64      `json:"vacancy_cost_avoided"` // see roi.go (days-saved * rate * hires)
+	Funnel             FunnelStat   `json:"funnel"`
+	TimeToHire         TimeToHire   `json:"time_to_hire"`
+	Success            []SuccessRow `json:"success"`
+}
