@@ -16,7 +16,10 @@ import type {
   Candidate,
   CompareResponse,
   CreateHRUserInput,
+  ExecCostConfig,
+  ExecROIFilters,
   ExecutiveOverview,
+  ExecutiveROI,
   FitAnalysis,
   HRUser,
   InterviewAppointment,
@@ -313,6 +316,50 @@ export function useExecutiveOverview(enabled = true) {
     queryKey: ["executive-overview"],
     queryFn: () => api.get<ExecutiveOverview>("/api/v1/executive/overview").then((r) => r.data),
     enabled,
+  });
+}
+
+// Recruitment ROI & Performance. 403s for non-leadership roles, so gate the page
+// on canViewExecutive(me) before rendering. Filters are part of the query key so a
+// period/dimension change refetches.
+export function useExecutiveROI(filters: ExecROIFilters, enabled = true) {
+  return useQuery({
+    queryKey: ["executive-roi", filters],
+    queryFn: () =>
+      api
+        .get<ExecutiveROI>(
+          "/api/v1/executive/roi" +
+            buildQuery({
+              period: filters.period,
+              dimension: filters.dimension,
+              store: filters.store ?? undefined,
+              region: filters.region || undefined,
+              position: filters.position || undefined,
+            }),
+        )
+        .then((r) => r.data),
+    enabled,
+  });
+}
+
+// Cost-config read is executive.view-gated; write is settings.admin-gated.
+export function useExecCostConfig(enabled = true) {
+  return useQuery({
+    queryKey: ["exec-cost-config"],
+    queryFn: () => api.get<ExecCostConfig>("/api/v1/executive/cost-config").then((r) => r.data),
+    enabled,
+  });
+}
+
+export function useSetExecCostConfig() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (cfg: ExecCostConfig) =>
+      api.put<ExecCostConfig>("/api/v1/executive/cost-config", cfg).then((r) => r.data),
+    onSuccess: (data) => {
+      qc.setQueryData(["exec-cost-config"], data);
+      qc.invalidateQueries({ queryKey: ["executive-roi"] });
+    },
   });
 }
 

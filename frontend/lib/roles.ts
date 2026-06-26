@@ -75,6 +75,11 @@ export function canViewExecutive(me: PermHolder): boolean {
   return can(me, PERMS.executiveView);
 }
 
+// canEditExecCost gates the ROI cost-assumptions editor (stricter than viewing).
+export function canEditExecCost(me: PermHolder): boolean {
+  return can(me, PERMS.settingsAdmin);
+}
+
 export function canViewReports(me: PermHolder): boolean {
   return can(me, PERMS.reportsView);
 }
