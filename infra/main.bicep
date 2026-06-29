@@ -449,6 +449,7 @@ var basePlainEnv = [
   { name: 'NOTIFY_PROVIDER', value: 'mock' }
   { name: 'PS_PROVIDER', value: 'mock' }
   { name: 'PORTAL_BASE_URL', value: portalUrl }
+  { name: 'DASHBOARD_BASE_URL', value: dashboardUrl }
   { name: 'CORS_ALLOW_ORIGINS', value: '${portalUrl},${dashboardUrl}' }
   { name: 'RETENTION_DAYS', value: retentionDays }
   { name: 'RETENTION_SWEEP_ENABLED', value: 'false' }
