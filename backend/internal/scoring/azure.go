@@ -14,7 +14,9 @@ import (
 	"github.com/nexto/hr-ats/pkg/config"
 )
 
-const openAIAPIVersion = "2024-08-01-preview"
+// gpt-5 family: api-version >= 2024-12-01-preview, max_completion_tokens (not
+// max_tokens), and no custom temperature.
+const openAIAPIVersion = "2024-12-01-preview"
 
 const scoringSystemPrompt = `You are an HR screening assistant for Thai retail. Given a candidate profile ` +
 	`and a job description (responsibilities + qualifications), return a strict JSON object: {"skills_score":<0-20 int>,` +
@@ -50,10 +52,9 @@ type chatMessage struct {
 }
 
 type chatRequest struct {
-	Messages       []chatMessage     `json:"messages"`
-	Temperature    float64           `json:"temperature"`
-	MaxTokens      int               `json:"max_tokens"`
-	ResponseFormat map[string]string `json:"response_format"`
+	Messages            []chatMessage     `json:"messages"`
+	MaxCompletionTokens int               `json:"max_completion_tokens"`
+	ResponseFormat      map[string]string `json:"response_format"`
 }
 
 type chatResponse struct {
@@ -78,9 +79,8 @@ func (a azureLLM) evaluate(ctx context.Context, p ai.Profile, jd JD) (LLMPart, e
 			{Role: "system", Content: scoringSystemPrompt},
 			{Role: "user", Content: user},
 		},
-		Temperature:    0,
-		MaxTokens:      500,
-		ResponseFormat: map[string]string{"type": "json_object"},
+		MaxCompletionTokens: 2000, // headroom for gpt-5-mini reasoning tokens
+		ResponseFormat:      map[string]string{"type": "json_object"},
 	})
 	if err != nil {
 		return LLMPart{}, fmt.Errorf("scoring: marshal: %w", err)

@@ -14,7 +14,9 @@ import (
 	"github.com/nexto/hr-ats/pkg/config"
 )
 
-const openAIAPIVersion = "2024-08-01-preview"
+// gpt-5 family: api-version >= 2024-12-01-preview, max_completion_tokens (not
+// max_tokens), and no custom temperature.
+const openAIAPIVersion = "2024-12-01-preview"
 
 // endSentinel: the interviewer is told to append this token to its final message
 // when it decides the interview is complete. We strip it before persisting.
@@ -44,10 +46,9 @@ type chatMessage struct {
 }
 
 type chatRequest struct {
-	Messages       []chatMessage     `json:"messages"`
-	Temperature    float64           `json:"temperature"`
-	MaxTokens      int               `json:"max_tokens"`
-	ResponseFormat map[string]string `json:"response_format,omitempty"`
+	Messages            []chatMessage     `json:"messages"`
+	MaxCompletionTokens int               `json:"max_completion_tokens"`
+	ResponseFormat      map[string]string `json:"response_format,omitempty"`
 }
 
 type chatResponse struct {
@@ -80,7 +81,7 @@ func (a azureInterviewer) NextTurn(ctx context.Context, ic InterviewContext, his
 	for _, t := range history {
 		msgs = append(msgs, chatMessage{Role: t.Role, Content: t.Content})
 	}
-	content, err := a.call(ctx, chatRequest{Messages: msgs, Temperature: 0.4, MaxTokens: 400})
+	content, err := a.call(ctx, chatRequest{Messages: msgs, MaxCompletionTokens: 1500})
 	if err != nil {
 		return "", false, err
 	}
@@ -106,9 +107,8 @@ func (a azureInterviewer) Evaluate(ctx context.Context, ic InterviewContext, his
 			{Role: "system", Content: evaluatorSystemPrompt},
 			{Role: "user", Content: user},
 		},
-		Temperature:    0,
-		MaxTokens:      500,
-		ResponseFormat: map[string]string{"type": "json_object"},
+		MaxCompletionTokens: 2000, // headroom for gpt-5-mini reasoning tokens
+		ResponseFormat:      map[string]string{"type": "json_object"},
 	})
 	if err != nil {
 		return Evaluation{}, err
