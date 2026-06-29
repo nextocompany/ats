@@ -11,7 +11,9 @@ import (
 	"time"
 )
 
-const openAIAPIVersion = "2024-08-01-preview"
+// gpt-5 family requires api-version >= 2024-12-01-preview + max_completion_tokens
+// (max_tokens is rejected) and does NOT accept a custom temperature.
+const openAIAPIVersion = "2024-12-01-preview"
 
 const cvParserSystemPrompt = `You are a Thai/English CV parser. Extract the candidate's details from the ` +
 	`provided resume text into a strict JSON object matching this schema (use empty strings/arrays/0 when ` +
@@ -47,10 +49,9 @@ type chatMessage struct {
 }
 
 type chatRequest struct {
-	Messages       []chatMessage     `json:"messages"`
-	Temperature    float64           `json:"temperature"`
-	MaxTokens      int               `json:"max_tokens"`
-	ResponseFormat map[string]string `json:"response_format"`
+	Messages            []chatMessage     `json:"messages"`
+	MaxCompletionTokens int               `json:"max_completion_tokens"`
+	ResponseFormat      map[string]string `json:"response_format"`
 }
 
 type chatResponse struct {
@@ -70,9 +71,8 @@ func (a azureParser) Parse(ctx context.Context, text, positionContext string) (P
 			{Role: "system", Content: cvParserSystemPrompt},
 			{Role: "user", Content: user},
 		},
-		Temperature:    0,
-		MaxTokens:      2000,
-		ResponseFormat: map[string]string{"type": "json_object"},
+		MaxCompletionTokens: 4000, // headroom: gpt-5-mini spends reasoning tokens first
+		ResponseFormat:      map[string]string{"type": "json_object"},
 	}
 	raw, err := json.Marshal(reqBody)
 	if err != nil {

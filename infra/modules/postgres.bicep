@@ -55,6 +55,19 @@ resource database 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2024-08-0
   }
 }
 
+// Allow-list the extensions the migrations CREATE EXTENSION (Azure Postgres
+// blocks CREATE EXTENSION unless the extension is in azure.extensions). Without
+// this, migration 000001 fails: 'extension "pgcrypto" is not allow-listed'.
+// Dynamic parameter — no server restart required.
+resource extensionsAllowlist 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2024-08-01' = {
+  parent: postgres
+  name: 'azure.extensions'
+  properties: {
+    value: 'pgcrypto,pg_trgm'
+    source: 'user-override'
+  }
+}
+
 // Allow access from Azure services (Container Apps egress). 0.0.0.0 is the
 // well-known sentinel that scopes the rule to Azure-internal traffic.
 resource allowAzure 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2024-08-01' = {

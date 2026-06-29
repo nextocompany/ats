@@ -52,6 +52,9 @@ param openAiDeploymentName string = 'gpt-4o-mini'
 @description('Azure OpenAI model name.')
 param openAiModelName string = 'gpt-4o-mini'
 
+@description('Azure OpenAI model version. MUST be a non-deprecating version for new deployments (the gpt-4o family is deprecating; use a current GA version).')
+param openAiModelVersion string = '2024-07-18'
+
 @description('Postgres administrator login.')
 param postgresAdminLogin string = 'hratsadmin'
 
@@ -228,6 +231,7 @@ module openai 'modules/openai.bicep' = if (deployAi) {
     accountName: openAiName
     deploymentName: openAiDeploymentName
     modelName: openAiModelName
+    modelVersion: openAiModelVersion
   }
 }
 
